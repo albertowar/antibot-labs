@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Workshop Store — {{ sku }}{% endblock %}
+{% block content %}
+<section class="product">
+  <div class="product-img" aria-hidden="true">👟</div>
+  <div class="product-info">
+    <h1>Workshop Runner <small>{{ sku }}</small></h1>
+    <p class="price">$180.00</p>
+    <p>A perfectly ordinary demo product. Add it to your cart and head to
+       checkout to see where a skimmer would sit.</p>
+    <a class="btn" href="/checkout">Buy now</a>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Workshop Store{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/shop.css" />
+
+  {# First-party inline config. In strict CSP it carries the nonce, so it runs;
+     an attacker's injected inline script has no nonce and will not. #}
+  <script {% if csp_mode == 'strict' %}nonce="{{ nonce }}"{% endif %}>
+    window.__LAB = {
+      variant: {{ variant | tojson }},
+      collector: {{ collector | tojson }}
+    };
+  </script>
+
+  {# DEFENSE (Round 4): the runtime monitor must load FIRST, before any other
+     script, so it can wrap fetch / XHR / sendBeacon before they are used. #}
+  {% if monitor %}
+  <script {% if csp_mode == 'strict' %}nonce="{{ nonce }}"{% endif %}
+          src="/static/js/runtime-monitor.js"></script>
+  {% endif %}
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/">WORKSHOP&nbsp;STORE</a>
+    <nav>
+      <a href="/product/sku-sneaker">Shop</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/login">Login</a>
+    </nav>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    <span>Demo store · CSP={{ csp_mode }} · SRI={{ 'on' if sri else 'off' }}
+      · Monitor={{ 'on' if monitor else 'off' }}</span>
+    <span>
+      <a href="/csp-report/log">CSP reports</a> ·
+      <a href="/api/script-violation/log">runtime reports</a> ·
+      <a href="/status">status</a>
+    </span>
+  </footer>
+
+  {# First-party page bundle (your own code). Nonced in strict CSP. In Round 4
+     the "poisoned build" scenario, the skim ships INSIDE this first-party file. #}
+  <script {% if csp_mode == 'strict' %}nonce="{{ nonce }}"{% endif %}
+          src="/static/js/shop.js"></script>
+
+  {# THIRD-PARTY VENDOR INCLUDE — the compromised supply-chain surface.
+     Nonced in strict CSP (we trust the vendor and allow it to load).
+     With SRI on, the browser checks the file against the pinned baseline hash
+     and refuses it if the vendor swapped the file. #}
+  <script
+    {% if csp_mode == 'strict' %}nonce="{{ nonce }}"{% endif %}
+    {% if sri %}integrity="{{ vendor_sri }}" crossorigin="anonymous"{% endif %}
+    src="/static/vendor/analytics-helper.js"></script>
+</body>
+</html>

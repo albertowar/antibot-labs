@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Workshop Store — Login{% endblock %}
+{% block content %}
+<section class="form-wrap">
+  <h1>Sign in</h1>
+  <p class="muted">Synthetic credentials only.</p>
+  <form id="login-form" method="post" action="/login">
+    <label>Email <input name="email" type="email" value="buyer@example.test" /></label>
+    <label>Password <input name="password" type="password" value="hunter2-demo" /></label>
+    <button type="submit">Sign in</button>
+  </form>
+  <p id="result" class="muted"></p>
+</section>
+{% endblock %}

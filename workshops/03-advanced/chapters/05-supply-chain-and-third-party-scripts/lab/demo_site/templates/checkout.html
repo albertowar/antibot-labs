@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Workshop Store — Checkout{% endblock %}
+{% block content %}
+<section class="form-wrap">
+  <h1>Checkout</h1>
+  <p class="muted">Synthetic data only. Never type a real card number into a lab.</p>
+  <form id="checkout-form" method="post" action="/checkout">
+    <label>Full name <input name="name" autocomplete="name" value="Test Buyer" /></label>
+    <label>Email <input name="email" type="email" value="buyer@example.test" /></label>
+    <label>Card number
+      <input name="card_number" inputmode="numeric" value="4242424242424242" /></label>
+    <div class="row">
+      <label>Expiry <input name="exp" value="12/29" /></label>
+      <label>CVV <input name="cvv" value="123" /></label>
+    </div>
+    <button type="submit">Pay $180.00</button>
+  </form>
+  <p id="result" class="muted"></p>
+</section>
+{% endblock %}
