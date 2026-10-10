@@ -1,0 +1,19 @@
+# Optional production-shaped backend for the W3 Ch6 lab.
+# The lab runs fully WITHOUT this (fakeredis + SQLite by default). Use it only to
+# rehearse on Redis + PostgreSQL. Both are bound to 127.0.0.1 — never exposed.
+#
+#   docker compose up -d
+#   export REDIS_URL=redis://127.0.0.1:6379/0
+#   export DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop
+#   python tools/seed.py && python demo_site/app.py
+services:
+  redis:
+    image: redis:8.1-alpine
+    ports: ["127.0.0.1:6379:6379"]
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports: ["127.0.0.1:5432:5432"]

@@ -1,0 +1,376 @@
+"""W3 Ch6 demo store — five attacker economies on one e-commerce back end.
+
+The end-of-Workshop-2 store, extended with the five surfaces this chapter attacks:
+
+    /login                      Round 1  credential stuffing
+    /drop/<sku> /cart/add /checkout   Round 2  scalping a limited drop
+    /products /product/<sku>    Round 3  adversarial scraping
+    /register                   Round 4  fake-account farming
+    /track/impression /track/click    Round 5  click / ad fraud
+
+The generic layers the store already had (per-IP rate limit from W1 Ch2, datacenter
+detection from W1 Ch3) live in defenses/netintel.py and run on every request. Each
+round's *scenario-specific* signature lives in its own defense module under
+defenses/, which starts as a permissive stub you complete. The store calls the
+module fresh on every request, so `checkpoint.py --round N --catch-up` takes effect
+without a restart.
+
+Lab-only shortcuts, all fenced and loopback-only:
+  * X-Lab-Client-IP  — the source IP a real CDN would hand us (RFC 5737 ranges).
+  * X-Lab-Session    — the browsing-session id a cookie would carry.
+  * X-Lab-FP         — the client fingerprint W2 Ch4 would compute.
+  * X-Lab-Actor      — ground truth (human/bot/bot2) for the scoreboard only.
+A real endpoint has none of these oracles; they exist to measure both sides.
+"""
+
+from __future__ import annotations
+
+import importlib
+import ipaddress
+import json
+import os
+import sys
+import time
+
+from flask import Flask, g, jsonify, request
+from werkzeug.security import check_password_hash
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+LAB_DIR = os.path.dirname(HERE)
+DATA_DIR = os.path.join(LAB_DIR, "data")
+sys.path.insert(0, LAB_DIR)       # for defenses/
+sys.path.insert(0, HERE)          # for store
+
+from store import (  # noqa: E402
+    ALLOW, BLOCK, CHALLENGE, INVALID,
+    Decision_, Product, User, allow, block, db, log_decision, make_redis,
+)
+from defenses import netintel  # noqa: E402
+from defenses.breachcorpus import BreachCorpus  # noqa: E402
+
+DROP_SKU = "lab-runner-9"
+DROP_STOCK = int(os.environ.get("DROP_STOCK", "50"))
+HIBP_LIVE = os.environ.get("HIBP_LIVE") == "1"
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("LAB_SECRET_KEY", "w3ch6-lab-fixed-secret-not-for-prod")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    "DATABASE_URL", f"sqlite:///{os.path.abspath(os.path.join(DATA_DIR, 'shop.db'))}"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
+
+rds = make_redis()
+breach = BreachCorpus(os.path.join(DATA_DIR, "breach_ranges"), live=HIBP_LIVE)
+
+def load_disposable():
+    """Disposable-email blocklist. Loaded defensively so the store imports cleanly
+    before tools/seed.py has written the fixture."""
+    path = os.path.join(DATA_DIR, "disposable_domains.txt")
+    if not os.path.exists(path):
+        return set()
+    with open(path) as fh:
+        return {d.strip().lower() for d in fh if d.strip() and not d.startswith("#")}
+
+
+DISPOSABLE = load_disposable()
+
+
+def defense(name):
+    """Import a scenario defense fresh, so --catch-up edits take effect live."""
+    mod = importlib.import_module(f"defenses.{name}")
+    return importlib.reload(mod)
+
+
+def _loopback(addr: str) -> bool:
+    try:
+        return ipaddress.ip_address(addr).is_loopback
+    except ValueError:
+        return False
+
+
+def client_ip() -> str:
+    if _loopback(request.remote_addr or ""):
+        fwd = request.headers.get("X-Lab-Client-IP")
+        if fwd:
+            return fwd.strip()
+    return request.remote_addr or "0.0.0.0"
+
+
+def actor() -> str:
+    return request.headers.get("X-Lab-Actor", "unknown")
+
+
+def fp() -> str:
+    return request.headers.get("X-Lab-FP") or request.cookies.get("did") or "no-fp"
+
+
+def sid() -> str:
+    return request.headers.get("X-Lab-Session") or request.cookies.get("sid") or "no-sid"
+
+
+def record(round_, endpoint, decision, extra=""):
+    ip = client_ip()
+    log_decision(
+        round=round_, actor=actor(), endpoint=endpoint, client_ip=ip,
+        net_type=netintel.net_type(ip), fp=fp(), outcome=decision.action,
+        reason=(decision.reason + (f" | {extra}" if extra else ""))[:255],
+        score=decision.score, latency_ms=getattr(g, "lat_ms", 0.0),
+    )
+
+
+_HTTP = {ALLOW: 200, CHALLENGE: 200, BLOCK: 403, INVALID: 401}
+
+
+def respond(round_, endpoint, decision, body=None, extra=""):
+    record(round_, endpoint, decision, extra)
+    out = {"outcome": decision.action, "reason": decision.reason}
+    if body:
+        out.update(body)
+    return jsonify(out), _HTTP[decision.action]
+
+
+# --- Round 1: credential stuffing -----------------------------------------------
+
+@app.post("/login")
+def login():
+    t0 = time.perf_counter()
+    data = request.get_json(silent=True) or request.form
+    email = (data.get("email") or "").lower().strip()
+    password = data.get("password") or ""
+    ip = client_ip()
+
+    # Generic layer (W1 Ch2): per-IP login rate limit. A distributed stuffer that
+    # rotates X-Lab-Client-IP resets this counter every request and walks past it.
+    if not netintel.rate_ok(rds, f"login:{ip}", limit=20, window_s=60):
+        g.lat_ms = (time.perf_counter() - t0) * 1000
+        return respond(1, "login", block("rate limit (per IP)", 100.0))
+
+    user = User.query.filter_by(email=email).first()
+    valid = bool(user and check_password_hash(user.password_hash, password))
+    ctx = {"valid_creds": valid, "password": password, "breach": breach, "user": user}
+    decision = defense("breached_passwords").evaluate(ctx)
+    g.lat_ms = (time.perf_counter() - t0) * 1000
+    return respond(1, "login", decision)
+
+
+# --- Round 2: scalping a limited drop -------------------------------------------
+
+@app.get("/drop/<sku>")
+def drop_view(sku):
+    """Viewing the product. Records the funnel entry time for this session."""
+    product = db.session.get(Product, sku)
+    if not product or not product.drop:
+        return jsonify({"outcome": "invalid", "reason": "no such drop"}), 404
+    rds.setex(f"view:{sid()}:{sku}", 600, time.time())
+    stock = rds.get(f"inv:{sku}")
+    stock = int(stock) if stock is not None else DROP_STOCK
+    return jsonify({"outcome": "allow", "sku": sku, "name": product.name,
+                    "price": product.price, "in_stock": stock > 0}), 200
+
+
+@app.post("/cart/add")
+def cart_add():
+    data = request.get_json(silent=True) or request.form
+    sku = data.get("sku") or DROP_SKU
+    if rds.get(f"view:{sid()}:{sku}") is None:
+        return respond(2, "cart/add", block("add-to-cart with no product view"))
+    rds.setex(f"cart:{sid()}", 600, sku)
+    return respond(2, "cart/add", allow("in cart"))
+
+
+@app.post("/checkout")
+def checkout():
+    t0 = time.perf_counter()
+    sku = rds.get(f"cart:{sid()}") or DROP_SKU
+    view_ts = rds.get(f"view:{sid()}:{sku}")
+    view_age = (time.time() - float(view_ts)) if view_ts is not None else None
+    bought = int(rds.get(f"bought:{fp()}") or 0)
+    ctx = {"view_age_s": view_age, "bought_by_fp": bought, "fp": fp(),
+           "client_ip": client_ip(), "net_type": netintel.net_type(client_ip())}
+    decision = defense("scalping_funnel").evaluate(ctx)
+
+    extra = ""
+    if decision.action == ALLOW:
+        # Atomically claim one unit of stock.
+        remaining = rds.decr(f"inv:{sku}") if rds.exists(f"inv:{sku}") else _init_inv(sku) - 1
+        if remaining < 0:
+            rds.incr(f"inv:{sku}")  # put it back
+            decision = block("sold out")
+        else:
+            rds.incr(f"bought:{fp()}")
+            extra = f"stock_left={remaining}"
+    g.lat_ms = (time.perf_counter() - t0) * 1000
+    return respond(2, "checkout", decision, extra=extra)
+
+
+def _init_inv(sku):
+    rds.set(f"inv:{sku}", DROP_STOCK)
+    return DROP_STOCK
+
+
+# --- Round 3: adversarial scraping ----------------------------------------------
+
+@app.get("/products")
+def products():
+    page = request.args.get("page", "1")
+    rds.sadd(f"cov:{sid()}", f"page:{page}")
+    coverage = rds.scard(f"cov:{sid()}")
+    rds.expire(f"cov:{sid()}", 300)
+    decision = defense("scrape_defense").evaluate({"sku": None, "honeypot": False,
+                                                   "coverage": coverage})
+    if decision.action != ALLOW:
+        return respond(3, "products", decision, extra=f"page={page}")
+    rows = Product.query.filter_by(honeypot=False).all()
+    per = 12
+    start = (int(page) - 1) * per if page.isdigit() else 0
+    listing = [{"sku": p.sku, "name": p.name, "price": p.price}
+               for p in rows[start:start + per]]
+    # Per-session canary (Round 3): if this exact token turns up in a competitor's
+    # catalogue, you know who scraped you. Here it is only logged for attribution.
+    canary = _canary(sid())
+    rds.sadd("canary:issued", canary)
+    return respond(3, "products", decision,
+                   body={"page": int(page) if page.isdigit() else 1,
+                         "products": listing, "canary": canary},
+                   extra=f"page={page} coverage={coverage}")
+
+
+@app.get("/product/<sku>")
+def product(sku):
+    p = db.session.get(Product, sku)
+    if not p:
+        return jsonify({"outcome": "invalid", "reason": "no such product"}), 404
+    rds.sadd(f"cov:{sid()}", f"sku:{sku}")
+    coverage = rds.scard(f"cov:{sid()}")
+    rds.expire(f"cov:{sid()}", 300)
+    decision = defense("scrape_defense").evaluate({"sku": sku, "honeypot": p.honeypot,
+                                                   "coverage": coverage})
+    if decision.action != ALLOW:
+        return respond(3, "product", decision, extra=f"sku={sku} honeypot={p.honeypot}")
+    return respond(3, "product", decision,
+                   body={"sku": sku, "name": p.name, "price": p.price},
+                   extra=f"sku={sku} coverage={coverage}")
+
+
+def _canary(session_id: str) -> str:
+    import hashlib
+    return hashlib.sha256(f"canary:{session_id}".encode()).hexdigest()[:12]
+
+
+# --- Round 4: fake-account farming ----------------------------------------------
+
+@app.post("/register")
+def register():
+    t0 = time.perf_counter()
+    data = request.get_json(silent=True) or request.form
+    email = (data.get("email") or "").lower().strip()
+    domain = email.split("@")[-1] if "@" in email else ""
+    ip = client_ip()
+    reg_ip = rds.incr(f"reg:{ip}:{int(time.time() // 300)}")
+    rds.expire(f"reg:{ip}:{int(time.time() // 300)}", 600)
+    fp_cluster = rds.incr(f"fpreg:{fp()}:{int(time.time() // 300)}")
+    rds.expire(f"fpreg:{fp()}:{int(time.time() // 300)}", 600)
+    ctx = {"disposable": domain in DISPOSABLE, "reg_count_ip": reg_ip,
+           "fp_cluster": fp_cluster, "email_domain": domain}
+    decision = defense("account_cluster").evaluate(ctx)
+    g.lat_ms = (time.perf_counter() - t0) * 1000
+    return respond(4, "register", decision, extra=f"domain={domain}")
+
+
+# --- Round 5: click / ad fraud --------------------------------------------------
+
+@app.post("/track/impression")
+def impression():
+    data = request.get_json(silent=True) or request.form
+    campaign = data.get("campaign") or "camp-1"
+    rds.setex(f"imp:{sid()}:{campaign}", 600, time.time())
+    return jsonify({"outcome": "allow", "reason": "impression recorded"}), 200
+
+
+@app.post("/track/click")
+def click():
+    t0 = time.perf_counter()
+    data = request.get_json(silent=True) or request.form
+    campaign = data.get("campaign") or "camp-1"
+    imp_ts = rds.get(f"imp:{sid()}:{campaign}")
+    had_imp = imp_ts is not None
+    dwell = (time.time() - float(imp_ts)) * 1000 if had_imp else 0.0
+    clicks = rds.incr(f"clk:{sid()}:{int(time.time() // 60)}")
+    rds.expire(f"clk:{sid()}:{int(time.time() // 60)}", 120)
+    ctx = {"net_type": netintel.net_type(client_ip()),
+           "user_agent": request.headers.get("User-Agent", ""),
+           "referrer": request.headers.get("Referer", ""),
+           "had_impression": had_imp, "dwell_ms": dwell, "clicks_in_session": clicks}
+    decision = defense("ivt_scoring").evaluate(ctx)
+    g.lat_ms = (time.perf_counter() - t0) * 1000
+    return respond(5, "click", decision, extra=f"campaign={campaign}")
+
+
+# --- Lab instrumentation (not part of the product) ------------------------------
+
+@app.get("/whoami")
+def whoami():
+    ip = client_ip()
+    return jsonify({"client_ip": ip, "net_type": netintel.net_type(ip),
+                    "asn": netintel.asn_of(ip), "fp": fp(), "session": sid(),
+                    "actor": actor()}), 200
+
+
+@app.get("/lab/decisions")
+def lab_decisions():
+    round_ = request.args.get("round")
+    q = Decision_.query
+    if round_:
+        q = q.filter_by(round=int(round_))
+    rows = q.order_by(Decision_.ts).all()
+    return jsonify([
+        {"ts": r.ts, "round": r.round, "actor": r.actor, "endpoint": r.endpoint,
+         "client_ip": r.client_ip, "net_type": r.net_type, "fp": r.fp,
+         "outcome": r.outcome, "reason": r.reason, "score": r.score,
+         "latency_ms": r.latency_ms} for r in rows])
+
+
+@app.post("/lab/reset")
+def lab_reset():
+    """Clear the decision log and all runtime counters; refill the drop stock.
+
+    Called at the start of each checkpoint so a round is measured from a clean
+    slate without restarting the server.
+    """
+    Decision_.query.delete()
+    db.session.commit()
+    rds.flushdb()
+    rds.set(f"inv:{DROP_SKU}", DROP_STOCK)
+    return jsonify({"status": "ok", "stock": DROP_STOCK})
+
+
+@app.get("/lab/stock")
+def lab_stock():
+    s = rds.get(f"inv:{DROP_SKU}")
+    return jsonify({"sku": DROP_SKU, "stock": int(s) if s is not None else DROP_STOCK})
+
+
+from sqlalchemy import event  # noqa: E402
+from sqlalchemy.engine import Engine  # noqa: E402
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_pragmas(dbapi_conn, _record):
+    if "sqlite3" in type(dbapi_conn).__module__:
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.close()
+
+
+with app.app_context():
+    db.create_all()
+    rds.set(f"inv:{DROP_SKU}", DROP_STOCK)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"W3 Ch6 demo store on http://127.0.0.1:{port}  "
+          f"(drop stock={DROP_STOCK}, HIBP_LIVE={HIBP_LIVE})")
+    app.run(host="127.0.0.1", port=port, threaded=True)
