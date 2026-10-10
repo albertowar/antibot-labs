@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Bot Workshop Store</title>
+<style>body{font-family:system-ui;max-width:40rem;margin:3rem auto;padding:0 1rem}
+code{background:#eee;padding:0 .3rem}nav a{margin-right:1rem}</style></head>
+<body>
+  <h1>Welcome to the store!</h1>
+  <p>Defense level: <code>{{ level }}</code> &middot; <a href="/challenge-check">/challenge-check</a></p>
+  <h2>Products, page {{ page }} of {{ pages }}</h2>
+  <ul id="products" data-page="{{ page }}">
+    {% for p in products %}<li>{{ p.name }} &mdash; ${{ "%.2f"|format(p.price) }}</li>
+    {% endfor %}
+  </ul>
+  <nav>
+    {% if page > 1 %}<a href="/?page={{ page - 1 }}">&larr; Previous</a>{% endif %}
+    {% if page < pages %}<a href="/?page={{ page + 1 }}">Next &rarr;</a>{% endif %}
+  </nav>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "w2-ch02-js-challenges-lab",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15"
+  },
+  "scripts": {
+    "deobfuscate": "node attacks/js/deobfuscate.mjs"
+  },
+  "dependencies": {
+    "javascript-obfuscator": "5.8.0",
+    "jsdom": "30.1.1",
+    "webcrack": "2.16.0"
+  }
+}
