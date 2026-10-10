@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-fp-nonce="{{ nonce }}">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Antibot Demo Store{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #1d2433; }
+    header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #ddd; }
+    .level { font-size: .85rem; color: #666; }
+    form { display: grid; gap: .6rem; max-width: 340px; }
+    input, button { font: inherit; padding: .5rem; }
+    button { background: #1d4ed8; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    pre { background: #f5f5f7; padding: 1rem; overflow-x: auto; font-size: .8rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    td, th { border-bottom: 1px solid #eee; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+    .bot { color: #b91c1c; font-weight: 600; } .suspicious { color: #b45309; font-weight: 600; } .clean { color: #15803d; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header><h1>🛒 Antibot Demo Store</h1><span class="level">DEFENSE_LEVEL={{ level }}</span></header>
+  {% block content %}{% endblock %}
+  <script src="{{ url_for('static', filename='fp_collector.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Fingerprint check{% endblock %}
+{% block content %}
+<h2>Your fingerprint</h2>
+<p id="status">Collecting…</p>
+<table id="summary"></table>
+<h3>How each defense level judges it</h3>
+<table id="levels"><tr><th>Level</th><th>Verdict</th><th>Score</th><th>Reasons</th></tr></table>
+<p><a href="/fp-profile">⬇️ Download as a real-user profile</a> → save it as <code>tools/profiles/you-&lt;browser&gt;.json</code></p>
+<details><summary>Raw payload</summary><pre id="raw"></pre></details>
+{% endblock %}
+{% block scripts %}
+<script>
+  const esc = (s) => String(s ?? "–").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  document.addEventListener("fp:done", async () => {
+    const me = await (await fetch("/api/fp/me")).json();
+    const p = me.payload;
+    document.getElementById("status").textContent =
+      `fp_id ${me.fp_id} · stable_id ${me.stable_id} · collected in ${p.collect_ms} ms`;
+    const rows = [
+      ["Device class", me.device_class],
+      ["User-Agent", p.nav.userAgent],
+      ["userAgentData", p.uad ? `${p.uad.brands.join(", ")} · ${p.uad.platform}` : "not supported"],
+      ["WebGL renderer", p.webgl.unmaskedRenderer || p.webgl.renderer],
+      ["MAX_TEXTURE_SIZE", p.webgl.maxTextureSize],
+      ["Canvas", `${p.canvas.hash} / ${p.canvas.hash2} · probe changed ${p.canvas.probeChangedPixels}/64`],
+      ["Audio", p.audio.supported ? p.audio.sum : "unsupported"],
+      ["Fonts", `${p.fonts.length}: ${p.fonts.join(", ")}`],
+      ["Voices", p.voices.count],
+      ["Screen", `${p.screen.width}×${p.screen.height} @${p.screen.devicePixelRatio}`],
+      ["Cores / memory", `${p.nav.hardwareConcurrency} / ${p.nav.deviceMemory}`],
+      ["Worker", p.worker.error || `${p.worker.platform} · ${p.worker.hardwareConcurrency} cores · ${p.worker.webglRenderer}`],
+    ];
+    document.getElementById("summary").innerHTML =
+      rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("");
+    document.getElementById("levels").innerHTML += Object.entries(me.levels).map(([lv, r]) =>
+      `<tr><td>${lv}${Number(lv) === me.level ? " ◀" : ""}</td><td class="${r.verdict}">${r.verdict}</td>` +
+      `<td>${r.score}</td><td>${r.reasons.map(esc).join("<br>")}</td></tr>`).join("");
+    document.getElementById("raw").textContent = JSON.stringify(p, null, 2);
+  });
+</script>
+{% endblock %}

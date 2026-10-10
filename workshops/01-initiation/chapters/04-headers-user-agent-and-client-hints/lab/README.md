@@ -212,6 +212,7 @@ Playwright rewrites the `User-Agent` and even the `Sec-CH-UA-Platform` hint. But
 
 - TLS and HTTP/2 fingerprints: Workshop 2, Chapter 5
 - Automation artefacts: Workshop 2, Chapter 1
+- JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): Workshop 2, Chapter 4
 - Behaviour: Workshop 2, Chapter 3
 
 ---

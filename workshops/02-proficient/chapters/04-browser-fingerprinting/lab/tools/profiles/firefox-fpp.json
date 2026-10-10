@@ -1,0 +1,807 @@
+{
+ "cohort": "firefox-fpp",
+ "provenance": "synthesized (base payload captured from Playwright Firefox 155)",
+ "description": "Firefox 155 with fingerprinting protection randomising canvas readback per session",
+ "noise": "per_session",
+ "ip": "distinct",
+ "users": [
+  {
+   "payload": {
+    "v": 1,
+    "nonce": null,
+    "nav": {
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Win32",
+     "language": "en-GB",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": null,
+     "maxTouchPoints": 0,
+     "vendor": "",
+     "pdfViewerEnabled": true
+    },
+    "uad": null,
+    "screen": {
+     "width": 1920,
+     "height": 1080,
+     "availWidth": 1920,
+     "availHeight": 1032,
+     "colorDepth": 24,
+     "devicePixelRatio": 1
+    },
+    "intl": {
+     "timeZone": "Europe/London",
+     "locale": "en-GB",
+     "tzOffset": -60
+    },
+    "canvas": {
+     "supported": true,
+     "hash": "8e4970a130238aec",
+     "hash2": "8e4970a130238aec",
+     "probeChangedPixels": 0
+    },
+    "webgl": {
+     "supported": true,
+     "vendor": "Mozilla",
+     "renderer": "Intel(R) HD Graphics, or similar",
+     "unmaskedVendor": "Intel",
+     "unmaskedRenderer": "Intel(R) HD Graphics, or similar",
+     "version": "WebGL 1.0",
+     "maxTextureSize": 16384,
+     "maxRenderbufferSize": 16384,
+     "maxViewportDims": [
+      16384,
+      16384
+     ],
+     "aliasedLineWidthRange": [
+      1,
+      1
+     ],
+     "maxVertexUniformVectors": 4088,
+     "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_sRGB",
+      "EXT_shader_texture_lod",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_astc",
+      "WEBGL_compressed_texture_etc",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context"
+     ]
+    },
+    "audio": {
+     "supported": true,
+     "sum": 35.749972,
+     "hash": "fced6df44150e5f9"
+    },
+    "fonts": [
+     "Segoe UI",
+     "Calibri",
+     "Cambria",
+     "Consolas",
+     "Tahoma",
+     "Candara",
+     "Franklin Gothic Medium",
+     "Arial",
+     "Times New Roman",
+     "Courier New",
+     "Georgia",
+     "Verdana",
+     "Trebuchet MS",
+     "Comic Sans MS",
+     "Impact",
+     "Palatino",
+     "Garamond"
+    ],
+    "voices": {
+     "supported": true,
+     "count": 3,
+     "local": 3,
+     "hash": "87412819a418ecb3"
+    },
+    "worker": {
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Win32",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": null,
+     "uadPlatform": null,
+     "timeZone": "Europe/London",
+     "webglRenderer": "Intel(R) HD Graphics, or similar"
+    },
+    "lies": {
+     "navigatorOwnProps": [],
+     "navGetters": {
+      "platform": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "hardwareConcurrency": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "deviceMemory": {
+       "present": false
+      },
+      "userAgent": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "languages": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "maxTouchPoints": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "webdriver": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     },
+     "methods": {
+      "WebGLRenderingContext.getParameter": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "HTMLCanvasElement.toDataURL": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "CanvasRenderingContext2D.getImageData": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "Function.toString": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     }
+    },
+    "collect_ms": 210
+   }
+  },
+  {
+   "payload": {
+    "v": 1,
+    "nonce": null,
+    "nav": {
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Win32",
+     "language": "en-GB",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 16,
+     "deviceMemory": null,
+     "maxTouchPoints": 0,
+     "vendor": "",
+     "pdfViewerEnabled": true
+    },
+    "uad": null,
+    "screen": {
+     "width": 2560,
+     "height": 1440,
+     "availWidth": 2560,
+     "availHeight": 1392,
+     "colorDepth": 24,
+     "devicePixelRatio": 1
+    },
+    "intl": {
+     "timeZone": "Europe/London",
+     "locale": "en-GB",
+     "tzOffset": -60
+    },
+    "canvas": {
+     "supported": true,
+     "hash": "36cd8f753101c732",
+     "hash2": "36cd8f753101c732",
+     "probeChangedPixels": 0
+    },
+    "webgl": {
+     "supported": true,
+     "vendor": "Mozilla",
+     "renderer": "NVIDIA GeForce GTX 980, or similar",
+     "unmaskedVendor": "Intel",
+     "unmaskedRenderer": "NVIDIA GeForce GTX 980, or similar",
+     "version": "WebGL 1.0",
+     "maxTextureSize": 16384,
+     "maxRenderbufferSize": 16384,
+     "maxViewportDims": [
+      16384,
+      16384
+     ],
+     "aliasedLineWidthRange": [
+      1,
+      1
+     ],
+     "maxVertexUniformVectors": 4088,
+     "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_sRGB",
+      "EXT_shader_texture_lod",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_astc",
+      "WEBGL_compressed_texture_etc",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context"
+     ]
+    },
+    "audio": {
+     "supported": true,
+     "sum": 35.749972,
+     "hash": "fced6df44150e5f9"
+    },
+    "fonts": [
+     "Segoe UI",
+     "Calibri",
+     "Cambria",
+     "Consolas",
+     "Tahoma",
+     "Candara",
+     "Franklin Gothic Medium",
+     "Arial",
+     "Times New Roman",
+     "Courier New",
+     "Georgia",
+     "Verdana",
+     "Trebuchet MS",
+     "Comic Sans MS",
+     "Impact",
+     "Palatino",
+     "Garamond"
+    ],
+    "voices": {
+     "supported": true,
+     "count": 3,
+     "local": 3,
+     "hash": "87412819a418ecb3"
+    },
+    "worker": {
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Win32",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 16,
+     "deviceMemory": null,
+     "uadPlatform": null,
+     "timeZone": "Europe/London",
+     "webglRenderer": "NVIDIA GeForce GTX 980, or similar"
+    },
+    "lies": {
+     "navigatorOwnProps": [],
+     "navGetters": {
+      "platform": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "hardwareConcurrency": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "deviceMemory": {
+       "present": false
+      },
+      "userAgent": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "languages": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "maxTouchPoints": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "webdriver": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     },
+     "methods": {
+      "WebGLRenderingContext.getParameter": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "HTMLCanvasElement.toDataURL": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "CanvasRenderingContext2D.getImageData": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "Function.toString": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     }
+    },
+    "collect_ms": 210
+   }
+  },
+  {
+   "payload": {
+    "v": 1,
+    "nonce": null,
+    "nav": {
+     "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Linux x86_64",
+     "language": "en-GB",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": null,
+     "maxTouchPoints": 0,
+     "vendor": "",
+     "pdfViewerEnabled": true
+    },
+    "uad": null,
+    "screen": {
+     "width": 1920,
+     "height": 1080,
+     "availWidth": 1920,
+     "availHeight": 1032,
+     "colorDepth": 24,
+     "devicePixelRatio": 1
+    },
+    "intl": {
+     "timeZone": "Europe/London",
+     "locale": "en-GB",
+     "tzOffset": -60
+    },
+    "canvas": {
+     "supported": true,
+     "hash": "2ef0e52750453633",
+     "hash2": "2ef0e52750453633",
+     "probeChangedPixels": 0
+    },
+    "webgl": {
+     "supported": true,
+     "vendor": "Mozilla",
+     "renderer": "Intel(R) HD Graphics, or similar",
+     "unmaskedVendor": "Intel",
+     "unmaskedRenderer": "Intel(R) HD Graphics, or similar",
+     "version": "WebGL 1.0",
+     "maxTextureSize": 16384,
+     "maxRenderbufferSize": 16384,
+     "maxViewportDims": [
+      16384,
+      16384
+     ],
+     "aliasedLineWidthRange": [
+      1,
+      1
+     ],
+     "maxVertexUniformVectors": 4088,
+     "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_sRGB",
+      "EXT_shader_texture_lod",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_astc",
+      "WEBGL_compressed_texture_etc",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context"
+     ]
+    },
+    "audio": {
+     "supported": true,
+     "sum": 35.749972,
+     "hash": "fced6df44150e5f9"
+    },
+    "fonts": [
+     "DejaVu Sans",
+     "Liberation Sans",
+     "Ubuntu",
+     "Noto Sans",
+     "Cantarell",
+     "Arial",
+     "Times New Roman",
+     "Courier New"
+    ],
+    "voices": {
+     "supported": true,
+     "count": 0,
+     "local": 0,
+     "hash": null
+    },
+    "worker": {
+     "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Linux x86_64",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": null,
+     "uadPlatform": null,
+     "timeZone": "Europe/London",
+     "webglRenderer": "Intel(R) HD Graphics, or similar"
+    },
+    "lies": {
+     "navigatorOwnProps": [],
+     "navGetters": {
+      "platform": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "hardwareConcurrency": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "deviceMemory": {
+       "present": false
+      },
+      "userAgent": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "languages": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "maxTouchPoints": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "webdriver": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     },
+     "methods": {
+      "WebGLRenderingContext.getParameter": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "HTMLCanvasElement.toDataURL": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "CanvasRenderingContext2D.getImageData": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "Function.toString": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     }
+    },
+    "collect_ms": 210
+   }
+  },
+  {
+   "payload": {
+    "v": 1,
+    "nonce": null,
+    "nav": {
+     "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Linux x86_64",
+     "language": "de-DE",
+     "languages": [
+      "de-DE",
+      "de",
+      "en"
+     ],
+     "hardwareConcurrency": 16,
+     "deviceMemory": null,
+     "maxTouchPoints": 0,
+     "vendor": "",
+     "pdfViewerEnabled": true
+    },
+    "uad": null,
+    "screen": {
+     "width": 2560,
+     "height": 1440,
+     "availWidth": 2560,
+     "availHeight": 1392,
+     "colorDepth": 24,
+     "devicePixelRatio": 1
+    },
+    "intl": {
+     "timeZone": "Europe/London",
+     "locale": "de-DE",
+     "tzOffset": -60
+    },
+    "canvas": {
+     "supported": true,
+     "hash": "4839281ea68bdfc0",
+     "hash2": "4839281ea68bdfc0",
+     "probeChangedPixels": 0
+    },
+    "webgl": {
+     "supported": true,
+     "vendor": "Mozilla",
+     "renderer": "NVIDIA GeForce GTX 980, or similar",
+     "unmaskedVendor": "Intel",
+     "unmaskedRenderer": "NVIDIA GeForce GTX 980, or similar",
+     "version": "WebGL 1.0",
+     "maxTextureSize": 16384,
+     "maxRenderbufferSize": 16384,
+     "maxViewportDims": [
+      16384,
+      16384
+     ],
+     "aliasedLineWidthRange": [
+      1,
+      1
+     ],
+     "maxVertexUniformVectors": 4088,
+     "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_sRGB",
+      "EXT_shader_texture_lod",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_astc",
+      "WEBGL_compressed_texture_etc",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context"
+     ]
+    },
+    "audio": {
+     "supported": true,
+     "sum": 35.749972,
+     "hash": "fced6df44150e5f9"
+    },
+    "fonts": [
+     "DejaVu Sans",
+     "Liberation Sans",
+     "Noto Sans",
+     "Arial",
+     "Times New Roman",
+     "Courier New"
+    ],
+    "voices": {
+     "supported": true,
+     "count": 0,
+     "local": 0,
+     "hash": null
+    },
+    "worker": {
+     "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+     "platform": "Linux x86_64",
+     "languages": [
+      "de-DE",
+      "de",
+      "en"
+     ],
+     "hardwareConcurrency": 16,
+     "deviceMemory": null,
+     "uadPlatform": null,
+     "timeZone": "Europe/London",
+     "webglRenderer": "NVIDIA GeForce GTX 980, or similar"
+    },
+    "lies": {
+     "navigatorOwnProps": [],
+     "navGetters": {
+      "platform": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "hardwareConcurrency": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "deviceMemory": {
+       "present": false
+      },
+      "userAgent": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "languages": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "maxTouchPoints": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "webdriver": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     },
+     "methods": {
+      "WebGLRenderingContext.getParameter": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "HTMLCanvasElement.toDataURL": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "CanvasRenderingContext2D.getImageData": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "Function.toString": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     }
+    },
+    "collect_ms": 210
+   }
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create an account, get €10 off your first order</h2>
+<form id="signup">
+  <input name="email" type="email" placeholder="you@example.test" required>
+  <input name="password" type="password" placeholder="password" required>
+  <button type="submit">Sign up</button>
+</form>
+<pre id="result" hidden></pre>
+<p><a href="/fp-check">What does this store know about my browser?</a></p>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById("signup").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await fetch("/signup", { method: "POST", body: new FormData(e.target) });
+    const out = document.getElementById("result");
+    out.hidden = false;
+    out.textContent = `${r.status}\n` + JSON.stringify(await r.json(), null, 2);
+  });
+</script>
+{% endblock %}

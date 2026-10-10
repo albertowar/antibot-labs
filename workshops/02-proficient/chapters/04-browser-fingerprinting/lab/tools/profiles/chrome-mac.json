@@ -1,0 +1,239 @@
+{
+ "cohort": "chrome-mac",
+ "provenance": "synthesized",
+ "description": "Four MacBook Air M2 owners on Chrome 153 (same model, same macOS: identical fingerprints)",
+ "noise": "none",
+ "ip": "distinct",
+ "users": [
+  {
+   "payload": {
+    "v": 1,
+    "nonce": null,
+    "nav": {
+     "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+     "platform": "MacIntel",
+     "language": "en-GB",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": 8,
+     "maxTouchPoints": 0,
+     "vendor": "Google Inc.",
+     "pdfViewerEnabled": true
+    },
+    "uad": {
+     "brands": [
+      "Google Chrome/153",
+      "Chromium/153",
+      "Not_A Brand/8"
+     ],
+     "mobile": false,
+     "platform": "macOS",
+     "high": {
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "",
+      "platformVersion": "15.6.1",
+      "fullVersionList": [
+       "Google Chrome/153.0.8010.12",
+       "Chromium/153.0.8010.12",
+       "Not_A Brand/8.0.0.0"
+      ]
+     }
+    },
+    "screen": {
+     "width": 1470,
+     "height": 956,
+     "availWidth": 1470,
+     "availHeight": 908,
+     "colorDepth": 24,
+     "devicePixelRatio": 2
+    },
+    "intl": {
+     "timeZone": "Europe/London",
+     "locale": "en-GB",
+     "tzOffset": -60
+    },
+    "canvas": {
+     "supported": true,
+     "hash": "25c15a791cff1ca0",
+     "hash2": "25c15a791cff1ca0",
+     "probeChangedPixels": 0
+    },
+    "webgl": {
+     "supported": true,
+     "vendor": "WebKit",
+     "renderer": "WebKit WebGL",
+     "unmaskedVendor": "Google Inc. (Apple)",
+     "unmaskedRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
+     "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)",
+     "maxTextureSize": 16384,
+     "maxRenderbufferSize": 16384,
+     "maxViewportDims": [
+      16384,
+      16384
+     ],
+     "aliasedLineWidthRange": [
+      1,
+      1
+     ],
+     "maxVertexUniformVectors": 4096,
+     "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_clip_control",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_disjoint_timer_query",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_sRGB",
+      "EXT_shader_texture_lod",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "KHR_parallel_shader_compile",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_blend_func_extended",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context",
+      "WEBGL_multi_draw",
+      "WEBGL_polygon_mode"
+     ]
+    },
+    "audio": {
+     "supported": true,
+     "sum": 124.043478,
+     "hash": "c40eda39b983616b"
+    },
+    "fonts": [
+     "Helvetica Neue",
+     "Menlo",
+     "Avenir",
+     "Gill Sans",
+     "Optima",
+     "Futura",
+     "Apple Color Emoji",
+     "Arial",
+     "Times New Roman",
+     "Courier New",
+     "Georgia",
+     "Verdana",
+     "Trebuchet MS",
+     "Comic Sans MS",
+     "Impact",
+     "Palatino"
+    ],
+    "voices": {
+     "supported": true,
+     "count": 176,
+     "local": 176,
+     "hash": "c7fb5652854de12f"
+    },
+    "worker": {
+     "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+     "platform": "MacIntel",
+     "languages": [
+      "en-GB",
+      "en"
+     ],
+     "hardwareConcurrency": 8,
+     "deviceMemory": 8,
+     "uadPlatform": "macOS",
+     "timeZone": "Europe/London",
+     "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)"
+    },
+    "lies": {
+     "navigatorOwnProps": [],
+     "navGetters": {
+      "platform": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "hardwareConcurrency": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "deviceMemory": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "userAgent": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "languages": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "maxTouchPoints": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "webdriver": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     },
+     "methods": {
+      "WebGLRenderingContext.getParameter": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "HTMLCanvasElement.toDataURL": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "CanvasRenderingContext2D.getImageData": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      },
+      "Function.toString": {
+       "present": true,
+       "nativeSource": true,
+       "hasPrototype": false,
+       "constructible": false
+      }
+     }
+    },
+    "collect_ms": 180
+   },
+   "count": 4
+  }
+ ]
+}

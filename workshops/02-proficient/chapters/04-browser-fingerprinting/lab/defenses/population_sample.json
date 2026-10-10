@@ -1,0 +1,27 @@
+{
+  "_comment": "Illustrative share of monthly visitors per device class (OS|GPU model|screen@dpr|cores) for a UK/EU store. In production, rebuild this nightly from your own traffic. Unlisted classes count as rare.",
+  "monthly_visitors": 2000000,
+  "device_classes": {
+    "iOS|Apple GPU|390x844@3|4": 0.060,
+    "iOS|Apple GPU|393x852@3|4": 0.055,
+    "iOS|Apple GPU|430x932@3|4": 0.030,
+    "Android|Adreno (TM) 740|412x915@2.625|8": 0.012,
+    "Android|Mali-G715|412x892@2.625|8": 0.008,
+    "Windows|Intel(R) UHD Graphics 620|1920x1080@1|8": 0.050,
+    "Windows|Intel(R) Iris(R) Xe Graphics|1536x864@1.25|8": 0.040,
+    "Windows|Intel(R) Iris(R) Xe Graphics|1280x720@1.5|8": 0.015,
+    "Windows|Intel(R) UHD Graphics|1366x768@1|4": 0.020,
+    "Windows|AMD Radeon(TM) Graphics|1920x1080@1|16": 0.010,
+    "Windows|NVIDIA GeForce GTX 1650|1920x1080@1|8": 0.008,
+    "Windows|NVIDIA GeForce RTX 3060|1920x1080@1|12": 0.006,
+    "Windows|AMD Radeon RX 6600|2560x1440@1|12": 0.003,
+    "Windows|NVIDIA GeForce RTX 3060|2560x1440@1|16": 0.0004,
+    "Windows|software|1920x1080@1|4": 0.004,
+    "macOS|Apple M2|1470x956@2|8": 0.020,
+    "macOS|Apple M1|1440x900@2|8": 0.018,
+    "macOS|Apple GPU|1512x982@2|8": 0.012,
+    "Windows|Intel(R) HD Graphics, or similar|1920x1080@1|8": 0.004,
+    "Linux|Intel(R) HD Graphics, or similar|1920x1080@1|8": 0.0005,
+    "Linux|NVIDIA GeForce GTX 980, or similar|2560x1440@1|16": 0.0001
+  }
+}
