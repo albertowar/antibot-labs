@@ -1,0 +1,348 @@
+{
+ "name": "chromium-153-linux",
+ "description": "Chromium 153 on Linux, captured live with /capture (headed window, real GPU via WSLg). The pointer path before the click was scripted.",
+ "source": "captured with /capture on 2026-10-10",
+ "navigation_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Linux\""
+  ],
+  [
+   "Upgrade-Insecure-Requests",
+   "1"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Accept",
+   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "none"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "navigate"
+  ],
+  [
+   "Sec-Fetch-User",
+   "?1"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "document"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ]
+ ],
+ "fetch_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Chromium\";v=\"153.0.8010.12\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Linux\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "post_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Content-Length",
+   "0"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Chromium\";v=\"153.0.8010.12\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Linux\""
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Content-Type",
+   "application/json"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Origin",
+   "http://localhost:5000"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "signals": {
+  "webdriver": false,
+  "suspicious_keys": [],
+  "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+  "platform": "Linux x86_64",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "uad": {
+   "brands": [
+    "Chromium/153",
+    "Not_A Brand/8"
+   ],
+   "mobile": false,
+   "platform": "Linux"
+  },
+  "geometry": {
+   "outer_w": 1905,
+   "outer_h": 2140,
+   "inner_w": 1905,
+   "inner_h": 2053,
+   "screen_w": 3840,
+   "screen_h": 2160,
+   "avail_w": 3840,
+   "avail_h": 2160,
+   "dpr": 1
+  },
+  "notification_permission": "default",
+  "permission_query": "prompt",
+  "plugins": 5,
+  "has_chrome_object": true,
+  "webgl": {
+   "vendor": "Google Inc. (Microsoft Corporation)",
+   "renderer": "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 3060), OpenGL 4.2)"
+  },
+  "hardware_concurrency": 12,
+  "max_touch_points": 0,
+  "native": {
+   "Navigator.webdriver": {
+    "src": "function get webdriver() { [native code] }",
+    "proto": false
+   },
+   "Navigator.userAgent": {
+    "src": "function get userAgent() { [native code] }",
+    "proto": false
+   },
+   "Navigator.platform": {
+    "src": "function get platform() { [native code] }",
+    "proto": false
+   },
+   "Navigator.languages": {
+    "src": "function get languages() { [native code] }",
+    "proto": false
+   },
+   "Navigator.plugins": {
+    "src": "function get plugins() { [native code] }",
+    "proto": false
+   },
+   "Navigator.hardwareConcurrency": {
+    "src": "function get hardwareConcurrency() { [native code] }",
+    "proto": false
+   },
+   "Navigator.userAgentData": {
+    "src": "function get userAgentData() { [native code] }",
+    "proto": false
+   },
+   "Screen.width": {
+    "src": "function get width() { [native code] }",
+    "proto": false
+   },
+   "Screen.height": {
+    "src": "function get height() { [native code] }",
+    "proto": false
+   },
+   "Screen.availHeight": {
+    "src": "function get availHeight() { [native code] }",
+    "proto": false
+   },
+   "window.outerWidth": {
+    "src": "function get outerWidth() { [native code] }",
+    "proto": false
+   },
+   "window.outerHeight": {
+    "src": "function get outerHeight() { [native code] }",
+    "proto": false
+   },
+   "Notification.permission": {
+    "src": "function get permission() { [native code] }",
+    "proto": false
+   },
+   "Permissions.query": {
+    "src": "function query() { [native code] }",
+    "proto": false
+   },
+   "WebGLRenderingContext.getParameter": {
+    "src": "function getParameter() { [native code] }",
+    "proto": false
+   },
+   "Function.toString": {
+    "src": "function toString() { [native code] }",
+    "proto": false
+   }
+  },
+  "navigator_own_props": [],
+  "iframe": {
+   "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+   "platform": "Linux x86_64",
+   "webdriver": false
+  },
+  "worker": {
+   "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+   "platform": "Linux x86_64",
+   "languages": [
+    "en-US",
+    "en"
+   ],
+   "hardware_concurrency": 12,
+   "brands": [
+    "Chromium",
+    "Not_A Brand"
+   ]
+  },
+  "collect_ms": 2242.8
+ },
+ "interaction": {
+  "is_trusted": true,
+  "pointer_type": "mouse",
+  "detail": 1,
+  "offset_x": -64.63,
+  "offset_y": -8.44,
+  "moves_before": 45
+ }
+}

@@ -1,0 +1,350 @@
+{
+ "name": "chrome-153-privacy-extension",
+ "description": "Google Chrome 153 with a JShelter-style anti-fingerprinting extension that wraps navigator getters in every realm.",
+ "source": "synthetic: header order and native-code strings from a real Chromium 153 capture, identity values edited to match this browser",
+ "navigation_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "Upgrade-Insecure-Requests",
+   "1"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Accept",
+   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "none"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "navigate"
+  ],
+  [
+   "Sec-Fetch-User",
+   "?1"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "document"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ]
+ ],
+ "fetch_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Google Chrome\";v=\"153.0.8010.92\", \"Chromium\";v=\"153.0.8010.92\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"19.0.0\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "post_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Content-Length",
+   "0"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Google Chrome\";v=\"153.0.8010.92\", \"Chromium\";v=\"153.0.8010.92\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Content-Type",
+   "application/json"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"19.0.0\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Origin",
+   "http://localhost:5000"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "signals": {
+  "webdriver": false,
+  "suspicious_keys": [],
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+  "platform": "Win32",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "uad": {
+   "brands": [
+    "Google Chrome/153",
+    "Chromium/153",
+    "Not_A Brand/8"
+   ],
+   "mobile": false,
+   "platform": "Windows"
+  },
+  "geometry": {
+   "outer_w": 1920,
+   "outer_h": 1032,
+   "inner_w": 1920,
+   "inner_h": 945,
+   "screen_w": 1920,
+   "screen_h": 1080,
+   "avail_w": 1920,
+   "avail_h": 1032,
+   "dpr": 1
+  },
+  "notification_permission": "default",
+  "permission_query": "prompt",
+  "plugins": 5,
+  "has_chrome_object": true,
+  "webgl": {
+   "vendor": "Google Inc. (NVIDIA)",
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002503) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "hardware_concurrency": 4,
+  "max_touch_points": 0,
+  "native": {
+   "Navigator.webdriver": {
+    "src": "function get webdriver() { [native code] }",
+    "proto": false
+   },
+   "Navigator.userAgent": {
+    "src": "function get userAgent() { [native code] }",
+    "proto": false
+   },
+   "Navigator.platform": {
+    "src": "function get platform() { [native code] }",
+    "proto": false
+   },
+   "Navigator.languages": {
+    "src": "function get languages() { [native code] }",
+    "proto": false
+   },
+   "Navigator.plugins": {
+    "src": "function() {\n      return wrapper.apply(this, arguments);\n    }",
+    "proto": true
+   },
+   "Navigator.hardwareConcurrency": {
+    "src": "function() {\n      return wrapper.apply(this, arguments);\n    }",
+    "proto": true
+   },
+   "Navigator.userAgentData": {
+    "src": "function get userAgentData() { [native code] }",
+    "proto": false
+   },
+   "Screen.width": {
+    "src": "function get width() { [native code] }",
+    "proto": false
+   },
+   "Screen.height": {
+    "src": "function get height() { [native code] }",
+    "proto": false
+   },
+   "Screen.availHeight": {
+    "src": "function get availHeight() { [native code] }",
+    "proto": false
+   },
+   "window.outerWidth": {
+    "src": "function get outerWidth() { [native code] }",
+    "proto": false
+   },
+   "window.outerHeight": {
+    "src": "function get outerHeight() { [native code] }",
+    "proto": false
+   },
+   "Notification.permission": {
+    "src": "function get permission() { [native code] }",
+    "proto": false
+   },
+   "Permissions.query": {
+    "src": "function query() { [native code] }",
+    "proto": false
+   },
+   "WebGLRenderingContext.getParameter": {
+    "src": "function() {\n      return wrapper.apply(this, arguments);\n    }",
+    "proto": true
+   },
+   "Function.toString": {
+    "src": "function toString() { [native code] }",
+    "proto": false
+   }
+  },
+  "navigator_own_props": [],
+  "iframe": {
+   "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+   "platform": "Win32",
+   "webdriver": false
+  },
+  "worker": {
+   "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+   "platform": "Win32",
+   "languages": [
+    "en-US",
+    "en"
+   ],
+   "hardware_concurrency": 4,
+   "brands": [
+    "Google Chrome",
+    "Chromium",
+    "Not_A Brand"
+   ]
+  },
+  "collect_ms": 140.0
+ },
+ "interaction": {
+  "is_trusted": true,
+  "pointer_type": "mouse",
+  "detail": 1,
+  "offset_x": 8.8,
+  "offset_y": 12.0,
+  "moves_before": 40
+ }
+}

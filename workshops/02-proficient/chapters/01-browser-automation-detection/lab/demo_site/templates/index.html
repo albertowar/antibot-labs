@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="sensor-nonce" content="{{ nonce }}">
+  <title>Bot Workshop Store</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+    code { background: #eee; padding: 0 .3rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; }
+    .card { border: 1px solid #ccc; border-radius: .5rem; padding: 1rem; }
+    .add-to-cart { margin-top: .5rem; padding: .5rem 1rem; font-size: 1rem; }
+    [data-state="blocked"] { color: #b00020; }
+    [data-state="ready"], [data-state="added"] { color: #1b5e20; }
+  </style>
+</head>
+<body>
+  <h1>Bot Workshop Store</h1>
+  <p>Defense level <code>{{ level }}</code> &middot;
+     <a href="/sensor-check">/sensor-check</a> &middot;
+     <a href="/sensor-logs">/sensor-logs</a> &middot;
+     <a href="/capture">/capture</a></p>
+
+  <p id="status" data-state="loading">Loading&hellip;</p>
+  <div id="products" class="grid"></div>
+  <p id="cart-status" data-state="idle"></p>
+
+  <noscript><p>This store needs JavaScript. (That is a cost: see the "no-JS" profile in the lab.)</p></noscript>
+
+  <script src="/static/sensor.js"></script>
+  <script>
+    const nonce = document.querySelector('meta[name="sensor-nonce"]').content;
+    const status = document.getElementById("status");
+    const cartStatus = document.getElementById("cart-status");
+
+    function show(el, state, text) { el.dataset.state = state; el.textContent = text; }
+
+    async function addToCart(event) {
+      const interaction = ShopSensor.describeClick(event);
+      const response = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: Number(event.currentTarget.dataset.id), interaction }),
+      });
+      const data = await response.json();
+      if (response.ok) show(cartStatus, "added", `Added. Cart size: ${data.cart_size}`);
+      else show(cartStatus, "blocked", `Cart blocked: ${(data.reasons || []).join("; ")}`);
+    }
+
+    async function loadProducts() {
+      const response = await fetch("/api/products");
+      const data = await response.json();
+      if (!response.ok) {
+        show(status, "blocked", `Blocked: ${(data.reasons || []).join("; ")}`);
+        return;
+      }
+      const grid = document.getElementById("products");
+      for (const p of data.products) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<strong>${p.name}</strong><br>$${p.price}<br>`;
+        const button = document.createElement("button");
+        button.className = "add-to-cart";
+        button.dataset.id = p.id;
+        button.textContent = "Add to cart";
+        button.addEventListener("click", addToCart);
+        card.appendChild(button);
+        grid.appendChild(card);
+      }
+      show(status, "ready", `${data.products.length} products`);
+    }
+
+    ShopSensor.send(nonce)
+      .then(loadProducts)
+      .catch((e) => show(status, "blocked", `Sensor failed: ${e}`));
+  </script>
+</body>
+</html>
