@@ -1,0 +1,31 @@
+{
+  "name": "blunt",
+  "_comment": [
+    "Round 2 starting point: the policy most stores ship on day one.",
+    "Hard rules on network facts, one score, no exemptions, no appeal path,",
+    "a third-party CAPTCHA and logs kept for a year. It stops every scraper",
+    "in the default campaigns. Run the audit and read who else it stops."
+  ],
+  "rules": [
+    {"if_signal": "tor_exit", "action": "block"},
+    {"if_pool_type": "datacenter", "action": "block"},
+    {"if_signal": "http_library_ua", "action": "block"}
+  ],
+  "weights": {
+    "ip_blocklist": 60, "tor_exit": 40, "datacenter_asn": 40,
+    "http_library_ua": 60, "missing_browser_headers": 30, "header_order_mismatch": 15, "outdated_browser": 30,
+    "ja4_non_browser": 50, "ja4_ua_mismatch": 30,
+    "ip_burst": 40, "ip_elevated": 30,
+    "honeypot_filled": 100,
+    "no_telemetry": 40, "webdriver_flag": 60, "cdp_artifacts": 40,
+    "headless_gpu": 35, "fp_randomized": 40, "fp_inconsistent": 25,
+    "no_pointer": 45, "mouse_too_straight": 15, "timing_too_regular": 20, "no_keystrokes": 20,
+    "telemetry_replay": 60, "fp_reuse": 30, "tz_geo_mismatch": 20, "lang_mismatch": 25
+  },
+  "challenge_at": 40,
+  "block_at": 60,
+  "exemptions": [],
+  "challenge_type": "captcha_thirdparty",
+  "appeal_path": false,
+  "retention_days": 365
+}

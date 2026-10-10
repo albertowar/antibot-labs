@@ -1,0 +1,35 @@
+{
+  "name": "naive",
+  "_comment": [
+    "The fix most teams write first, shipped so the Round 2 attack step is",
+    "reproducible. The hard rules are gone and the three cohorts that the",
+    "blunt policy hurt most are exempted with max_action 'allow': never",
+    "challenged, never blocked. Every real person gets in. So does every bot",
+    "that learns to look like one of them (tools/fp_audit.py --campaigns",
+    "cgnat_burst,tor_hidden,a11y_mimic)."
+  ],
+  "rules": [
+    {"if_signal": "http_library_ua", "action": "block"}
+  ],
+  "weights": {
+    "ip_blocklist": 60, "tor_exit": 40, "datacenter_asn": 20,
+    "http_library_ua": 60, "missing_browser_headers": 30, "header_order_mismatch": 15, "outdated_browser": 10,
+    "ja4_non_browser": 50, "ja4_ua_mismatch": 30,
+    "ip_burst": 20, "ip_elevated": 10,
+    "honeypot_filled": 100,
+    "no_telemetry": 40, "webdriver_flag": 60, "cdp_artifacts": 40,
+    "headless_gpu": 35, "fp_randomized": 40, "fp_inconsistent": 25,
+    "no_pointer": 45, "mouse_too_straight": 15, "timing_too_regular": 20, "no_keystrokes": 20,
+    "telemetry_replay": 60, "fp_reuse": 30, "tz_geo_mismatch": 20, "lang_mismatch": 25
+  },
+  "challenge_at": 40,
+  "block_at": 60,
+  "exemptions": [
+    {"if_signal": "tor_exit", "max_action": "allow"},
+    {"if_signal": "no_pointer", "max_action": "allow"},
+    {"if_signal": "ip_elevated", "max_action": "allow"}
+  ],
+  "challenge_type": "captcha_thirdparty",
+  "appeal_path": false,
+  "retention_days": 365
+}
