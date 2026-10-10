@@ -1,0 +1,46 @@
+# W3 Ch1 — OPTIONAL production-shaped path (Redis + PostgreSQL).
+#
+# The lab runs with NO Docker by default: the store uses SQLite and an in-memory
+# Redis (fakeredis). Use this only to see the store on the same stack it would
+# run on in production.
+#
+#   docker compose up -d --wait     # start both, bound to 127.0.0.1 only
+#   docker compose down -v          # stop and wipe
+#
+# Then run the store against them:
+#   DATABASE_URL=postgresql+psycopg://workshop:workshop@localhost:5432/shop \
+#   REDIS_URL=redis://127.0.0.1:6379/0 python demo_site/app.py
+# (uncomment psycopg in requirements.txt first).
+
+name: w3-ch01-mobile
+
+services:
+  redis:
+    image: redis:7.4.11-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
