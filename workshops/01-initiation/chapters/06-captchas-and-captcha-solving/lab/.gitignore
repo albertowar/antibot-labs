@@ -1,0 +1,5 @@
+venv/
+.venv/
+__pycache__/
+defenses/_backup/
+sample_*.png

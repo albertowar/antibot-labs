@@ -1,0 +1,21 @@
+# Chapter 6 lab: Redis for server-side sessions (Chapter 5) and CAPTCHA state.
+#
+#   docker compose up -d --wait   # start
+#   docker compose down           # stop (nothing is persisted)
+#
+# The Flask apps run on the host and connect with REDIS_URL=redis://localhost:6379/0
+# No Docker? Run `python tools/fake_redis.py` instead.
+
+name: w1-ch06-captchas
+
+services:
+  redis:
+    image: redis:8.8.3-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
