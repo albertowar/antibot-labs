@@ -1,0 +1,21 @@
+# Chapter 8 lab: Redis for the counters that every app server must share
+# (velocity, telemetry replay, fingerprint reuse, campaign clusters, challenges).
+#
+#   docker compose up -d --wait   # start
+#   docker compose down -v        # stop and wipe
+#
+# The Flask app runs on the host (python demo_site/app.py) and connects with
+# REDIS_URL=redis://localhost:6379/0. No Docker? Use REDIS_URL=memory:// instead.
+
+name: w2-ch08-multi-layered
+
+services:
+  redis:
+    image: redis:8.10.2-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
