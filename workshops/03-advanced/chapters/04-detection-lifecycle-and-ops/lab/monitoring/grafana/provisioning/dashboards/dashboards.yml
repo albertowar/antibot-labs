@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: W3 Ch4
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

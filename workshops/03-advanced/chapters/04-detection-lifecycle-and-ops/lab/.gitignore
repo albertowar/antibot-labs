@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+decision_log.jsonl
+data/truth.jsonl
+data/labels.jsonl
+data/ops_config.json
+data/world_updates.json
+data/snapshots/
+models/*.txt
+models/manifest.json
+incident/incident_report.md

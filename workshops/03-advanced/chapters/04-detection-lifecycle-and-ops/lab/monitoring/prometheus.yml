@@ -1,0 +1,10 @@
+# Scrapes the Flask app running on the host. The app exposes defenses/metrics.py
+# at /metrics; see demo_site/app.py.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: bot_defense
+    static_configs:
+      - targets: ["host.docker.internal:5000"]
+    metrics_path: /metrics
