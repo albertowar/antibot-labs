@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+logs/
+*.db
+defenses/pipeline.py.bak
+instance/

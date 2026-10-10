@@ -1,0 +1,30 @@
+{
+ "cloud_ranges": {
+  "source": "AWS ip-ranges.json, GCP cloud.json, DigitalOcean geo CSV, Cloudflare ips-v4/v6",
+  "fetched_at": "2026-10-09T23:30:05+00:00"
+ },
+ "hosting_asns": {
+  "source": "https://raw.githubusercontent.com/brianhama/bad-asn-list/master/bad-asn-list.csv",
+  "fetched_at": "2026-10-09T23:30:06+00:00"
+ },
+ "ip2asn": {
+  "source": "https://iptoasn.com/data/ip2asn-v4.tsv.gz",
+  "fetched_at": "2026-10-09T23:30:07+00:00"
+ },
+ "open_proxies": {
+  "source": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+  "fetched_at": "2026-10-09T23:30:04+00:00"
+ },
+ "private_relay": {
+  "source": "https://mask-api.icloud.com/egress-ip-ranges.csv",
+  "fetched_at": "2026-10-09T23:30:22+00:00"
+ },
+ "tor_exits": {
+  "source": "https://check.torproject.org/torbulkexitlist",
+  "fetched_at": "2026-10-09T23:30:03+00:00"
+ },
+ "vpn_ranges": {
+  "source": "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt",
+  "fetched_at": "2026-10-09T23:30:05+00:00"
+ }
+}
