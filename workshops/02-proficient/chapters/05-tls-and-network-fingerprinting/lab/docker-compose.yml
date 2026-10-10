@@ -1,0 +1,30 @@
+# Chapter 5 lab: PostgreSQL for the demo store's request log.
+#
+#   docker compose up -d --wait   # start
+#   docker compose down -v        # stop and wipe the logs
+#
+# The Flask app runs on the host (python demo_site/app.py) and connects with
+# DATABASE_URL=postgresql+psycopg://workshop:workshop@localhost:5432/shop
+# No Docker? Use DATABASE_URL=sqlite:///tls_logs.db instead (see README).
+
+name: w2-ch05-tls
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

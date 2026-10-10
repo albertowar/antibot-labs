@@ -1,0 +1,42 @@
+{
+  "_provenance": "Captured 2026-10-10 through fingerproxy v1.2.3 on Linux x86_64: Python 3.10 + OpenSSL 3.0.2, Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0), curl_cffi 0.16.3 targets. Fingerprints of HTTP libraries depend on YOUR OpenSSL build: run tools/capture_fingerprints.py to add the ones from your machine (written to local_fingerprints.json). Browser entries marked 'unverified' come from curl_cffi impersonation targets, not from a real install.",
+  "_collision": "JA4 a+b is not unique: a RESUMED Chrome connection adds pre_shared_key (17 extensions) and becomes t13d1517h2_8daaf6152771, the same a+b as a FRESH Firefox 155 connection. Both families list it; tls_family.py resolves the tie with the engine the User-Agent claims.",
+  "library_ja4": {
+    "t13d1812h1_85036bcba153_b26ce05bbdd6": "python-requests 2.34 / urllib3 (OpenSSL 3.0)",
+    "t13d1812h1_85036bcba153_d41ae481755e": "httpx 0.28 / Python ssl (OpenSSL 3.0)",
+    "t13d181100_85036bcba153_d41ae481755e": "urllib.request / stdlib (OpenSSL 3.0, no ALPN)",
+    "t13d3113h2_e8f1e7e78f70_ce5650b735ce": "curl 7.81 (OpenSSL 3.0)",
+    "t13d3113h1_e8f1e7e78f70_ce5650b735ce": "curl 7.81 --http1.1 (OpenSSL 3.0)"
+  },
+  "browser_families": {
+    "chromium": {
+      "label": "Chromium / BoringSSL (Chrome, Edge, Brave, Opera, Samsung Internet)",
+      "ja4_ab": {
+        "t13d1516h2_8daaf6152771": "Chrome desktop (Playwright Chromium 153 and curl_cffi chrome150, verified)",
+        "t13d1517h2_8daaf6152771": "Chrome resumed TLS session, + pre_shared_key (Playwright Chromium 153 via tools/clienthello_dump.py, verified)"
+      },
+      "h2": {
+        "1:65536;2:0;4:6291456;6:262144|15663105|m,a,s,p": "Chrome desktop (Playwright Chromium 153 and curl_cffi chrome150, verified)"
+      }
+    },
+    "gecko": {
+      "label": "Firefox / NSS",
+      "ja4_ab": {
+        "t13d1517h2_8daaf6152771": "Firefox 155, fresh and resumed (session_ticket swapped for pre_shared_key) (Playwright Firefox, verified)",
+        "t13d1717h2_5b57614c22b0": "Firefox 147 (curl_cffi firefox147 target, unverified)"
+      },
+      "h2": {
+        "1:65536;2:0;4:131072;5:16384|12517377|m,p,a,s": "Firefox 155 (Playwright Firefox, verified)"
+      }
+    },
+    "webkit": {
+      "label": "Safari / Apple TLS (also every iOS browser: CriOS, FxiOS, EdgiOS)",
+      "ja4_ab": {
+        "t13d2013h2_a09f3c656075": "Safari 26 (curl_cffi safari2601 target, unverified)"
+      },
+      "h2": {
+        "2:0;3:100;4:2097152;9:1|10420225|m,s,a,p": "Safari 26 (curl_cffi safari2601 target, unverified)"
+      }
+    }
+  }
+}

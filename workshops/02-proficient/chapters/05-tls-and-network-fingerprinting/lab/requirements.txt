@@ -1,0 +1,12 @@
+# Chapter 5 lab — Python >= 3.10. Pinned; verified 2026-10-10.
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+psycopg[binary]==3.3.6
+cryptography==50.0.2
+# Clients: HTTP libraries (Round 0/1) and impersonators (Rounds 2/3)
+requests==2.34.2
+httpx==0.28.1
+impit==0.14.1
+curl_cffi==0.16.3
+# Real browsers (Round 0/4 and the legitimate-traffic personas)
+playwright==1.63.0
