@@ -1,0 +1,51 @@
+{
+ "name": "office-win",
+ "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture). Replace or extend with your own capture from /lab/capture.",
+ "impersonate": "chrome150",
+ "headers": {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "sec-ch-ua-platform": "\"Windows\""
+ },
+ "note": "Identical corporate laptops (same image, GPU, screen): every one of them has the same fingerprint hash.",
+ "fp": {
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "platform": "Win32",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "hc": 8,
+  "mem": 8,
+  "touch_points": 0,
+  "plugins": 5,
+  "screen": [
+   1920,
+   1080,
+   1920,
+   1040
+  ],
+  "win": [
+   1920,
+   1040,
+   1920,
+   953
+  ],
+  "dpr": 1.25,
+  "tz": "America/New_York",
+  "webgl": {
+   "vendor": "Google Inc. (Intel)",
+   "renderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x0000A7A0) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "canvas": "1f4be09d",
+  "uach": {
+   "brands": [
+    "Chromium",
+    "Google Chrome",
+    "Not_A Brand"
+   ],
+   "platform": "Windows",
+   "mobile": false,
+   "platform_version": "15.0.0"
+  }
+ }
+}

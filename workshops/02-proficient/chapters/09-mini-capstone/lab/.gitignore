@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+instance/
+*.pyc
+*.bak
+tools/profiles/mine.json
+attacks/data/combo_list.txt
