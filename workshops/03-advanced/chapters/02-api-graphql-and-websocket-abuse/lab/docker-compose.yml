@@ -1,0 +1,35 @@
+# Optional, production-shaped backends for the W3 Ch2 lab. The lab runs with no
+# Docker at all (in-process fakeredis + a local SQLite file); bring these up only
+# if you want to exercise the real Redis and PostgreSQL paths.
+#
+#   docker compose up -d --wait
+#   export REDIS_URL=redis://127.0.0.1:6379/0
+#   export DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop
+#   python tools/seed.py && DEFENSE_LEVEL=1 python demo_site/app.py
+#   docker compose down -v        # tear down
+name: w3-ch02-api-graphql-websocket
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "workshop", "-d", "shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+volumes:
+  pgdata:
