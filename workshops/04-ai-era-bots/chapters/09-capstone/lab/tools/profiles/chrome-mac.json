@@ -1,0 +1,118 @@
+{
+ "name": "chrome-mac",
+ "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture). Replace or extend with your own capture from /lab/capture.",
+ "impersonate": "chrome150",
+ "headers": {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "sec-ch-ua-platform": "\"macOS\""
+ },
+ "fp": {
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "platform": "MacIntel",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "hc": 10,
+  "mem": 8,
+  "touch_points": 0,
+  "plugins": 5,
+  "screen": [
+   1512,
+   982,
+   1512,
+   944
+  ],
+  "win": [
+   1512,
+   944,
+   1512,
+   857
+  ],
+  "dpr": 2,
+  "tz": "America/Los_Angeles",
+  "webgl": {
+   "vendor": "Google Inc. (Apple)",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)"
+  },
+  "canvas": "9be1407a",
+  "uach": {
+   "brands": [
+    "Chromium",
+    "Google Chrome",
+    "Not_A Brand"
+   ],
+   "platform": "macOS",
+   "mobile": false,
+   "platform_version": "26.0.0"
+  }
+ },
+ "variants": {
+  "screen": [
+   [
+    [
+     1512,
+     982,
+     1512,
+     944
+    ],
+    [
+     1512,
+     944,
+     1512,
+     857
+    ]
+   ],
+   [
+    [
+     1728,
+     1117,
+     1728,
+     1079
+    ],
+    [
+     1728,
+     1079,
+     1728,
+     992
+    ]
+   ],
+   [
+    [
+     1440,
+     900,
+     1440,
+     875
+    ],
+    [
+     1440,
+     875,
+     1440,
+     788
+    ]
+   ]
+  ],
+  "hc": [
+   8,
+   10,
+   12
+  ],
+  "tz": [
+   "America/Los_Angeles",
+   "America/Denver",
+   "Europe/Berlin"
+  ],
+  "gpu": [
+   [
+    "Google Inc. (Apple)",
+    "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
+    "9be1407a"
+   ],
+   [
+    "Google Inc. (Apple)",
+    "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+    "9be1407a"
+   ]
+  ]
+ }
+}

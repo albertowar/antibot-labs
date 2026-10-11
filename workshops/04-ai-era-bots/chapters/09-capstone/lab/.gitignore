@@ -1,0 +1,7 @@
+.venv/
+instance/
+data/keys/
+data/directories/
+rules/pending.json
+__pycache__/
+*.bak

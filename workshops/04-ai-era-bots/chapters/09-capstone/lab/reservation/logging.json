@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "Everything a complaint or a claim needs, kept for one cease-and-desist cycle.",
+    "90 days is a choice: long enough to answer a letter, short enough to defend",
+    "as data minimisation (W3 Ch7). /.well-known/governance.json publishes it and",
+    "/admin/purge enforces it."
+  ],
+  "robots_fetches": true,
+  "user_agent": true,
+  "asn": true,
+  "signature_verification": true,
+  "challenge_outcomes": true,
+  "retention_days": 90
+}

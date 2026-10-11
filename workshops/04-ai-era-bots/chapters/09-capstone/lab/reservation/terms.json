@@ -1,0 +1,7 @@
+{
+  "_comment": "Natural-language terms bind account holders who clicked, not crawlers. The agents clause is the contract lever Amazon v. Perplexity (9th Cir. 2026) left a merchant.",
+  "acceptance": "clickwrap",
+  "automated_access_clause": true,
+  "ai_training_clause": true,
+  "agents_clause": "declared_only"
+}

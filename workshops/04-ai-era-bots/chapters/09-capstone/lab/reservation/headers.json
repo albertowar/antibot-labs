@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "Per-response preference signals, for clients that never read robots.txt:",
+    "the IETF aipref header, the TDM Reservation Protocol header and an RSL",
+    "licence link (Link and TDM-Policy are completed with the store's own URL)."
+  ],
+  "headers": {
+    "Content-Usage": "train-ai=n, ai-use=n, search=y",
+    "TDM-Reservation": "1"
+  }
+}
