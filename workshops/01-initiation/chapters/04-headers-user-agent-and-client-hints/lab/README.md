@@ -210,10 +210,10 @@ Playwright rewrites the `User-Agent` and even the `Sec-CH-UA-Platform` hint. But
 
 **Debrief:** set the `userAgentMetadata` brands through the CDP command `Emulation.setUserAgentOverride`, or run headed Chrome on a real Windows box. At that point **every header is genuine**. Header inspection ends here; the next layers are:
 
-- TLS and HTTP/2 fingerprints: Workshop 2, Chapter 5
-- Automation artefacts: Workshop 2, Chapter 1
-- JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): Workshop 2, Chapter 4
-- Behaviour: Workshop 2, Chapter 3
+- TLS and HTTP/2 fingerprints: W2 Ch5
+- Automation artefacts: W2 Ch1
+- JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): W2 Ch4
+- Behaviour: W2 Ch3
 
 ---
 

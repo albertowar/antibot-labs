@@ -2,7 +2,7 @@
 
 This is given infrastructure so you can read it, not a student exercise. It
 implements just enough of RFC 9421 to sign and verify the way the IETF
-`draft-ietf-webbotauth-httpsig-protocol` and Cloudflare's verifier do:
+`draft-ietf-webbotauth-httpsig-protocol-00` and Cloudflare's verifier do:
 
   * Ed25519 only (the one algorithm Cloudflare's verifier accepts in 2026).
   * Derived components `@method`, `@authority`, `@path`, `@target-uri`, plus any

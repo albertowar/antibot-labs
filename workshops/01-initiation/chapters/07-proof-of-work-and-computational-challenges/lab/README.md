@@ -241,8 +241,8 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated users match your
 
 The bot pays exactly what a human pays, and PoW has nothing left to say. PoW **prices** requests; it doesn't **identify** clients. Telling this browser apart from a person is the job of these chapters:
 
-- automation artefacts: Workshop 2, Chapter 1
-- behavior: Workshop 2, Chapter 3
+- automation artefacts: W2 Ch1
+- behavior: W2 Ch3
 - layering it all: Chapter 9
 
 ---

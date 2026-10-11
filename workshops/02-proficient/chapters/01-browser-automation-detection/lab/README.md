@@ -233,10 +233,10 @@ Read `round5_forged_sensor.py`: it is `tools/legit_traffic.py` with a different 
 
 | Gap | Picked up in |
 |---|---|
-| A sensor whose output cannot be forged without running it (challenge binding, obfuscation, signing) | Workshop 2, Chapter 2 |
-| Movement that is merely "not a teleport" | Workshop 2, Chapter 3 |
-| Device plausibility (canvas, audio, fonts) | Workshop 2, Chapter 4 |
-| The httpx client underneath the forged sensor | Workshop 2, Chapter 5 (TLS) |
+| A sensor whose output cannot be forged without running it (challenge binding, obfuscation, signing) | W2 Ch2 |
+| Movement that is merely "not a teleport" | W2 Ch3 |
+| Device plausibility (canvas, audio, fonts) | W2 Ch4 |
+| The httpx client underneath the forged sensor | W2 Ch5 (TLS) |
 
 ---
 
@@ -273,7 +273,7 @@ Things to watch for:
 - **Version drift is the whole game.** When Playwright, patchright or Chrome update, rerun `scoreboard.py --bonus` at every level before the session. Then re-capture `tools/profiles/chromium-153-linux.json` with `/capture`, and update the version strings in the synthetic profiles.
 - **Synthetic profiles.** Twelve of the thirteen profiles are synthetic. Their header order and native-code strings come from the real Chromium capture, and the identity values (UA, brands, GPU, geometry) are edited per browser. The Firefox, Safari and resistFingerprinting values are representative, not captured. Ask students to add their own browsers with `/capture` in Round 0. That's the best false-positive data you will get in the room.
 - **Headed attacks.** Every attack runs headless, so no display is needed. If a student runs patchright headed on a real desktop, the SwiftShader signal disappears too.
-- **Docker.** The expected results above were verified on SQLite. The PostgreSQL path uses the same models and the same compose file as Workshop 1, Chapter 4.
+- **Docker.** The expected results above were verified on SQLite. The PostgreSQL path uses the same models and the same compose file as W1 Ch4.
 
 ---
 

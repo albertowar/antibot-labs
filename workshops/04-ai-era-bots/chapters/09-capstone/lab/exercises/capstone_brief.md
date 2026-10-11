@@ -3,7 +3,7 @@
 **Scenario.** It is launch day for the *Lab Runner 9* drop on the Lab Store. For
 three days you built the AI-era stack piece by piece. Today you run all of it at
 once, against everything that shows up, under the AI governance record your team
-wrote in Workshop 4 Chapter 8.
+wrote in W4 Ch8.
 
 **Who must get in.**
 - Human shoppers in six cohorts: desktop, an office NAT and an RPA macro behind one
@@ -32,6 +32,6 @@ wrote in Workshop 4 Chapter 8.
 has a non-visual path and whether the person behind an agent ever sees it). A block
 of a real user is a failure. A challenge is a cost you count, not a failure.
 
-Bring your governance record from Workshop 4 Chapter 8 (or use
+Bring your governance record from W4 Ch8 (or use
 `solutions/round4/governance_record.md`). The team that found the most holes in
 Chapter 8 audits in Round 4.

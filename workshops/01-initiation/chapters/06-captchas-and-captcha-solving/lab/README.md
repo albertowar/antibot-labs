@@ -203,7 +203,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | 🗡️ Re-run | both Round 4 attacks | `0/10` and `0/10` |
 | ✅ Checkpoint | `python tools/checkpoint.py 4` | **40/40 shoppers · 4/40 challenged** |
 
-**Residual:** `python attacks/round4_solver_farm.py --sticky-ip` gets `10/10` again for ~$0.01. With one proxy per voucher there is no IP mismatch, and the farm's 10–40 s band alone is too weak to block on (slow humans live there too). That is the end of what a CAPTCHA can do. It has priced a $10 voucher at a tenth of a cent plus half a minute. The fix is a business rule (one voucher per verified account) and identity signals (Chapter 9, Workshop 2), not a harder puzzle.
+**Residual:** `python attacks/round4_solver_farm.py --sticky-ip` gets `10/10` again for ~$0.01. With one proxy per voucher there is no IP mismatch, and the farm's 10–40 s band alone is too weak to block on (slow humans live there too). That is the end of what a CAPTCHA can do. It has priced a $10 voucher at a tenth of a cent plus half a minute. The fix is a business rule (one voucher per verified account) and identity signals (W2 Ch6), not a harder puzzle.
 
 ---
 
