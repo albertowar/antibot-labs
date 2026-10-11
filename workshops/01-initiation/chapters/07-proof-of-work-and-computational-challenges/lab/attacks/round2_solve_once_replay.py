@@ -1,66 +1,61 @@
 """
-Chapter 7 — Round 2 Attack: pay once, use forever
+Chapter 7, Round 2 attack: pay once, use forever.
 
-Objective: play fair exactly once. Solve the server's (signed) challenge
-honestly on one core, then reuse what it buys:
+Objective: play fair exactly once. Solve the server's (signed) challenge honestly on one
+core, then reuse what it buys:
 
-  1. reuse the pass cookie for every page;
-  2. when the pass stops working, redeem the *same* solution again to mint
-     a fresh pass, instead of solving a new challenge.
+  1. keep using the cleared session for every product;
+  2. when the pass stops working, redeem the *same* solution again to mint a new one,
+     instead of solving a new challenge.
 
 Chapter 5 warned about this: "solve once, replay a million times".
 
-Expected results:
-  - DEFENSE_LEVEL<=2    → 200/200 for one solve (~65k hashes, a fraction of a CPU-second)
-  - DEFENSE_LEVEL>=3    → 20/200: the pass budget runs out, and the replayed
-                          solution is refused ("challenge already redeemed")
+Expected:
+  DEFENSE_LEVEL<=2    120/120 for one solve (~65k hashes, a fraction of a CPU-second)
+  DEFENSE_LEVEL>=3    20/120: the pass budget runs out, then the replayed solution is
+                      refused (pow_reason "challenge already redeemed (replay)")
 
-With --share the bot also hands its pass to a second IP (a pass-sharing
-farm). At level 3 that fails: "PoW pass is bound to another client".
+With --share the bot also hands its session to a second IP (a pass-sharing farm). At level 3
+that fails: the pass is bound to the IP + User-Agent that solved it.
 
-Run:
     python attacks/round2_solve_once_replay.py [--share]
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(__file__))
-from _common import (PAGES, Tally, client, get_challenge, redeem, report,  # noqa: E402
-                     scrape, solve_here)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+import labclient  # noqa: E402,F401  (the localhost guard runs on import)
+from pow_client import SKUS, Tally, bot, finish, redeem, scrape, solve_here  # noqa: E402
 
 
 def run(share=False):
-    """Run the attack; return its scoreboard row (used by tools/checkpoint.py)."""
-    tally = Tally("round2_solve_once_replay")
+    tally = Tally("round2_solve_once_replay" + ("_share" if share else ""))
     saved = {}
-    with client() as c:
-        def pass_once_then_replay():
-            if not saved:
-                challenge = get_challenge(c)
-                if challenge is None:
-                    return False
-                saved["challenge"], saved["counter"] = challenge, solve_here(challenge, tally)
-            else:
-                tally.note("replaying the same solution for a new pass")
-            ok, why = redeem(c, saved["challenge"], saved["counter"])
-            if not ok:
-                tally.note(f"verify refused: {why}")
-            return ok
+    c = bot("pow-replay", index=3)
 
-        if not share:
-            scrape(c, tally, range(1, PAGES + 1), get_pass=pass_once_then_replay)
-            return tally.result()
+    def pass_once_then_replay(payload):
+        if not saved:
+            saved["challenge"], saved["counter"] = payload, solve_here(payload, tally)
+        else:
+            tally.note("replaying the same solution for a new pass")
+        ok, why = redeem(c, saved["challenge"], saved["counter"])
+        if not ok:
+            tally.note(f"verify refused: {why}")
+        return ok
 
-        # --share: earn a pass on 203.0.113.66, spend it from 203.0.113.67
-        scrape(c, tally, [1], get_pass=pass_once_then_replay)
-        with client("203.0.113.67") as other:
-            other.cookies.update(c.cookies)
-            scrape(other, tally, range(2, PAGES + 1), get_pass=lambda: False)
+    if not share:
+        scrape(c, tally, SKUS, get_pass=pass_once_then_replay)
+        return tally.result()
+    # --share: earn a pass on one IP, spend it from another
+    scrape(c, tally, SKUS[:1], get_pass=pass_once_then_replay)
+    other = bot("pow-replay", index=4)
+    other.set_cookie("sid", c.http.cookies.get("sid"))
+    scrape(other, tally, SKUS[1:], get_pass=lambda payload: False)
     return tally.result()
 
 
 if __name__ == "__main__":
     share = "--share" in sys.argv
     print(f"=== Round 2: solve once, replay{' + share the pass' if share else ''} ===")
-    report(run(share=share))
+    finish(run(share=share))

@@ -1,42 +1,43 @@
 """
-Chapter 6 — Server-side verification of a provider token (Section 6.2, Round 1)
+Chapter 6, Round 1: server-side verification of a provider token (section 6.2).
 
-The widget in the browser only *collects* a token. Your server must redeem
-it with the provider's siteverify API and then decide. Most real-world
-"CAPTCHA bypasses" are mistakes in this function, not broken puzzles.
+The widget in the browser only *collects* a token. Your server must redeem it with the
+provider's siteverify API and then decide. Most real-world "CAPTCHA bypasses" are mistakes
+in this function, not broken puzzles. defenses/turnstile_check.py calls it for sign-ups
+(`register`, fail closed) and the newsletter (`newsletter`, fail open).
 
-As shipped, this is the verifier most people write: it checks `success`
-and nothing else, it lets requests without a token through ("the widget
-probably failed to load"), and it fails open when the provider errors.
-attacks/round1_bypass.py gets past it four different ways.
+As shipped, it trusts too much: attacks/round1_bypass.py gets in with no token, with a
+newsletter token, with a token solved on another site, and during a provider outage.
 
-Your job in Round 1: fix every TODO (Round 1). The checklist:
+Your job in Round 1: fix the five TODO (Round 1) so that
   - a missing token is a failure
-  - check `hostname`: a token solved on someone else's page is not yours
-  - check `action`: a token minted for the newsletter must not unlock signup
-  - check freshness (`challenge_ts`); the provider enforces single use
-  - set a timeout, and choose the fail mode on purpose (fail_mode)
+  - the call has a timeout and checks the HTTP status
+  - an outage follows fail_mode on purpose instead of always letting people in
+  - `hostname` and `action` match: a token solved on someone else's page, or minted for the
+    newsletter, must not unlock sign-up
+  - the token is fresh (`challenge_ts`); the provider enforces single use
 
-Trade-off: fail-closed on registration means a provider outage stops your
-signups. Fail-open means an outage is an open door. Pick per endpoint, log
-every outage, and alert on it.
+Trade-off: fail-closed on registration means a provider outage stops your sign-ups.
+Fail-open means an outage is an open door. Pick per endpoint (policy.TURNSTILE_FAIL_MODE),
+log every outage, and alert on it.
 
-Works with the mock provider (provider/mock_turnstile.py), and with the real
-Cloudflare Turnstile API if you set SITEVERIFY_URL and CAPTCHA_SECRET.
+Works with the MOCK provider (provider/mock_turnstile.py, test keys, no network), and with
+the real Cloudflare Turnstile API if you set SITEVERIFY_URL and CAPTCHA_SECRET (Bonus 2).
+
+Try it on its own, with the store (or `python provider/mock_turnstile.py`) running; when the
+TODOs are done it prints 1 accept and 3 rejects:
+
+    python -m defenses.siteverify
 """
 
 import os
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 import httpx
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from labkit import PROVIDER_URL, SECRET  # noqa: E402
+from . import policy
 
-SITEVERIFY_URL = os.environ.get("SITEVERIFY_URL",
-                                f"{PROVIDER_URL}/turnstile/v0/siteverify")
 MAX_TOKEN_AGE_S = 300      # Turnstile tokens are valid for 300 s
 TIMEOUT_S = 3.0
 
@@ -45,53 +46,61 @@ TIMEOUT_S = 3.0
 _http = httpx.Client()
 
 
+def siteverify_url():
+    base = os.environ.get("PROVIDER_URL", "http://127.0.0.1:5001")
+    return os.environ.get("SITEVERIFY_URL", f"{base}/turnstile/v0/siteverify")
+
+
 @dataclass
-class Verdict:
+class Result:
     ok: bool
     reason: str
     outcome: dict = field(default_factory=dict)
 
 
-def verify_token(token, *, remoteip, expected_action, expected_hostnames,
-                 fail_mode="closed"):
+def _age_seconds(challenge_ts):
+    issued = datetime.fromisoformat(challenge_ts.replace("Z", "+00:00"))
+    return (datetime.now(timezone.utc) - issued).total_seconds()
+
+
+def verify_token(token, *, remoteip, expected_action, expected_hostnames, fail_mode="closed"):
     """Redeem `token` with the provider and decide whether to accept it."""
     # TODO (Round 1): a missing token must be a failure, not a pass.
     if not token:
-        return Verdict(True, "no token: widget probably failed to load, letting it through")
+        return Result(True, "no token: widget probably failed to load, letting it through")
 
     try:
-        # TODO (Round 1): pass timeout=TIMEOUT_S, and check the HTTP status.
-        r = _http.post(SITEVERIFY_URL, data={"secret": SECRET, "response": token,
-                                             "remoteip": remoteip})
+        # TODO (Round 1): pass timeout=TIMEOUT_S, and check the HTTP status (r.raise_for_status()).
+        r = _http.post(siteverify_url(),
+                       data={"secret": policy.SECRET, "response": token, "remoteip": remoteip})
         outcome = r.json()
     except Exception as exc:
-        # TODO (Round 1): honour fail_mode ("closed" rejects, "open" accepts)
-        #   instead of always accepting. Failing open here lets anyone in
-        #   during an outage.
-        return Verdict(True, f"provider error ({type(exc).__name__}): failing open")
+        # TODO (Round 1): honour fail_mode ("closed" rejects, "open" accepts) instead of
+        #   always accepting. Failing open here lets anyone in during an outage.
+        return Result(True, f"provider error ({type(exc).__name__}): failing open")
 
     if not outcome.get("success"):
-        return Verdict(False, f"provider rejected token: {outcome.get('error-codes')}", outcome)
+        return Result(False, f"provider rejected token: {outcome.get('error-codes')}", outcome)
 
-    # TODO (Round 1): reject if outcome["hostname"] is not in expected_hostnames.
-    # TODO (Round 1): reject if outcome["action"] != expected_action.
+    # TODO (Round 1): reject if outcome["hostname"] is not in expected_hostnames, and if
+    #   outcome["action"] != expected_action.
     # TODO (Round 1): reject if outcome["challenge_ts"] is older than MAX_TOKEN_AGE_S
-    #   It looks like "2026-10-10T09:15:02.123Z"; before Python 3.11, replace the
-    #   trailing "Z" with "+00:00" before datetime.fromisoformat().
-    return Verdict(True, "provider accepted token", outcome)
-
+    #   (_age_seconds() parses it), or missing.
+    return Result(True, "provider accepted token", outcome)
 
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+    from captcha_kit import mint_token
+
     print("Exercise the verifier against the running mock provider:\n")
-    from labkit import mint_token
     cases = {
-        "valid register token": mint_token("198.51.100.7", "register"),
+        "valid register token": mint_token("192.0.2.10", "register"),
         "newsletter token": mint_token("203.0.113.9", "newsletter"),
-        "token from another site": mint_token("203.0.113.9", "register",
-                                              hostname="free-movies.example"),
+        "token from another site": mint_token("203.0.113.9", "register", hostname="free-movies.example"),
         "no token": "",
     }
     for label, token in cases.items():
-        v = verify_token(token, remoteip="198.51.100.7", expected_action="register",
-                         expected_hostnames={"localhost", "127.0.0.1"})
+        v = verify_token(token, remoteip="192.0.2.10", expected_action="register",
+                         expected_hostnames=policy.OUR_HOSTNAMES)
         print(f"  {'accept' if v.ok else 'reject':<7} {label:<26} {v.reason}")

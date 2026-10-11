@@ -1,23 +1,29 @@
 """
-Chapter 4 — Defense Layer 3b: Header Order Fingerprinting (Section 4.6)
+Chapter 4, Round 3 defense (L3b): header order fingerprinting.
 
-Browsers emit headers in a fixed order baked into their network stack.
-HTTP libraries use their own order (python-requests always starts with
-User-Agent, Accept-Encoding, Accept, Connection), and copy-pasting header
-*values* does not fix the *order*.
+Browsers emit headers in a fixed order baked into their network stack. HTTP libraries use their own
+(python-requests starts with User-Agent, Accept-Encoding, Accept, Connection), and copy-pasting header
+*values* does not fix the *order*. `ctx.headers` is a list in arrival order, with the lab's own
+`X-Lab-*` headers already removed, so this check sees what a production origin would.
 
-Rather than matching a full template (which changes between versions and
-between navigation vs fetch requests), we check a few stable "A comes before
-B" relationships that hold for Chromium.
+Rather than matching a full template (which changes between versions and between navigation and
+fetch requests), it checks a few stable "A comes before B" relationships that hold for Chromium.
 
-Caveats: this only works when your server sees the raw order. Werkzeug's dev
-server and gunicorn preserve it in the WSGI environ; many reverse proxies and
-CDNs re-order or normalise headers. HTTP/2 lower-cases names, so casing is
-not a signal here. Keep the weight low: alone it should only reach
-"suspicious".
+What it catches: Round 3 (copied values, Python's order), and any client that builds its header dict
+by hand.
 
-Enabled when DEFENSE_LEVEL >= 3.
+What it misses: a client that sets the order too (Round 4), and anything that is a real Chromium.
+
+Who it hurts: it only works if your server sees the raw order. Many reverse proxies and CDNs re-order
+or normalise headers, and HTTP/2 lower-cases names (so casing is not a signal here). Put this behind
+a proxy you have not tested and it fires on real users. That is why the weight is low: alone it only
+reaches "suspicious".
+
+    python -m defenses.header_order      # from the lab folder
 """
+
+from .header_util import demo_ctx, note_reasons, show
+from .pipeline import Check, Signal
 
 # (before, after) pairs that hold for Chromium on navigation and fetch requests
 CHROMIUM_ORDER_RULES = [
@@ -27,37 +33,38 @@ CHROMIUM_ORDER_RULES = [
     ("sec-fetch-dest", "accept-encoding"),
     ("accept-encoding", "accept-language"),
 ]
-
 MAX_VIOLATIONS = 1
 
 
 def order_violations(header_names, rules=CHROMIUM_ORDER_RULES):
-    """Return the list of (before, after) rules broken by this header order."""
+    """The (before, after) rules broken by this header order."""
     position = {}
     for i, name in enumerate(header_names):
         position.setdefault(name.lower(), i)
-    broken = []
-    for before, after in rules:
-        if before in position and after in position and position[before] > position[after]:
-            broken.append((before, after))
-    return broken
+    return [(a, b) for a, b in rules if a in position and b in position and position[a] > position[b]]
 
 
 def score_header_order(header_names, ua_string):
-    """
-    Layer 3b: compare header order with Chromium's. Only applied when the UA
-    claims Chromium. Returns (score, reasons).
-    """
+    """Compare the header order with Chromium's. Applies only when the UA claims Chromium."""
     if "Chrome/" not in ua_string or "CriOS" in ua_string:
-        return 0, []
+        return []
     broken = order_violations(header_names)
     if len(broken) > MAX_VIOLATIONS:
         pairs = ", ".join(f"{a} before {b}" for a, b in broken)
-        return 15, [f"Header order unlike Chromium ({len(broken)} rules broken: expected {pairs})"]
-    return 0, []
+        return [Signal("header_order", "unlike_chromium", 15, f"Header order unlike Chromium ({len(broken)} rules broken: expected {pairs})")]
+    return []
 
 
-if __name__ == '__main__':
+def _check(ctx):
+    signals = score_header_order(ctx.header_names, ctx.ua.raw)
+    note_reasons(ctx, signals)
+    return signals
+
+
+CHECK = Check("header_order", _check, phases=("request",))
+
+
+if __name__ == "__main__":
     chrome_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/153.0.0.0 Safari/537.36"
     orders = {
         "Real Chrome navigation": [
@@ -72,7 +79,4 @@ if __name__ == '__main__':
         ],
     }
     for label, names in orders.items():
-        score, reasons = score_header_order(names, chrome_ua)
-        print(f"\n{label}: score={score}")
-        for r in reasons:
-            print(f"  - {r}")
+        show(label, score_header_order(names, chrome_ua))

@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Checking your browser</h1>
+  <p id="pow-status" class="muted" role="status">Solving a small puzzle ({{ payload.difficulty }} bits). This takes a moment.</p>
+  <noscript><p><strong>This page needs JavaScript</strong> to run a short proof-of-work check. Without it, the catalog stays closed.</p></noscript>
+  <script type="application/json" id="pow-payload">{{ payload|tojson }}</script>
+</section>
+{% endblock %}

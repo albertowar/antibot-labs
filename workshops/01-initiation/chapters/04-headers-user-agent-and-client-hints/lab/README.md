@@ -1,5 +1,31 @@
 # Chapter 4 Lab: Headers, User-Agent & Client Hints
 
+Starts from: workshops/01-initiation/starter/ (contract 1.2). Adds: five header checks (`ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `accept_ch`) wired into the ladder, the `headers` feature module, the browser-profile capture and replay tools, six attack scripts and the Chapter 4 shoppers.
+
+<!-- lab-diff:start -->
+**Adds** (files not in the starter):
+
+- `defenses/accept_ch.py`
+- `defenses/client_hints.py`
+- `defenses/header_inspector.py`
+- `defenses/header_order.py`
+- `defenses/header_util.py`
+- `defenses/ua_inspector.py`
+- `demo_site/ext/headers.py`
+- `tools/capture_profiles.py`
+- `tools/headers_client.py`
+- `tools/personas_ch4.py`
+- `tools/profiles/chrome-145-linux.json`
+- `tools/profiles/firefox-155-linux.json`
+- `tools/replay_profiles.py`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
+- `tools/checkpoint.py`
+<!-- lab-diff:end -->
+
 **Format:** 6 rounds of attack ⚔️ defend, ~105 min. See `../chapter_04_content.md`, §4.7.
 
 You play both sides. In each round, the attacker runs a script against the demo store. The defender then turns on the next defense layer and measures two things: what it catches, and what it costs. Then the attacker works out what to try next.
@@ -238,7 +264,7 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ## Instructor: expected results
 
-Verified with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, psycopg 3.3.6, requests 2.34.2, user-agents 2.2.0 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell) on Linux, on the no-Docker path (`DATABASE_URL=sqlite:///...`); the shipped `tools/profiles/` come from real Chrome 145 and Firefox 155. The `docker compose` path (PostgreSQL 18) was also run end to end on 2026-10-11; every checkpoint passes. "403" means every scraping request was blocked.
+Verified with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, psycopg 3.3.6, requests 2.34.2, user-agents 2.2.0 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell) on Linux, on the no-Docker path (`DATABASE_URL=sqlite:///...`); the shipped `tools/profiles/` come from real Chrome 145 and Firefox 155. The `docker compose` path has not been run for the migrated lab. "403" means every scraping request was blocked.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
 |---|---|---|---|---|---|---|

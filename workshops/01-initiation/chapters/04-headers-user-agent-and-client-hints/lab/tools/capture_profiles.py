@@ -1,33 +1,35 @@
 """
-Chapter 4 — Capture Real-Browser Header Profiles (Section 4.7)
+Chapter 4: capture real-browser header profiles.
 
-Opens real, headed browsers with Playwright, visits the demo store and saves
-what /header-check saw into tools/profiles/, for legit_traffic.py to replay.
+Opens real, headed browsers with Playwright, visits the store and saves what /lab/headers/check saw
+into tools/profiles/, for tools/replay_profiles.py to replay.
 
-Run the demo site at DEFENSE_LEVEL=4 first, so the server sends Accept-CH
-and the Chromium profile includes its high-entropy hints:
-    cd demo_site && DEFENSE_LEVEL=4 python app.py
+Run the store at DEFENSE_LEVEL=4 first, so it sends Accept-CH and the Chromium profile includes its
+high-entropy hints:
+    DEFENSE_LEVEL=4 python demo_site/app.py
 Then (needs a display; headless browsers do NOT count as real users):
     python tools/capture_profiles.py
 
+The session and device cookies (sid, did) are dropped from the saved headers: they are this run's
+identifiers and mean nothing to the next store. `ch_offered` stays; it is what makes level 4 check the hints.
+
 Caveat: Playwright's Firefox and WebKit are patched builds, close to but not
 identical to stock Firefox and Safari. Prefer captures from your own browsers
-(save /header-check as JSON), and record where each profile came from.
+(save /lab/headers/check as JSON), and record where each profile came from.
 """
 
 import json
 import os
-import sys
 import platform
+import sys
 from datetime import date
 
 from playwright.sync_api import sync_playwright
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from labclient import BASE_URL  # noqa: E402  (the localhost guard)
 
-PROFILES_DIR = os.path.join(os.path.dirname(__file__), "profiles")
+PROFILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profiles")
 
 BROWSERS = [
     ("chrome", "chromium", {"channel": "chrome"}),   # installed Google Chrome
@@ -36,16 +38,23 @@ BROWSERS = [
 ]
 
 
+def _own_cookies_only(cookie_header):
+    keep = [c.strip() for c in cookie_header.split(";") if c.strip().startswith("ch_offered=")]
+    return "; ".join(keep)
+
+
 def capture(p, name, engine, options):
     browser = getattr(p, engine).launch(headless=False, **options)
     page = browser.new_page()
     page.goto(f"{BASE_URL}/")
     page.wait_for_timeout(1000)       # let the page's fetch() and Accept-CH settle
-    page.goto(f"{BASE_URL}/header-check")
+    page.goto(f"{BASE_URL}/lab/headers/check")
     data = json.loads(page.inner_text("body"))
     if "headers_received" not in data:
         browser.close()
-        raise RuntimeError(f"{BASE_URL} is not the Chapter 4 demo site: {data}")
+        raise RuntimeError(f"{BASE_URL} is not the Chapter 4 store: {data}")
+    data["headers_received"] = [[n, _own_cookies_only(v) if n.lower() == "cookie" else v] for n, v in data["headers_received"]]
+    data["headers_received"] = [[n, v] for n, v in data["headers_received"] if v]
     version = browser.version
     browser.close()
 

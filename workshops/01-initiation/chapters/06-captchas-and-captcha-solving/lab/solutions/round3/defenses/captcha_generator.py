@@ -1,5 +1,5 @@
 """
-Chapter 6 — Self-hosted text CAPTCHA generator (Section 6.3, Round 3)
+Chapter 6, Round 3: the self-hosted text CAPTCHA generator (section 6.3) REFERENCE SOLUTION
 
 Two styles:
 
@@ -13,13 +13,16 @@ Two styles:
             and "the text is the only dark thing in the image".
 
 The trade-off this module makes visible: every hardening step that hurts
-the solver also hurts people. tools/legit_traffic.py assumes first-try
+the solver also hurts people. tools/personas_ch06.py assumes first-try
 human success of 97% (basic) and 88% (hardened), in the range Bursztein
 et al. measured for distorted-text CAPTCHAs (2010). Harder images cost you real
 users long before they cost a determined attacker anything: a custom CNN
 or a multimodal model reads the hardened style too (see the content doc).
 
-The DEFENSE_LEVEL decides the style: basic below 3, hardened at 3 and above.
+defenses/captcha_gate.py picks the style from the level: basic below
+policy.HARDENED_FROM_LEVEL (3), hardened from it.
+
+Try it on its own:  python defenses/captcha_generator.py   (writes sample_*.png here)
 """
 
 import functools

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block page %}pow-bench{% endblock %}{% block title %}PoW bench · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>How fast is this browser?</h1>
+  <p class="muted">Runs the store's own solver (pure-JS SHA-256 in Web Workers) for 3 s per row. Write the numbers down: Round 0 uses them.</p>
+  <button id="pow-bench-go" class="btn">Run benchmark</button>
+  <table><thead><tr><th>workers</th><th>MH/s</th><th>16-bit p50</th><th>16-bit p95</th></tr></thead><tbody id="pow-bench-out"></tbody></table>
+</section>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block page %}home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <p class="eyebrow">New season</p>
+    <h1>Gear that goes further than the forecast.</h1>
+    <p class="lead">Trail runners, packs and shells built with our trail crew. Limited drops every month.</p>
+    <div class="actions"><a class="btn" href="/products">Shop all gear</a><a class="btn ghost" href="/drop/{{ drops[0].sku if drops else 'lab-runner-9' }}">This month's drop</a></div>
+  </div>
+  <div class="hero-art" aria-hidden="true"><img src="/img/{{ featured[0].sku if featured else 'p001' }}.svg?w=480" alt="" width="480" height="480"></div>
+</section>
+{% if drops %}
+<section class="drops">
+  <div class="section-head"><h2>Drops</h2><a href="/drop/{{ drops[0].sku }}" class="muted">How drops work</a></div>
+  <div class="drop-grid">
+    {% for d in drops %}
+    <a class="drop-card" href="/drop/{{ d.sku }}" data-sku="{{ d.sku }}">
+      <img src="/img/{{ d.sku }}.svg" alt="" width="160" height="160">
+      <div>
+        <span class="tag drop">{% if d.drop_open %}Live now{% else %}Opens soon{% endif %}</span>
+        <h3>{{ d.name }}</h3>
+        <p class="muted">{{ d.blurb }}</p>
+        <p><span class="price">${{ "%.2f"|format(d.price) }}</span> <span class="muted">· {{ d.stock }} left</span></p>
+        {% if not d.drop_open and d.drop_at %}<p class="countdown muted" data-drop-at="{{ d.drop_at.isoformat() }}Z">Opens {{ d.drop_at.strftime('%b %d %H:%M') }} UTC</p>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section>
+  <div class="section-head"><h2>Top rated</h2><a href="/products?sort=rating" class="muted">See all</a></div>
+  <div class="grid">{% for p in featured %}{% include "partials/_card.html" %}{% endfor %}</div>
+</section>
+<section class="band">
+  <div><h3>Free returns, 60 days</h3><p class="muted">Walk it, run it, send it back if it does not fit.</p></div>
+  <div><h3>Repair before replace</h3><p class="muted">Every shell and pack comes with a lifetime repair program.</p></div>
+  <div><h3>Loyalty points</h3><p class="muted">One point per dollar. Redeem gift cards into your account.</p></div>
+</section>
+{% endblock %}

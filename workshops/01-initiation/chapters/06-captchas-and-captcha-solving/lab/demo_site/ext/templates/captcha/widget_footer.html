@@ -1,0 +1,15 @@
+{% if config['LAB'].defense_level >= 1 %}
+<script>
+  /* The newsletter form lives in the shared footer, which has no slot of its own: add the widget's
+     container here, before the (mock) provider script looks for .cf-turnstile elements. */
+  (function () {
+    var form = document.querySelector("form.newsletter");
+    if (!form) return;
+    var box = document.createElement("div");
+    box.className = "cf-turnstile"; box.setAttribute("data-sitekey", "{{ captcha_sitekey }}");
+    box.setAttribute("data-action", "newsletter"); box.setAttribute("data-testid", "turnstile-newsletter");
+    form.appendChild(box);
+  })();
+</script>
+<script src="{{ captcha_provider() }}/turnstile/v0/api.js"></script>
+{% endif %}

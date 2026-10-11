@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block page %}promo{% endblock %}{% block title %}Your $10 voucher · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow" id="promo">
+  <p class="eyebrow">Welcome offer</p>
+  <h1>Claim your $10 voucher</h1>
+  <p class="muted">One voucher per visit. (A lab feature: it is what a bot with a CAPTCHA solver would farm.)</p>
+  <form id="promo-form" action="/lab/promo/redeem" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn big" type="submit" id="claim">Claim voucher</button>
+  </form>
+  <div id="captcha-box" data-testid="captcha"></div>
+  <p id="voucher" class="flash ok" role="status" data-testid="voucher" {% if not voucher %}hidden{% endif %}>Your voucher: <strong>{{ voucher or '' }}</strong></p>
+  <p id="promo-msg" class="muted" role="status"></p>
+</section>
+<script src="/static/js/captcha.js" defer></script>
+{% endblock %}

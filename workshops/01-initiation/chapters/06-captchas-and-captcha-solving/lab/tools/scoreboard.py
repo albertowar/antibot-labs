@@ -1,63 +1,55 @@
 """
-Chapter 6 — Solve-time scoreboard (Round 4 design aid)
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Every CAPTCHA check the demo site makes is logged to the Redis stream
-lab:solvelog: who submitted (human / bot / farm, a lab-only label the
-defenses never see), whether the answer was right, the solve time in
-simulated seconds, and whether the submitting IP matched the issuer.
-
-Use the histogram to pick FAST_SOLVE_SIM_S and FARM_BAND_SIM_S in
-defenses/solver_signals.py. Generate data first, at DEFENSE_LEVEL=3:
-    python tools/legit_traffic.py
-    python attacks/round4_retry_ocr.py
-    python attacks/round4_solver_farm.py
-Then:
-    python tools/scoreboard.py
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
-import os
-import sys
+import argparse
+import json
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from labkit import redis_client  # noqa: E402
-
-BUCKETS = [0, 1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 60]
+from labclient import scoreboard
 
 
-def bucket(t):
-    for lo, hi in zip(BUCKETS, BUCKETS[1:]):
-        if lo <= t < hi:
-            return f"{lo:>2}–{hi:<2} s"
-    return f"{BUCKETS[-1]}+ s  "
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
+            continue
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
 
 
-def main():
-    rows = [fields for _, fields in redis_client().xrange("lab:solvelog")]
-    if not rows:
-        print("No solves logged yet. Run some traffic first (see the docstring).")
-        return
-    actors = sorted({r["actor"] for r in rows})
-    counts = {}
-    for r in rows:
-        t = float(r["solve_sim"])
-        if t >= 0 and r["ok"] == "1":
-            counts.setdefault(bucket(t), {}).setdefault(r["actor"], 0)
-            counts[bucket(t)][r["actor"]] += 1
-    marks = {"human": "█", "bot": "▒", "farm": "░"}
-    print("Correct solves by solve time (simulated seconds)\n")
-    print("          " + "   ".join(f"{marks.get(a, '?')} {a}" for a in actors))
-    for lo, hi in zip(BUCKETS, BUCKETS[1:] + [None]):
-        key = f"{lo:>2}–{hi:<2} s" if hi else f"{BUCKETS[-1]}+ s  "
-        row = counts.get(key, {})
-        bar = "".join(marks.get(a, "?") * min(40, row.get(a, 0)) for a in actors)
-        print(f"  {key}  {bar} {' '.join(f'{a}={n}' for a, n in sorted(row.items()))}")
-    for a in actors:
-        mine = [r for r in rows if r["actor"] == a]
-        wrong = sum(r["ok"] == "0" for r in mine)
-        moved = sum(r.get("ip_match") == "0" for r in mine)
-        print(f"\n  {a:<6} {len(mine)} checks · {wrong} wrong answers · "
-              f"{moved} submitted from a different IP than the issuer")
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

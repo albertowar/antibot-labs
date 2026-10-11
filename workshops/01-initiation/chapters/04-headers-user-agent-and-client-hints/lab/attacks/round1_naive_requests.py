@@ -1,55 +1,28 @@
 """
-Chapter 4 — Round 1 Attack: Naive Scraper (Section 4.7)
+Chapter 4, Round 1 attack: the naive scraper.
 
-Objective: scrape the product catalogue with python-requests defaults. This
-is what most first-time scrapers (and a surprising amount of real bot
-traffic) look like on the wire.
+Objective: scrape the catalog (five pages of /api/products) with python-requests defaults. This is what
+most first-time scrapers, and a surprising amount of real bot traffic, look like on the wire:
+`User-Agent: python-requests/2.x`, `Accept: */*`, and nothing a browser would send.
 
-Expected results:
-  - DEFENSE_LEVEL=0 → 200, products scraped
-  - DEFENSE_LEVEL=1 → 403, "[L1] UA red flag: Raw HTTP library (Python requests)"
+Expected:
+  DEFENSE_LEVEL=0     5/5 pages
+  DEFENSE_LEVEL>=1    0/5, X-Lab-Signals: ua:red_flag
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=0 python app.py
-Then run:
     python attacks/round1_naive_requests.py
 """
 
 import os
 import sys
 
-import requests
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
-
-TARGET_URL = f"{BASE_URL}/api/products"
-
-
-def to_result(path, r):
-    data = r.json()
-    return {"path": path, "status": r.status_code, "data": data,
-            "reasons": data.get("reasons", []) if r.status_code == 403 else []}
-
-
-def report(result):
-    print(f"  Status: {result['status']}")
-    if result["status"] == 200:
-        print(f"  Scraped: {[p['name'] for p in result['data']['products']]}")
-    else:
-        print(f"  Blocked (score {result['data'].get('score')}):")
-        for reason in result["reasons"]:
-            print(f"    - {reason}")
-    print()
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from headers_client import Tally, bot, fetch_catalog, finish, requests_defaults  # noqa: E402
 
 
 def run():
-    """Run the attack; return one result per scraping request (used by tools/checkpoint.py)."""
-    return [to_result("/api/products", requests.get(TARGET_URL, timeout=5))]
+    return fetch_catalog(bot("naive-requests", 1), requests_defaults(), Tally("round1_naive_requests")).result()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=== Round 1: python-requests defaults ===")
-    for result in run():
-        report(result)
+    finish(run())

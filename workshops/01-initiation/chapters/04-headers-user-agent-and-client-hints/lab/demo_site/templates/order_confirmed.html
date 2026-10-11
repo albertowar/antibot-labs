@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block page %}confirmed{% endblock %}{% block title %}Order confirmed · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="confirm card" data-testid="order-confirmed">
+  <p class="eyebrow">Thank you</p>
+  <h1>Order {{ order.number if order else 'K' ~ range(10000000, 99999999)|random }} confirmed</h1>
+  {% if order %}
+  <p>We emailed a receipt to <strong>{{ order.email }}</strong>.</p>
+  <ul class="lines-plain">{% for i in order.items %}<li>{{ i.qty }} × {{ i.name }}{% if i.size %} ({{ i.size }}){% endif %} — ${{ "%.2f"|format(i.price_cents * i.qty / 100) }}</li>{% endfor %}</ul>
+  <p class="total"><span>Total</span><span>${{ "%.2f"|format(order.total / 1) }}</span></p>
+  {% else %}<p>We emailed a receipt. Your order ships in 2–4 days.</p>{% endif %}
+  <div class="actions"><a class="btn" href="/products">Keep shopping</a>{% if user %}<a class="btn ghost" href="/orders">Your orders</a>{% endif %}</div>
+</section>
+{% endblock %}

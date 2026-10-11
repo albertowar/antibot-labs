@@ -4,8 +4,8 @@ Chapter 7 — Round 1 Defense (L1): a PoW gate with a naive verifier
 This is the design most first implementations end up with, and it is
 close to the code in many tutorials:
 
-  GET  /pow/challenge  -> {"nonce": ..., "difficulty": 16, "issued_at": ...}
-  POST /pow/verify     <- {"challenge": <the same JSON>, "counter": ...}
+  GET  /api/challenge?type=pow  (or the gate's 403 payload) -> {"nonce": ..., "difficulty": 16, "issued_at": ...}
+  POST /api/challenge/verify  <- {"type": "pow", "answer": {"challenge": <the same JSON>, "counter": ...}}
 
 It looks reasonable, but it is broken. The server keeps no state, so it
 trusts the challenge the *client* sends back, including `difficulty`.
@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import time
 
-from pow_core import digest, meets_difficulty
+from .pow_core import digest, meets_difficulty
 
 
 def issue(difficulty: int) -> dict:

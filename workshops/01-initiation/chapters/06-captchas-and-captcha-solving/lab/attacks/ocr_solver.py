@@ -1,5 +1,5 @@
 """
-Chapter 6 — A small, targeted CAPTCHA solver (used by Rounds 3 and 4)
+Chapter 6: a small, targeted CAPTCHA solver (used by Rounds 3 and 4)
 
 Not a general OCR engine. It is the kind of solver one person writes in an
 afternoon against ONE site's CAPTCHA, which is the realistic threat for a
@@ -32,8 +32,9 @@ from PIL import Image, ImageFilter
 from scipy import ndimage
 from sklearn.neighbors import KNeighborsClassifier
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "defenses"))
-import captcha_generator  # noqa: E402  (white-box: the defender's own code)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+import labclient  # noqa: E402,F401  (the localhost guard; also puts the lab root on sys.path)
+from defenses import captcha_generator  # noqa: E402  (white-box: the defender's own code)
 
 GLYPH = 20
 MIN_PIXELS = 40

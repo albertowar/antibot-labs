@@ -1,8 +1,9 @@
 """
-Chapter 6 — Mock CAPTCHA provider with a Turnstile-compatible API (port 5001)
+Chapter 6: a MOCK CAPTCHA provider with a Turnstile-compatible API (port 5001)
 
-A stand-in for a hosted CAPTCHA service, so the lab runs offline with no
-account and no keys. It copies the contract that matters to YOUR server:
+This is not Cloudflare and talks to nobody. It is a stand-in for a hosted CAPTCHA service, so the
+lab runs offline with no account and TEST keys only (the pair in defenses/policy.py). It copies the
+contract that matters to YOUR server:
 
   GET  /turnstile/v0/api.js        widget script: renders a box, puts a
                                    token in the hidden input
@@ -21,10 +22,16 @@ Its domain allowlist is off, the way test keys and many misconfigured
 sitekeys behave, so a page on another hostname can mint tokens for your
 sitekey. Checking `hostname` is your job.
 
+Local only, on purpose: it binds 127.0.0.1, refuses any request that is not from loopback, and
+refuses to start for a PROVIDER_URL that is not this machine (tools/labclient.py is the one guard).
+The store starts it for you (demo_site/ext/captcha.py); run it by hand with
+`python provider/mock_turnstile.py` if you want it in its own terminal (PROVIDER_AUTOSTART=0 on the store).
+
 Lab-only endpoints:
   POST /lab/mint    what the widget calls after a pass
-  POST /lab/chaos   {"mode": "ok" | "error", "seconds": 5}: simulate an
-                    outage (siteverify returns HTTP 500 for a few seconds)
+  POST /lab/chaos   {"mode": "ok" | "error", "seconds": 5, "ip": null}: simulate an
+                    outage (siteverify returns HTTP 500 for a few seconds; with "ip",
+                    only for calls whose remoteip is that address)
   POST /lab/reset   forget every token
 """
 
@@ -37,14 +44,17 @@ from datetime import datetime, timezone
 
 from flask import Flask, Response, jsonify, request
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from labkit import SECRET, SITEKEY  # noqa: E402
+LAB = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path[:0] = [LAB, os.path.join(LAB, "tools")]
+from defenses.policy import SECRET, SITEKEY  # noqa: E402  (the mock's test keys: one source of truth)
+from labclient import assert_local  # noqa: E402  (the one localhost guard)
 
 TOKEN_TTL_S = 300
 app = Flask(__name__)
 _tokens = {}
 _lock = threading.Lock()
 _chaos_until = 0.0
+_chaos_ip = None
 
 WIDGET_JS = """
 (function () {
@@ -68,6 +78,13 @@ WIDGET_JS = """
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+@app.before_request
+def loopback_only():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "this mock provider only answers the machine it runs on"}), 403
+    return None
 
 
 @app.after_request
@@ -104,10 +121,10 @@ def mint():
 
 @app.post("/turnstile/v0/siteverify")
 def siteverify():
-    if time.time() < _chaos_until:
+    data = request.form if request.form else (request.get_json(silent=True) or {})
+    if time.time() < _chaos_until and _chaos_ip in (None, data.get("remoteip")):
         return Response("<html><h1>502 Bad Gateway</h1></html>", status=500,
                         mimetype="text/html")
-    data = request.form if request.form else (request.get_json(silent=True) or {})
     secret, token = data.get("secret"), data.get("response")
 
     def fail(*codes):
@@ -133,19 +150,20 @@ def siteverify():
 
 @app.post("/lab/chaos")
 def chaos():
-    global _chaos_until
+    global _chaos_until, _chaos_ip
     data = request.get_json(force=True)
     seconds = min(float(data.get("seconds", 5)), 30)
     _chaos_until = time.time() + seconds if data.get("mode") == "error" else 0.0
+    _chaos_ip = data.get("ip") or None
     return jsonify({"mode": data.get("mode"), "seconds": seconds})
 
 
 @app.post("/lab/reset")
 def reset():
-    global _chaos_until
+    global _chaos_until, _chaos_ip
     with _lock:
         _tokens.clear()
-    _chaos_until = 0.0
+    _chaos_until, _chaos_ip = 0.0, None
     return jsonify({"ok": True})
 
 
@@ -155,5 +173,5 @@ def health():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=int(os.environ.get("PROVIDER_PORT", "5001")),
-            threaded=True)
+    assert_local(os.environ.get("PROVIDER_URL", "http://127.0.0.1:5001"))
+    app.run(host="127.0.0.1", port=int(os.environ.get("PROVIDER_PORT", "5001")), threaded=True)

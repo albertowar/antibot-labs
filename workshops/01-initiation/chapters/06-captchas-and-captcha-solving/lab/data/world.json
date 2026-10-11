@@ -1,0 +1,158 @@
+{
+ "_comment": [
+  "The simulated internet for every lab. Every address comes from a documentation range",
+  "(RFC 5737 IPv4, RFC 3849 IPv6) and every ASN from the documentation range (RFC 5398), so",
+  "nothing here can ever point at a real network. demo_site/lab_edge.py accepts X-Lab-Client-IP",
+  "only for addresses inside these pools; tools/labclient.py picks source addresses from them.",
+  "`type` is ground truth for the scoreboard and is NEVER exposed to defenses: they must infer",
+  "it from data/feeds/* (built by tools/build_world.py), like a production stack would.",
+  "Allocation: 192.0.2.0/24 residential ISPs; 198.51.100.0/24 mobile, corporate, universities,",
+  "privacy relays; 203.0.113.0/24 datacenter, hosting, VPN, Tor, open proxies; 2001:db8::/32",
+  "one /48 per pool that needs a large fleet. See workshops/STORE_CONTRACT.md before adding a pool."
+ ],
+ "student_ip": "192.0.2.10",
+ "pools": {
+  "home_broadband": {
+   "cidr": "192.0.2.0/26",
+   "hosts": 60,
+   "asn": 64496,
+   "org": "Example Broadband",
+   "type": "residential",
+   "country": "US",
+   "tz": "America/New_York"
+  },
+  "home_cable": {
+   "cidr": "192.0.2.64/26",
+   "hosts": 60,
+   "asn": 64497,
+   "org": "Example Cable",
+   "type": "residential",
+   "country": "US",
+   "tz": "America/Chicago"
+  },
+  "home_fiber": {
+   "cidr": "192.0.2.128/26",
+   "hosts": 60,
+   "asn": 64498,
+   "org": "Example Fiber",
+   "type": "residential",
+   "country": "US",
+   "tz": "America/Los_Angeles"
+  },
+  "home_eu": {
+   "cidr": "192.0.2.192/26",
+   "hosts": 60,
+   "asn": 64499,
+   "org": "Example Telecom EU",
+   "type": "residential",
+   "country": "DE",
+   "tz": "Europe/Berlin"
+  },
+  "mobile_cgnat": {
+   "cidr": "198.51.100.0/30",
+   "hosts": 2,
+   "asn": 64500,
+   "org": "Example Mobile (CGNAT)",
+   "type": "mobile",
+   "country": "US",
+   "tz": "America/New_York",
+   "nat_users": 4000
+  },
+  "corporate": {
+   "cidr": "198.51.100.16/28",
+   "hosts": 4,
+   "asn": 64505,
+   "org": "Example Corp Egress",
+   "type": "corporate",
+   "country": "US",
+   "tz": "America/New_York",
+   "nat_users": 800
+  },
+  "university": {
+   "cidr": "198.51.100.32/28",
+   "hosts": 4,
+   "asn": 64506,
+   "org": "Example University",
+   "type": "corporate",
+   "country": "GB",
+   "tz": "Europe/London",
+   "nat_users": 3000
+  },
+  "private_relay": {
+   "cidr": "198.51.100.64/27",
+   "hosts": 8,
+   "asn": 64507,
+   "org": "Example Privacy Relay",
+   "type": "relay",
+   "country": "US",
+   "tz": "America/Los_Angeles"
+  },
+  "consumer_vpn": {
+   "cidr": "203.0.113.128/27",
+   "hosts": 12,
+   "asn": 64502,
+   "org": "Example VPN",
+   "type": "vpn",
+   "country": "NL",
+   "tz": "Europe/Amsterdam"
+  },
+  "cloud_vm": {
+   "cidr": "203.0.113.0/26",
+   "hosts": 60,
+   "asn": 64501,
+   "org": "Example Cloud",
+   "type": "datacenter",
+   "country": "US",
+   "tz": "America/New_York"
+  },
+  "hosting_asn": {
+   "cidr": "203.0.113.64/26",
+   "hosts": 60,
+   "asn": 64504,
+   "org": "Example Hosting GmbH",
+   "type": "datacenter",
+   "country": "DE",
+   "tz": "Europe/Berlin"
+  },
+  "tor_exit": {
+   "cidr": "203.0.113.192/27",
+   "hosts": 12,
+   "asn": 64503,
+   "org": "Tor exits (simulated)",
+   "type": "tor",
+   "country": "DE",
+   "tz": "Europe/Berlin"
+  },
+  "open_proxy": {
+   "cidr": "203.0.113.224/27",
+   "hosts": 12,
+   "asn": 64508,
+   "org": "Example Hosting LLC",
+   "type": "proxy",
+   "country": "US",
+   "tz": "America/Chicago"
+  },
+  "residential_proxy": {
+   "cidr": "2001:db8:a::/48",
+   "hosts": 400,
+   "asn": 64496,
+   "org": "Example Broadband",
+   "type": "residential_proxy",
+   "country": "US",
+   "tz": "America/New_York"
+  },
+  "home_v6": {
+   "cidr": "2001:db8:b::/48",
+   "hosts": 60,
+   "asn": 64497,
+   "org": "Example Cable",
+   "type": "residential",
+   "country": "US",
+   "tz": "America/Chicago"
+  }
+ },
+ "community_blocklist": [
+  "203.0.113.224/27",
+  "203.0.113.192/27"
+ ]
+}

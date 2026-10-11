@@ -1,5 +1,8 @@
-venv/
 .venv/
+instance/
+logs/
 __pycache__/
-defenses/_backup/
+*.pyc
+*.bak
+.env
 sample_*.png

@@ -1,5 +1,33 @@
 # Chapter 6 Lab: Price the Puzzle
 
+Starts from: workshops/01-initiation/starter/ (contract 1.2). Adds: the `captcha` challenge type and widget templates, the Turnstile-style siteverify check, the self-hosted image CAPTCHA and its challenge store, the solver signals, the local mock provider, eight attack scripts (bypass, replay, OCR, farm) and the Chapter 6 shoppers.
+
+<!-- lab-diff:start -->
+**Adds** (files not in the starter):
+
+- `defenses/captcha_gate.py`
+- `defenses/captcha_generator.py`
+- `defenses/challenge_store.py`
+- `defenses/siteverify.py`
+- `defenses/solver_signals.py`
+- `defenses/turnstile_check.py`
+- `demo_site/ext/captcha.py`
+- `demo_site/ext/templates/captcha/interstitial.html`
+- `demo_site/ext/templates/captcha/promo.html`
+- `demo_site/ext/templates/captcha/widget_footer.html`
+- `demo_site/ext/templates/captcha/widget_register.html`
+- `demo_site/static/js/captcha.js`
+- `tools/captcha_kit.py`
+- `tools/personas_ch06.py`
+- `tools/solve_times.py`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
+- `tools/checkpoint.py`
+<!-- lab-diff:end -->
+
 **Format:** Round 0 plus 4 rounds of attack ⚔️ defend, 77 min, then a 10-minute debrief. See `../chapter_06_content.md`, §6.6.
 
 You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (`TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
@@ -231,7 +259,7 @@ Then use the discussion questions in the content doc (§6.6).
 
 ## Instructor: expected results
 
-Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, redis 8.1.0, fakeredis 2.39.0 standing in for Redis, httpx 0.28.1, Pillow 12.3.0, numpy 2.5.4 and scikit-learn 1.9.1, `LAB_TIME_SCALE=5`, and the reference solutions (`--catch-up`). The `docker compose` path (Redis 8.10) was also run end to end on 2026-10-11 (Rounds 0-4 with `--catch-up`); every checkpoint passes. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
+Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, redis 8.1.0, fakeredis 2.39.0 standing in for Redis, httpx 0.28.1, Pillow 12.3.0, numpy 2.5.4 and scikit-learn 1.9.1, `LAB_TIME_SCALE=5`, and the reference solutions (`--catch-up`). The `docker compose` path has not been run for the migrated lab. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
 
 | Attack ↓ / state → | L0 | L1 before | L1 after | L2 before | L2 after | L3 before | L3 after | L4 before | L4 after |
 |---|---|---|---|---|---|---|---|---|---|

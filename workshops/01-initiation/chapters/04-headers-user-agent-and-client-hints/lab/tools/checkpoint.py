@@ -1,122 +1,100 @@
 """
-Chapter 4 — Round Checkpoint (Section 4.7)
+Round checkpoint for Chapter 4 (Headers, User-Agent & Client Hints). Declares the rounds and hands over
+to checkpoint_core.
 
-Run at the end of every round to check you are where you should be, and to
-measure BOTH sides of the defense:
+    python tools/checkpoint.py --round 3              # set the level, run every scraper next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first
+    python tools/checkpoint.py --all --markdown       # every round (the instructor's table)
 
-  - bot traffic:   every attack script, blocked or not, vs. the expected result
-  - real users:    replayed real-browser profiles (tools/legit_traffic.py)
-  - defender cost: header-scoring time per request (Server-Timing)
+Every round runs the same set of scrapers against that round's level, so you see the whole attack by defense
+matrix grow one diagonal at a time. A scraper is expected to get through (`full`) until the level that is
+built to stop it (`blocked`). Next to them, three measures of the other side:
 
-Fell behind? The defenses are already written; catching up means restarting
-the demo site with the round's level:
-    cd demo_site && DEFENSE_LEVEL=<round> python app.py
+  - the shoppers (tools/population.py + tools/personas_ch4.py): who was stopped who should not have been;
+    the stale-Chrome shopper is the one to watch, because it is "suspicious" (score 20) from level 1 on
+  - the real-browser profiles (tools/profiles, replayed by tools/replay_profiles.py): zero stopped
+  - the defender's cost: the gate's time per replayed request, from Server-Timing
 
-Run:
-    python tools/checkpoint.py --round 3
-    python tools/checkpoint.py --round 3 --skip-browser   # skip the Playwright attack
+The two Playwright scrapers need `pip install -r requirements-browser.txt` and
+`python -m playwright install chromium`. No browser? `SKIP_BROWSER=1 python tools/checkpoint.py --round 3`.
 """
 
-import argparse
-import importlib.util
-import json
 import os
 import statistics
 import sys
-import urllib.request
 
-import legit_traffic
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
+import personas_ch4  # noqa: E402,F401  (registers the shoppers' Accept-CH behaviour)
+import replay_profiles  # noqa: E402
+from checkpoint_core import Round, main  # noqa: E402
 
-ATTACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "attacks")
+SKIP_BROWSER = bool(os.environ.get("SKIP_BROWSER"))
 
-# attack script -> first DEFENSE_LEVEL that blocks it
-FIRST_BLOCKED_AT = {
-    "round1_naive_requests": 1,
-    "round2_fake_ua": 2,
-    "round3_devtools_copy": 3,
-    "round4_client_hints_spoof": 4,
-    "round5_playwright_ua_override": 3,
+SCRAPERS = {                                    # name -> script, and the first level that stops it
+    "naive": ("attacks/round1_naive_requests.py", 1),
+    "fake_ua": ("attacks/round2_fake_ua.py", 2),
+    "copied": ("attacks/round3_devtools_copy.py", 3),
+    "spoof": ("attacks/round4_client_hints_spoof.py", 4),
 }
-SCRAPE_PATH = "/api/products"
+BROWSERS = {
+    "headless": ("attacks/round5_playwright_ua_override.py --no-override", 1),
+    "override": ("attacks/round5_playwright_ua_override.py", 3),
+}
 
 
-def load_attack(name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(ATTACKS_DIR, f"{name}.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def attacks_at(level, scrapers=True, browsers=True):
+    """(attacks, expect) for a checkpoint at `level`: every scraper, each blocked from its own level on."""
+    specs = dict(SCRAPERS) if scrapers else {}
+    if browsers and not SKIP_BROWSER:
+        specs.update(BROWSERS)
+    attacks = {name: script for name, (script, _) in specs.items()}
+    expect = {name: ("blocked" if level >= first else "full") for name, (_, first) in specs.items()}
+    return attacks, expect
 
 
-def server_level():
-    with urllib.request.urlopen(f"{BASE_URL}/header-check", timeout=5) as r:
-        return json.loads(r.read())["level"]
+def report_profiles(board, results):
+    """Real browsers must never be stopped, and the gate's cost per request is reported next to it."""
+    out = replay_profiles.run()
+    replay_profiles.print_run(out)
+    stopped = [r for r in out if r["status"] != 200]
+    times = [r["gate_ms"] for r in out if r["gate_ms"] is not None]
+    if times:
+        p95 = statistics.quantiles(times, n=20)[-1] if len(times) >= 2 else times[0]
+        print(f"\n  Defender cost on these requests: median {statistics.median(times):.2f} ms, p95 {p95:.2f} ms "
+              f"(the gate: Ctx build + every check)")
+    return not stopped, "a real browser's headers were stopped: " + ", ".join(f"{r['profile']} {r['path']}" for r in stopped)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 6))
-    parser.add_argument("--skip-browser", action="store_true", help="skip the Playwright attack")
-    args = parser.parse_args()
-
-    expected_level = min(args.round, 4)
-    try:
-        level = server_level()
-    except OSError:
-        print(f"❌ Demo site not reachable on {BASE_URL}. Is it running?")
-        return 1
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={level}) ===\n")
-    if level != expected_level:
-        print(f"❌ Expected DEFENSE_LEVEL={expected_level}. Restart the demo site with:")
-        print(f"     cd demo_site && DEFENSE_LEVEL={expected_level} python app.py")
-        return 1
-
-    failures = 0
-
-    print("Bot traffic")
-    for name, first_blocked in FIRST_BLOCKED_AT.items():
-        if name.startswith("round5") and args.skip_browser:
-            print(f"  ⏭️  {name:<32} skipped (--skip-browser)")
-            continue
-        results = [r for r in load_attack(name).run() if r["path"] == SCRAPE_PATH]
-        blocked = sum(r["status"] == 403 for r in results)
-        is_blocked = blocked == len(results)
-        should_block = level >= first_blocked
-        ok = is_blocked == should_block
-        failures += not ok
-        expectation = "blocked" if should_block else "gets through"
-        print(f"  {'✅' if ok else '❌'} {name:<32} {blocked}/{len(results)} blocked "
-              f"(expected: {expectation})")
-
-    print("\nReal users (replayed browser profiles)")
-    legit = legit_traffic.run()
-    blocked = [r for r in legit if r["status"] == 403]
-    suspicious = {r["profile"] for r in legit if r["verdict"] == "suspicious"}
-    failures += bool(blocked)
-    print(f"  {'✅' if not blocked else '❌'} {len(blocked)}/{len(legit)} requests blocked "
-          f"across {len({r['profile'] for r in legit})} profiles")
-    for r in blocked:
-        print(f"       {r['profile']} GET {r['path']}: {r['reasons']}")
-    if suspicious:
-        print(f"  ⚠️  scored 'suspicious': {', '.join(sorted(suspicious))}")
-
-    timings = [r["score_ms"] for r in legit if r["score_ms"] is not None]
-    if timings:
-        p95 = statistics.quantiles(timings, n=20)[-1] if len(timings) >= 2 else timings[0]
-        print("\nDefender cost")
-        print(f"  header scoring: median {statistics.median(timings):.2f} ms, "
-              f"p95 {p95:.2f} ms per request")
-
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. Ask your instructor.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def report_suspicious(board, results):
+    """Report only: shoppers whose average score reached the 'monitor' band without being stopped."""
+    rows = [r for r in board["actors"] if r["kind"] == "human" and r["avg_score"] >= 15]
+    for r in rows:
+        print(f"\n  suspicious but served: {r['actor']} averaged score {r['avg_score']} over {r['requests']} requests")
+    return True, ""
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def templates_agree(board, results):
+    problems = replay_profiles.compare_templates()
+    return not problems, "tools/browsers.py disagrees with tools/profiles:\n" + "\n".join(problems)
+
+
+def round_at(level, description, **kw):
+    attacks, expect = attacks_at(level, kw.pop("scrapers", True), kw.pop("browsers", True))
+    return Round(level=level, description=description, attacks=attacks, expect=expect, scenario="browse",
+                 extra_checks=[report_profiles, report_suspicious] + kw.pop("extra", []),
+                 solutions=("defenses/ladder.py",), **kw)
+
+
+ROUNDS = {
+    0: round_at(0, "recon: nothing is wired, every scraper gets the catalog", browsers=False, extra=[templates_agree]),
+    1: round_at(1, "User-Agent parsing: the naive scraper and headless Chrome are stopped"),
+    2: round_at(2, "presence and Fetch Metadata: a Chrome UA on default headers is stopped"),
+    3: round_at(3, "Client Hints and header order: copied browser headers and the UA override are stopped"),
+    4: round_at(4, "Accept-CH negotiation: consistent static hints are stopped"),
+    5: round_at(4, "a real browser with a UA override: already stopped, but only by what its brand list leaks", scrapers=False),
+}
+
+if __name__ == "__main__":
+    main(ROUNDS)

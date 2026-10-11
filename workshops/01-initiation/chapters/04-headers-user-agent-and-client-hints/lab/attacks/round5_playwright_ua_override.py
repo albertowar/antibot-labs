@@ -1,26 +1,21 @@
 """
-Chapter 4 — Round 5 Attack: Give Up on Faking, Drive a Real Browser (Section 4.7)
+Chapter 4, Round 5 attack: give up faking, drive a real browser.
 
-Objective: modelling Chrome's headers by hand is a losing game, so the
-attacker launches a real Chromium with Playwright. The default headless UA
-says "HeadlessChrome", so they override it with a Windows Chrome UA built
-from the real browser version.
+Objective: modelling Chrome's headers by hand is a losing game, so the attacker launches a real
+Chromium with Playwright. The default headless User-Agent says "HeadlessChrome", so they override
+it with a Windows Chrome UA built from the real browser version.
 
-Recent Playwright versions are careful: they derive matching Client Hints
-from the override (Sec-CH-UA-Platform becomes "Windows"). What the override
-does NOT change is the brand list Chromium builds from the real binary.
+Recent Playwright versions are careful: they derive matching Client Hints from the override
+(Sec-CH-UA-Platform becomes "Windows"). What the override does NOT change is the brand list
+Chromium builds from the real binary, which still names HeadlessChrome.
 
-Expected results (verified with Playwright 1.63 / Chromium 153):
-  - --no-override: DEFENSE_LEVEL>=1 → 403, "[L1] UA red flag: Headless Chrome"
-  - with override: DEFENSE_LEVEL=2 → 200 (only "[L2] Missing Accept-Language", 15 pts)
-                   DEFENSE_LEVEL>=3 → 403, "[L3] Sec-CH-UA brand list contains HeadlessChrome"
-                   DEFENSE_LEVEL=4  → also "[L4] Platform-Version '10.0' is not in browser format"
+Expected (Playwright 1.63 / Chromium 153):
+  --no-override   DEFENSE_LEVEL>=1  0/5: ua:red_flag (Headless Chrome)
+  with override   DEFENSE_LEVEL<=2  5/5: nothing but at most a missing Accept-Language
+                  DEFENSE_LEVEL>=3  0/5: client_hints:headless_brand
 
-Setup (once):
-    playwright install chromium
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=3 python app.py
-Then run:
+Needs: pip install -r requirements-browser.txt && python -m playwright install chromium
+
     python attacks/round5_playwright_ua_override.py [--no-override]
 """
 
@@ -28,58 +23,40 @@ import json
 import os
 import sys
 
-from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from headers_client import BASE_URL, CATALOG_PAGES, Tally, bot, finish  # noqa: E402
+from labclient import browser_context, world_pool  # noqa: E402
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
+FETCH = "async url => { const r = await fetch(url); return [r.status, r.headers.get('X-Lab-Signals') || '', r.headers.get('X-Lab-Score') || '0']; }"
 
 
-def run(override=True, verbose=False):
-    """
-    Run the attack in a real headless Chromium. Returns one result per request
-    (used by tools/checkpoint.py).
-    """
-    results = []
+def run(override=True):
+    from playwright.sync_api import sync_playwright
+
+    tally = Tally("round5_playwright_ua_override" if override else "round5_playwright_headless")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        major = browser.version.split(".")[0]
         options = {}
         if override:
-            options["user_agent"] = (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                f"(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
-            )
-        context = browser.new_context(**options)
-        page = context.new_page()
-
-        if verbose:
-            label = "UA override" if override else "default headless UA"
-            print(f"=== Round 5: Playwright Chromium {browser.version} ({label}) ===")
-
-        for path in ["/", "/api/products", "/api/products"]:
-            response = page.goto(f"{BASE_URL}{path}")
-            reasons = []
-            if response.status == 403:
-                reasons = json.loads(page.inner_text("body")).get("reasons", [])
-            results.append({"path": path, "status": response.status, "reasons": reasons})
-
-        if verbose:
-            for result in results:
-                print(f"  GET {result['path']:<14} {result['status']}")
-                for reason in result["reasons"]:
-                    print(f"    - {reason}")
-
-            # What did the server actually see?
-            page.goto(f"{BASE_URL}/header-check")
-            seen = json.loads(page.inner_text("body"))
-            print("\n  Headers the server received:")
-            for name, value in seen["headers_received"]:
-                if name.lower().startswith("sec-ch") or name == "User-Agent":
-                    print(f"    {name}: {value}")
+            major = browser.version.split(".")[0]
+            options["user_agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                     f"(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36")
+        page = browser_context(browser, "bot:headers-playwright", ip=world_pool("cloud_vm")[5], **options).new_page()
+        landing = page.goto(f"{BASE_URL}/")           # the navigation: the store offers Accept-CH here at level 4
+        tally.note(f"navigation: {landing.status}")
+        for n in range(1, CATALOG_PAGES + 1):
+            status, signals, score = page.evaluate(FETCH, f"/api/products?page={n}")
+            tally.page(status, signals, score, products=24 if status == 200 else 0)
+        # What did the store actually see? (The lab page is ungated, so this works at any level.)
+        page.goto(f"{BASE_URL}/lab/headers/check")
+        seen = json.loads(page.inner_text("body"))
+        tally.note("hints seen: " + "; ".join(f"{n}: {v}" for n, v in seen["headers_received"]
+                                              if n.lower().startswith("sec-ch") or n == "User-Agent"))
         browser.close()
-    return results
+    return tally.result()
 
 
-if __name__ == '__main__':
-    run(override="--no-override" not in sys.argv, verbose=True)
+if __name__ == "__main__":
+    override = "--no-override" not in sys.argv
+    print(f"=== Round 5: Playwright Chromium ({'UA override' if override else 'default headless UA'}) ===")
+    finish(run(override))

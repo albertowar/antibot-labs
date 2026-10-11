@@ -28,7 +28,7 @@ import hmac
 import os
 import time
 
-from pow_core import MAX_BITS, digest, meets_difficulty
+from .pow_core import MAX_BITS, digest, meets_difficulty
 
 CHALLENGE_TTL = 60  # seconds to solve and redeem
 
@@ -80,7 +80,7 @@ def verify(secret: bytes, challenge: dict, counter, bind: str,
 if __name__ == "__main__":
     secret, me = os.urandom(32), client_bind("203.0.113.66")
     c = issue(secret, 8, me)
-    from pow_core import solve
+    from .pow_core import solve
     counter, _ = solve(c["nonce"], 8)
     print("Honest solution:   ", verify(secret, c, counter, me))
     print("Forged difficulty: ", verify(secret, {**c, "difficulty": 0}, counter, me))

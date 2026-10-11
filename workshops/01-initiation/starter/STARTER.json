@@ -1,0 +1,9 @@
+{
+  "contract_version": "1.2",
+  "workshop": 1,
+  "source": "bare",
+  "built_from": null,
+  "default_level": 0,
+  "baseline_checks": [],
+  "description": "The skeleton store. No defenses wired; LADDER[0] is empty."
+}

@@ -1,0 +1,3 @@
+cidr,provider
+203.0.113.0/26,Example Cloud
+203.0.113.64/26,Example Hosting GmbH

@@ -1,50 +1,46 @@
 """
-Chapter 7 — Round 5 Attack: let the browser pay
+Chapter 7, Round 5 attack: let the browser pay.
 
-Objective: stop re-implementing the solver. Drive a real Chromium with
-Playwright, let the store's own JavaScript solve every challenge in its
-Web Workers, and read the catalog through the page's gatedFetch().
+Objective: stop re-implementing the solver. Drive a real Chromium with Playwright, let the
+store's own JavaScript solve every challenge in its Web Workers, and read the catalog through
+the page's own gatedFetch().
 
-The bot now pays exactly what a human pays, per pass, and PoW has nothing
-left to say: it *prices* requests, it does not *identify* clients.
-Telling this browser apart from a human is Workshop 2 (automation
-detection in W2 Ch1, behavior in W2 Ch3).
+The bot now pays exactly what a human pays, per pass, and PoW has nothing left to say: it
+*prices* requests, it does not *identify* clients. Telling this browser apart from a human is
+Workshop 2 (automation artefacts in W2 Ch1, behavior in W2 Ch3).
 
-Expected results (any level):
-  - 60/60 pages, solve times in line with your /pow-bench numbers.
+Expected (any level): 60/60 products, solve times in line with your /lab/pow/bench numbers.
 
-Needs: pip install playwright && playwright install chromium
+Needs: pip install -r requirements-browser.txt && python -m playwright install chromium
 
-Run:
     python attacks/round5_playwright_browser.py
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(__file__))
-from _common import BASE_URL, Tally, report  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from labclient import BASE_URL, browser_context, world_pool  # noqa: E402
+from pow_client import SKUS, Tally, finish  # noqa: E402
 
-BROWSER_IP = "203.0.113.77"
-PAGES_WANTED = 60  # three passes' worth at level 3+
+WANTED = 60  # three passes' worth at level 3+
 
-FETCH_PAGE = "async n => (await gatedFetch(`/api/products?page=${n}`)).status"
+FETCH = "async sku => (await gatedFetch(`/api/products/${sku}`)).status"
 
 
 def run():
-    """Run the attack; return its scoreboard row (used by tools/checkpoint.py)."""
     from playwright.sync_api import sync_playwright
 
-    tally = Tally("round5_playwright_browser", wanted=PAGES_WANTED)
+    tally = Tally("round5_playwright_browser", wanted=WANTED)
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(extra_http_headers={"X-Sim-Client-IP": BROWSER_IP})
-        page.goto(BASE_URL)
+        page = browser_context(browser, "bot:pow-browser", ip=world_pool("cloud_vm")[30]).new_page()
+        page.goto(BASE_URL + "/")
         page.wait_for_function("typeof gatedFetch === 'function'")
-        for n in range(1, PAGES_WANTED + 1):
-            status = page.evaluate(FETCH_PAGE, n)
+        for sku in SKUS[:WANTED]:
+            status = page.evaluate(FETCH, sku)
             if status != 200:
-                tally.note(f"page {n}: {status}")
+                tally.note(f"{sku}: {status}")
                 break
             tally.pages_ok += 1
         solves = page.evaluate("window.powStats.solves")
@@ -54,14 +50,12 @@ def run():
         tally.solves += 1
         tally.bits.append(s["bits"])
         tally.hashes += s["tried"]
-        # every worker is busy for the whole solve: CPU ≈ wall time × workers
-        tally.cpu_s += s["ms"] / 1000 * workers
+        tally.cpu_s += s["ms"] / 1000 * workers      # every worker is busy for the whole solve
     if solves:
-        ms = ", ".join(f"{s['ms']:.0f} ms ({s['bits']} bits)" for s in solves)
-        tally.note(f"browser solves with {workers} workers: {ms}")
+        tally.note(f"browser solves with {workers} workers: " + ", ".join(f"{s['ms']:.0f} ms ({s['bits']} bits)" for s in solves))
     return tally.result()
 
 
 if __name__ == "__main__":
     print("=== Round 5: Playwright, the page solves its own challenges ===")
-    report(run())
+    finish(run())

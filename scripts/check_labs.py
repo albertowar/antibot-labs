@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Repo-wide lab checks: the conventions AGENTS.md promises, enforced.
 
-    python3 scripts/check_labs.py        # or: make check
+    python3 scripts/check_labs.py               # every starter and lab; or: make check
+    python3 scripts/check_labs.py <lab folder>  # one
 
 Exit 1 on any failure. Each failure is one line: ``<lab>: rule<N>: <detail>``.
 
+A lab is on the starter chain when it has ``tools/checkpoint_core.py`` (copied from
+``workshops/<NN>/starter/``); rules 10-15 apply only there.
+
 Rules
-  1  every lab with network code has lab/labnet.py byte-identical to scripts/labnet.py
+  1  every lab (and starter) with network code has labnet.py byte-identical to scripts/labnet.py
   2  every attacks/ or tools/ script that uses DEMO_URL or an HTTP client imports labnet
      (directly, or through a sibling module of the same lab that does)
   3  os.environ[...]("DEMO_URL") is read only inside labnet.py
@@ -18,6 +22,14 @@ Rules
   8  solutions live only at lab/solutions/roundN/
   9  every lab with solutions/ has tools/checkpoint.py offering --catch-up, and no solution
      file is byte-identical to the student file it replaces
+
+Starter chain only (starters and the labs copied from them)
+ 10  every attacks/*.py imports labnet (directly or via a tools/ or attacks/ helper)
+ 11  no defenses/ or demo_site/ext/ file reads the ground-truth actor label
+ 12  pins in requirements.txt match the baseline where the package is used
+ 13  README.md starts with a "Starts from:" line naming the starter (labs only)
+ 14  solutions/roundN/ folders agree with ROUNDS in tools/checkpoint.py (labs only)
+ 15  no retired route names in demo_site/ (see AGENTS.md "Retired names")
 """
 
 from __future__ import annotations
@@ -30,6 +42,11 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CANON = os.path.join(ROOT, "scripts", "labnet.py")
 LABS = sorted(glob.glob(os.path.join(ROOT, "workshops", "*", "chapters", "*", "lab")))
+STARTERS = sorted(glob.glob(os.path.join(ROOT, "workshops", "*", "starter")))
+BASELINE = {"Flask": "3.1.3", "Flask-SQLAlchemy": "3.1.1", "SQLAlchemy": "2.1.4", "redis": "8.1.0", "fakeredis": "2.39.0",
+            "requests": "2.34.2", "httpx": "0.28.1", "psycopg[binary]": "3.3.6"}
+RETIRED = [r'"/admin/', r"'/admin/", r'"/api/v0', r'"/api/sensor"', r'"/api/session"', r'"/api/fp"', r'"/telemetry"',
+           r'"/products/<', r'"/signup"']
 
 HTTP_CLIENTS = ("requests", "httpx", "urllib.request", "http.client", "playwright", "patchright",
                 "camoufox", "selenium", "curl_cffi", "impit", "websockets", "aiohttp")
@@ -158,6 +175,10 @@ def check_lab(lab: str) -> None:
             if REAL_URL_CALL.search(line):
                 fail(lab, 6, f"{os.path.relpath(p, lab)}:{i} HTTP call to a non-local URL")
 
+    if is_starter(lab):
+        check_starter_chain(lab)
+        return
+
     # rule 7: README with RoE
     readme = os.path.join(lab, "README.md")
     if not os.path.exists(readme):
@@ -177,7 +198,10 @@ def check_lab(lab: str) -> None:
             if not re.fullmatch(r"round\d+", entry) and not os.path.isfile(os.path.join(solutions, entry)):
                 fail(lab, 8, f"solutions/{entry}/ is not a roundN/ directory")
 
-    # rule 9: checkpoint with --catch-up, and solutions differ from student files
+    # rule 9: checkpoint with --catch-up, and solutions differ from student files. A
+    # starter-chain lab in the pre-written style (AGENTS.md "Demo store") ships complete
+    # defenses, so its per-round solutions may equal the student files.
+    pre_written = on_starter_chain(lab) and os.path.exists(readme) and "pre-written" in read(readme)
     if os.path.isdir(solutions):
         ckpt = os.path.join(tools, "checkpoint.py")
         if not os.path.exists(ckpt):
@@ -192,19 +216,97 @@ def check_lab(lab: str) -> None:
                         continue
                     src = os.path.join(dirpath, f)
                     dst = os.path.join(lab, os.path.relpath(src, rnd))
-                    if os.path.exists(dst) and read(src) == read(dst):
+                    if not pre_written and os.path.exists(dst) and read(src) == read(dst):
                         fail(lab, 9, f"{os.path.relpath(src, lab)} is byte-identical to {os.path.relpath(dst, lab)}")
+
+    if on_starter_chain(lab):
+        check_starter_chain(lab)
+
+
+def is_starter(lab: str) -> bool:
+    return os.path.basename(lab) == "starter"
+
+
+def on_starter_chain(lab: str) -> bool:
+    return os.path.exists(os.path.join(lab, "tools", "checkpoint_core.py"))
+
+
+def check_starter_chain(lab: str) -> None:
+    # rule 10: every attack imports labnet, directly or through a helper in tools/ or attacks/
+    # (tools/labclient.py imports it, so `from labclient import ...` counts)
+    def uses_labnet(src: str, seen: tuple = ()) -> bool:
+        if re.search(r"^\s*(from\s+labnet\s+import|import\s+labnet)", src, re.M):
+            return True
+        for mod in re.findall(r"^\s*(?:from\s+(\w+)\s+import|import\s+(\w+))", src, re.M):
+            name = mod[0] or mod[1]
+            if name in seen:
+                continue
+            for d in ("tools", "attacks"):
+                helper = os.path.join(lab, d, name + ".py")
+                if os.path.exists(helper) and uses_labnet(read(helper), seen + (name,)):
+                    return True
+        return False
+
+    for f in sorted(glob.glob(os.path.join(lab, "attacks", "*.py"))):
+        if os.path.basename(f).startswith("_") and os.path.basename(f) != "__main__.py":
+            continue
+        if not uses_labnet(read(f)):
+            fail(lab, 10, f"attacks/{os.path.basename(f)} does not import labnet (directly or via tools/labclient.py)")
+
+    # rule 11: no defense reads the ground-truth actor label
+    for p in py_files(*(os.path.join(lab, d) for d in ("defenses", os.path.join("demo_site", "ext")))):
+        src = read(p)
+        if 'lab.actor"' in src or 'X-Lab-Actor"' in src or "HTTP_X_LAB_ACTOR" in src:
+            fail(lab, 11, f"{os.path.relpath(p, lab)} reads the ground-truth actor")
+
+    # rule 12: baseline pins
+    req = os.path.join(lab, "requirements.txt")
+    if os.path.exists(req):
+        for line in read(req).splitlines():
+            m = re.match(r"^\s*([A-Za-z0-9_.\[\]-]+)==([\w.]+)", line)
+            if m and m.group(1) in BASELINE and m.group(2) != BASELINE[m.group(1)]:
+                fail(lab, 12, f"requirements.txt: {m.group(1)}=={m.group(2)} (baseline {BASELINE[m.group(1)]})")
+
+    # rule 15: no retired routes (/api/telemetry and /api/products/<sku> are canonical under url_prefix="/api")
+    for p in py_files(os.path.join(lab, "demo_site")):
+        src = read(p)
+        under_api = 'url_prefix="/api"' in src
+        for pat in RETIRED:
+            if pat in src and not (under_api and pat in ('"/telemetry"', '"/products/<')):
+                fail(lab, 15, f"{os.path.relpath(p, lab)}: retired route {pat}")
+
+    if is_starter(lab):
+        return
+
+    # rule 13: "Starts from:" line
+    readme = os.path.join(lab, "README.md")
+    head = read(readme)[:600] if os.path.exists(readme) else ""
+    if "Starts from:" not in head:
+        fail(lab, 13, "README.md has no 'Starts from:' line in the first lines")
+
+    # rule 14: ROUNDS in tools/checkpoint.py vs solutions/round<N>/
+    cp = os.path.join(lab, "tools", "checkpoint.py")
+    if os.path.exists(cp):
+        rounds = set(int(n) for n in re.findall(r"^\s*(\d+)\s*:\s*Round\(", read(cp), re.M))
+        have = set(int(os.path.basename(d)[5:]) for d in glob.glob(os.path.join(lab, "solutions", "round*"))
+                   if os.path.basename(d)[5:].isdigit())
+        missing = sorted(r for r in rounds if r > 0 and r not in have)
+        if missing:
+            fail(lab, 14, f"ROUNDS {missing} have no solutions/round<N>/")
+    else:
+        fail(lab, 14, "no tools/checkpoint.py")
 
 
 def main() -> int:
     if not os.path.exists(CANON):
         print("scripts/labnet.py missing", file=sys.stderr)
         return 1
-    for lab in LABS:
+    targets = [os.path.abspath(a) for a in sys.argv[1:]] or STARTERS + LABS
+    for lab in targets:
         check_lab(lab)
     for line in failures:
         print(line)
-    print(f"{len(LABS)} labs checked, {len(failures)} failure(s)")
+    print(f"{len(targets)} labs checked, {len(failures)} failure(s)")
     return 1 if failures else 0
 
 
