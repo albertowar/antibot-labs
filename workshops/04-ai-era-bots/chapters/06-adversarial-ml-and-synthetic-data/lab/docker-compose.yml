@@ -1,0 +1,29 @@
+# W4 Ch6 lab (Adversarial ML & Synthetic Data): the demo store's event log.
+#
+#   docker compose up -d --wait     # PostgreSQL on 127.0.0.1:5432
+#   docker compose down -v          # stop and wipe the data
+#
+# No Docker? Every lab command works with SQLite instead. Run them all from
+# the lab/ folder with:
+#   export DATABASE_URL=sqlite:///ml_lab.db
+name: w4-ch06-adv
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

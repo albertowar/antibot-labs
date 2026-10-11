@@ -1,0 +1,299 @@
+"""Shared crawler engine, signer and the ethics guardrail for every attack script.
+
+Rules of engagement are absolute: these scripts run ONLY against the local demo
+store you run yourself. ``require_local`` enforces it in code: a non-loopback
+target raises before a single request is sent. Lab traffic never touches a
+third party, a public proxy, or anyone else's infrastructure. Every operator,
+key, IP and user agent here is synthetic.
+
+The IPs are RFC 5737 documentation ranges, honoured by the store only from
+loopback (``X-Lab-Client-IP``). 203.0.113.0/26 and /26+64 are the two lab
+operators' *published* ranges (defenses/crawler_registry.py); 192.0.2.0/24 is
+"a datacenter nobody published"; 198.51.100.0/24 is "residential".
+
+``Crawler`` is a deliberately simple breadth-first fetcher: a frontier, a page
+budget, link extraction with the stdlib HTML parser, and hooks for the choices
+each round makes (obey robots.txt or not, sign or not, pay or not, follow hidden
+links or not). Just strong enough to beat the previous round; not a tool.
+"""
+
+from __future__ import annotations
+
+import base64
+import ipaddress
+import os
+import re
+import secrets
+import time
+import urllib.robotparser
+import zlib
+from collections import Counter, deque
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
+
+import httpx
+
+BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+KEYS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys")
+
+TRAINBOT_UA = "Mozilla/5.0 (compatible; LabTrainBot/1.0; +https://trainbot.example/bot)"
+SEARCHBOT_UA = "Mozilla/5.0 (compatible; LabSearchBot/2.1; +https://labsearch.example/bot)"
+CHROME_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+             "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+
+TRAINBOT_RANGE = [f"203.0.113.{i}" for i in range(1, 63)]      # published
+SEARCHBOT_RANGE = [f"203.0.113.{i}" for i in range(65, 127)]   # published
+DATACENTER = [f"192.0.2.{i}" for i in range(1, 255)]           # unpublished
+RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)]
+
+SKU_RE = re.compile(r"/product/(p\d{3})")
+
+
+def require_local(url: str) -> str:
+    host = urlparse(url).hostname or ""
+    if host == "localhost":
+        return url
+    try:
+        if ipaddress.ip_address(host).is_loopback:
+            return url
+    except ValueError:
+        pass
+    raise SystemExit(
+        f"Refusing to run against non-local target {host!r}. "
+        f"This lab only ever targets the local demo store (127.0.0.1). "
+        f"Do not remove this check to 'try it on something real'.")
+
+
+# --- Web Bot Auth-style signer (the crawler side of defenses/bot_identity.py) ------
+
+class Signer:
+    """Signs requests the way a registered operator would (RFC 9421, Ed25519).
+
+    The operator holds the private key (attacks/keys/*.pem); the site holds the
+    public key under ``keyid``. Covered components: @authority and
+    signature-agent, as in the Web Bot Auth examples. W4 Ch2 owns the full
+    protocol (nonces, key directories); this is the minimum the paywall needs.
+    """
+
+    def __init__(self, pem_name: str, keyid: str, signature_agent: str):
+        from cryptography.hazmat.primitives import serialization
+        with open(os.path.join(KEYS, pem_name), "rb") as fh:
+            self.key = serialization.load_pem_private_key(fh.read(), password=None)
+        self.keyid, self.agent = keyid, signature_agent
+
+    def headers(self, authority: str) -> dict:
+        now = int(time.time())
+        params = (f'("@authority" "signature-agent");created={now};expires={now + 300};'
+                  f'nonce="{secrets.token_hex(8)}";keyid="{self.keyid}";alg="ed25519";tag="web-bot-auth"')
+        base = "\n".join([f'"@authority": {authority}', f'"signature-agent": {self.agent}',
+                          f'"@signature-params": {params}']).encode()
+        sig = base64.b64encode(self.key.sign(base)).decode()
+        return {"Signature-Agent": self.agent, "Signature-Input": f"sig1={params}",
+                "Signature": f"sig1=:{sig}:"}
+
+
+def trainbot_signer():
+    return Signer("trainbot_ed25519.pem", "trainbot-2026-10", "https://trainbot.example")
+
+
+def searchbot_signer():
+    return Signer("searchbot_ed25519.pem", "searchbot-2026-10", "https://labsearch.example")
+
+
+# --- link extraction ------------------------------------------------------------------
+
+class Links(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []   # (href, is_hidden_or_nofollow)
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "a":
+            return
+        a = dict(attrs)
+        href = a.get("href")
+        if not href:
+            return
+        hidden = ("nofollow" in (a.get("rel") or "") or "hp" in (a.get("class") or "")
+                  or a.get("aria-hidden") == "true" or a.get("tabindex") == "-1")
+        self.links.append((href, hidden))
+
+
+def extract_links(html_text: str):
+    p = Links()
+    p.feed(html_text)
+    return p.links
+
+
+def babble_score(text: str) -> float:
+    """Crude 'is this page junk?' heuristic: the share of repeated 3-word phrases.
+
+    Markov babble repeats short phrases far more than catalogue prose does. A
+    maze-aware crawler bails on pages above a threshold. Real crawlers use
+    perplexity from a small LM; the idea is the same.
+    """
+    words = re.sub(r"<[^>]+>", " ", text).lower().split()
+    if len(words) < 60:
+        return 0.0
+    grams = Counter(tuple(words[i:i + 3]) for i in range(len(words) - 2))
+    return 1 - len(grams) / max(1, sum(grams.values()))
+
+
+# --- the crawler ------------------------------------------------------------------------
+
+class Crawler:
+    def __init__(self, base, ua, ips, actor="bot", budget=400, obey_robots=False,
+                 follow_hidden=True, signer=None, pay=None, max_depth=None, trap_hints=False,
+                 babble_limit=None, workers=4, label="crawler", robots_token=None, purpose="ai-train"):
+        self.base = require_local(base).rstrip("/")
+        self.ua, self.ips, self.actor = ua, list(ips), actor
+        # RFC 9309 matches groups on the crawler's *product token*, not the whole
+        # UA string. urllib.robotparser compares the text before the first "/",
+        # so "Mozilla/5.0 (compatible; LabTrainBot/1.0)" would match nothing and
+        # fall through to "*". Real crawlers pass their token explicitly; so do we.
+        self.robots_token = robots_token or ua.split("/")[0]
+        self.purpose = purpose   # which AIPREF / RSL key applies to this crawler
+        self.budget, self.obey_robots, self.follow_hidden = budget, obey_robots, follow_hidden
+        self.signer, self.pay, self.max_depth = signer, pay, max_depth
+        self.trap_hints, self.babble_limit, self.label = trap_hints, babble_limit, label
+        self.workers = workers
+        self.authority = urlparse(self.base).netloc
+        self.rp = None
+        self.disallowed_prefixes = []
+        self.seen = set()
+        self.skus = set()
+        self.stats = Counter()
+        self.spent = 0.0
+        self._ip_i = 0
+        self.client = httpx.Client(timeout=10)
+
+    # -- helpers --
+    def _ip(self):
+        ip = self.ips[self._ip_i % len(self.ips)]
+        self._ip_i += 1
+        return ip
+
+    def _headers(self, extra=None):
+        h = {"User-Agent": self.ua, "X-Lab-Client-IP": self._ip(), "X-Lab-Actor": self.actor,
+             "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8"}
+        if self.signer:
+            h.update(self.signer.headers(self.authority))
+        if extra:
+            h.update(extra)
+        return h
+
+    def read_robots(self):
+        r = self.client.get(f"{self.base}/robots.txt", headers=self._headers())
+        self.stats["requests"] += 1
+        self.rp = urllib.robotparser.RobotFileParser()
+        self.rp.parse(r.text.splitlines())
+        self.robots_text = r.text
+        # Trap hints: every Disallow line, whichever group it is in.
+        self.disallowed_prefixes = sorted({ln.split(":", 1)[1].strip() for ln in r.text.splitlines()
+                                           if ln.lower().startswith("disallow:") and ln.split(":", 1)[1].strip()})
+        return r.text
+
+    def allowed(self, url: str) -> bool:
+        path = urlparse(url).path
+        if self.obey_robots and self.rp and not self.rp.can_fetch(self.robots_token, url):
+            return False
+        if self.trap_hints and any(path.startswith(p) for p in self.disallowed_prefixes if p != "/"):
+            return False
+        return True
+
+    def fetch(self, url: str):
+        """One request, with the Round 4 402 negotiation if `pay` is set."""
+        extra = {}
+        if self.pay and self.pay.get("mode") == "proactive":
+            extra["crawler-max-price"] = f"USD {self.pay['max']:.2f}"
+        try:
+            r = self.client.get(url, headers=self._headers(extra))
+        except httpx.HTTPError as exc:
+            # A dripped decoy page or a dropped keep-alive connection: a real
+            # crawler logs it and moves on, so does this one.
+            self.stats["requests"] += 1
+            self.stats["errors"] += 1
+            return httpx.Response(599, request=httpx.Request("GET", url), text=str(exc))
+        self.stats["requests"] += 1
+        if r.status_code == 402:
+            price = r.headers.get("crawler-price", "")
+            if self.pay and self.pay.get("mode") == "reactive":
+                amount = float(price.split()[-1]) if price else None
+                if amount is not None and amount <= self.pay["max"]:
+                    r = self.client.get(url, headers=self._headers({"crawler-exact-price": f"USD {amount:.2f}"}))
+                    self.stats["requests"] += 1
+        if r.headers.get("crawler-charged"):
+            self.spent += float(r.headers["crawler-charged"].split()[-1])
+            self.stats["charged"] += 1
+        self.stats[str(r.status_code)] += 1
+        return r
+
+    # -- the crawl --
+    def crawl(self, start="/", seeds=()):
+        if self.obey_robots or self.trap_hints:
+            self.read_robots()
+        frontier = deque([(urljoin(self.base, s), 0) for s in (start, *seeds)])
+        t0 = time.time()
+        while frontier and self.stats["requests"] < self.budget:
+            url, depth = frontier.popleft()
+            if url in self.seen or not url.startswith(self.base):
+                continue
+            self.seen.add(url)
+            if not self.allowed(url):
+                self.stats["skipped_by_policy"] += 1
+                continue
+            if self.max_depth is not None and depth > self.max_depth:
+                self.stats["skipped_by_depth"] += 1
+                continue
+            r = self.fetch(url)
+            path = urlparse(url).path
+            if path.startswith("/maze/"):
+                self.stats["maze_pages"] += 1
+            if r.status_code != 200:
+                continue
+            if "Content-Usage" in r.headers and self.obey_robots:
+                self._content_usage = r.headers["Content-Usage"]
+                key = {"ai-train": "train-ai", "ai-input": "ai-use", "search": "search"}[self.purpose]
+                if f"{key}=n" in r.headers["Content-Usage"].replace(" ", ""):
+                    self.stats["stopped_by_content_usage"] += 1
+                    break
+            ctype = r.headers.get("content-type", "")
+            if "html" in ctype:
+                self.skus.update(SKU_RE.findall(r.text))
+                if self.babble_limit is not None and babble_score(r.text) > self.babble_limit:
+                    self.stats["bailed_on_babble"] += 1
+                    continue
+                for href, hidden in extract_links(r.text):
+                    if hidden and not self.follow_hidden:
+                        self.stats["ignored_hidden_links"] += 1
+                        continue
+                    frontier.append((urljoin(url, href), depth + 1))
+            elif "json" in ctype:
+                for p in r.json().get("products", []):
+                    self.skus.add(p["sku"])
+            elif "xml" in ctype:
+                self.skus.update(SKU_RE.findall(r.text))
+        self.stats["seconds"] = round(time.time() - t0, 1)
+        return self.report()
+
+    def report(self):
+        cov = len(self.skus) / 300
+        out = {"label": self.label, "requests": self.stats["requests"], "coverage": round(cov, 3),
+               "products": len(self.skus), "maze_pages": self.stats["maze_pages"],
+               "status": {k: v for k, v in self.stats.items() if k.isdigit()},
+               "spent_usd": round(self.spent, 2), "seconds": self.stats["seconds"]}
+        for k in ("skipped_by_policy", "stopped_by_content_usage", "ignored_hidden_links",
+                  "skipped_by_depth", "bailed_on_babble", "errors"):
+            if self.stats[k]:
+                out[k] = self.stats[k]
+        return out
+
+
+def print_report(rep):
+    print(f"[{rep['label']}] {rep['requests']} requests in {rep['seconds']}s -> "
+          f"{rep['products']}/300 products ({rep['coverage']:.0%} coverage), "
+          f"maze pages {rep['maze_pages']}, spent ${rep['spent_usd']:.2f}, statuses {rep['status']}")
+    extras = {k: v for k, v in rep.items() if k.endswith(("_by_policy", "_by_content_usage",
+                                                           "_hidden_links", "_by_depth", "_on_babble", "errors"))}
+    if extras:
+        print(f"    {extras}")

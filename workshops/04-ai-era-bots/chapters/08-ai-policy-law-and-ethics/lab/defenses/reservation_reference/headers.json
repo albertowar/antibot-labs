@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "Three channels, because crawlers read different ones: the aipref header,",
+    "the TDM Reservation Protocol header, and an RSL licence link. Natural-language",
+    "terms stay in terms.json; they bind account holders, not crawlers."
+  ],
+  "headers": {
+    "Content-Usage": "train-ai=n, ai-use=n",
+    "TDM-Reservation": "1",
+    "TDM-Policy": "https://store.example/.well-known/tdm-policy.json",
+    "Link": "<https://store.example/license.xml>; rel=\"license\"; type=\"application/rsl+xml\""
+  }
+}

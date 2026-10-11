@@ -1,0 +1,35 @@
+{
+  "name": "reference",
+  "_comment": [
+    "Instructor solution for Round 2. Not the only good answer.",
+    "Nothing is blocked for being an agent. After Amazon v. Perplexity (9th Cir. 2026) a",
+    "user's local agent is the user, so the policy treats 'agent' as a client type, not a",
+    "verdict, and puts the weight where the farm differs from the shopper: reused",
+    "fingerprints, brand-new accounts, order velocity per account, and the absence of a",
+    "human at the money step. Undeclared agents are challenged, not blocked (declare or",
+    "pay a proof of work). Signed agents and assistive agents are capped at a challenge;",
+    "no_pointer alone is not exempted because at weight 5 it never blocks anyone by itself.",
+    "Checkout steps up to a human confirmation, which an unattended farm cannot answer",
+    "and a shopper's agent hands back to the shopper. Terms are clickwrap with a declared-",
+    "agent path, so there is a contract to point at. Appeal path on, 90-day logs."
+  ],
+  "rules": [],
+  "weights": {
+    "headless_gpu": 40, "fp_reuse": 35, "ip_burst": 20, "cdp_artifacts": 10,
+    "datacenter_asn": 10, "timing_too_regular": 10, "no_pointer": 5, "new_account": 15,
+    "screen_reader_api": 0, "agent_ua": 0, "signature_agent": 0, "tz_geo_mismatch": 5
+  },
+  "challenge_at": 30,
+  "block_at": 60,
+  "exemptions": [
+    {"if_signal": "signature_agent", "max_action": "challenge"},
+    {"if_signal": "screen_reader_api", "max_action": "challenge"}
+  ],
+  "declaration": {"required": true, "undeclared_agent_action": "challenge"},
+  "account_velocity": {"orders_per_hour": 4, "action": "block"},
+  "checkout_step_up": "human_confirm",
+  "challenge_type": "pow",
+  "terms": {"acceptance": "clickwrap", "agents_clause": "declared_only"},
+  "appeal_path": true,
+  "retention_days": 90
+}

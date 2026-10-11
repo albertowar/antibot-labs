@@ -1,0 +1,10 @@
+{
+  "_comment": "Crawlers the ai.robots.txt snapshot does not list (search engines, link previewers, one fictional operator). Same field names as robots.json. LocalSearchBot is invented for this lab: a small search engine that publishes neither IP ranges nor a reverse-DNS suffix.",
+  "Googlebot": {"operator": "Google", "respect": "Yes", "function": "Web search indexing.", "frequency": "Continuous.", "description": "Google Search crawler. Verified by forward-confirmed reverse DNS (*.googlebot.com, *.google.com) or the published common-crawlers.json ranges."},
+  "bingbot": {"operator": "Microsoft", "respect": "Yes", "function": "Web search indexing.", "frequency": "Continuous.", "description": "Bing crawler. Verified by reverse DNS (*.search.msn.com)."},
+  "DuckDuckBot": {"operator": "DuckDuckGo", "respect": "Yes", "function": "Web search indexing.", "frequency": "Continuous.", "description": "Verified against DuckDuckGo's published IP list."},
+  "Applebot": {"operator": "Apple", "respect": "Yes", "function": "Search (Siri, Spotlight).", "frequency": "Continuous.", "description": "Applebot-Extended is the separate robots.txt token for AI training opt-out."},
+  "Slackbot-LinkExpanding": {"operator": "Slack", "respect": "No", "function": "Link preview (unfurl) on user paste.", "frequency": "One fetch per shared link.", "description": "User-triggered fetch of a single page; does not crawl."},
+  "facebookexternalhit": {"operator": "Meta", "respect": "Unclear", "function": "Link preview for shared links.", "frequency": "One fetch per shared link.", "description": "May bypass robots.txt for integrity checks (Meta docs)."},
+  "LocalSearchBot": {"operator": "LocalSearch (fictional)", "respect": "Yes", "function": "Web search indexing.", "frequency": "Weekly.", "description": "A small regional search engine invented for this lab. Publishes no IP ranges and no reverse-DNS suffix, so it can be identified but never verified."}
+}

@@ -1,0 +1,9 @@
+{
+  "_comment": "LAB SNAPSHOT. Shape mirrors https://openai.com/gptbot.json. Prefixes are RFC 5737 documentation space, not OpenAI's.",
+  "creationTime": "2026-10-01T00:00:00.000000",
+  "prefixes": [
+    {
+      "ipv4Prefix": "203.0.113.176/28"
+    }
+  ]
+}

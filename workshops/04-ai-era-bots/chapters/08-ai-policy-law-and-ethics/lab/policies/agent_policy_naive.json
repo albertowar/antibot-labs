@@ -1,0 +1,30 @@
+{
+  "name": "naive",
+  "_comment": [
+    "The first fix most teams reach: delete the hard rules, exempt everything an agent",
+    "or a screen reader trips, let the classic signals carry the weight. Agent shoppers",
+    "and assistive agents are never blocked, the headless scalper is still caught, and",
+    "the scoreboard looks finished. Then run the hidden campaigns."
+  ],
+  "rules": [],
+  "weights": {
+    "headless_gpu": 40, "fp_reuse": 35, "ip_burst": 20, "cdp_artifacts": 10,
+    "datacenter_asn": 10, "timing_too_regular": 10, "no_pointer": 5, "new_account": 10,
+    "screen_reader_api": 0, "agent_ua": 0, "signature_agent": 0, "tz_geo_mismatch": 5
+  },
+  "challenge_at": 30,
+  "block_at": 60,
+  "exemptions": [
+    {"if_signal": "agent_ua", "max_action": "allow"},
+    {"if_signal": "signature_agent", "max_action": "allow"},
+    {"if_signal": "no_pointer", "max_action": "allow"},
+    {"if_signal": "screen_reader_api", "max_action": "allow"}
+  ],
+  "declaration": {"required": false, "undeclared_agent_action": "allow"},
+  "account_velocity": {"orders_per_hour": 0, "action": "allow"},
+  "checkout_step_up": "none",
+  "challenge_type": "pow",
+  "terms": {"acceptance": "clickwrap", "agents_clause": "silent"},
+  "appeal_path": true,
+  "retention_days": 90
+}

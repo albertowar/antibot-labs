@@ -1,0 +1,8 @@
+# Day-one robots.txt, copied from a blog post: one vendor's token, nothing else.
+# Every crawler that is not literally called GPTBot is welcome to everything.
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: *
+Allow: /

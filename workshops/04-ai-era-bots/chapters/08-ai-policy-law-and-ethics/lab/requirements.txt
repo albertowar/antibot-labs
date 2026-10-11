@@ -1,0 +1,3 @@
+# W4 Ch8 lab: Python 3.10+ standard library only. Nothing to install.
+# Both code rounds run over shipped, deterministic data, so there is no
+# demo-site process, no Redis, no Docker and no network in this chapter.

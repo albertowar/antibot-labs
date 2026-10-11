@@ -1,0 +1,25 @@
+{
+  "_comment": "Synthetic DNS for the lab. Addresses are RFC 5737 documentation ranges; hostnames use the suffixes the operators really document. 198.51.100.0/25 = operator crawlers, 198.51.100.128/25 = residential humans, 203.0.113.0/24 = shared cloud egress (App Engine style), 192.0.2.0/24 = the attacker's hosting allocation.",
+  "ptr": {
+    "198.51.100.10": ["crawl-198-51-100-10.googlebot.com"],
+    "198.51.100.11": ["crawl-198-51-100-11.googlebot.com"],
+    "198.51.100.12": ["msnbot-198-51-100-12.search.msn.com"],
+    "198.51.100.13": ["msnbot-198-51-100-13.search.msn.com"],
+    "198.51.100.14": ["198-51-100-14.applebot.apple.com"],
+    "198.51.100.15": ["198-51-100-15.applebot.apple.com"]
+  },
+  "a": {
+    "crawl-198-51-100-10.googlebot.com": ["198.51.100.10"],
+    "crawl-198-51-100-11.googlebot.com": ["198.51.100.11"],
+    "msnbot-198-51-100-12.search.msn.com": ["198.51.100.12"],
+    "msnbot-198-51-100-13.search.msn.com": ["198.51.100.13"],
+    "198-51-100-14.applebot.apple.com": ["198.51.100.14"],
+    "198-51-100-15.applebot.apple.com": ["198.51.100.15"]
+  },
+  "patterns": {
+    "_comment": "Whole /24s with generated names, like a hosting provider's default reverse zone. {d} is the IP with dots replaced by dashes.",
+    "203.0.113.0/24": "{d}.gae.googleusercontent.com",
+    "192.0.2.0/24": "static-{d}.attacker-hosting.example",
+    "198.51.100.128/25": "{d}.dyn.residential-isp.example"
+  }
+}

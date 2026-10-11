@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.db
+*.db-*
+data/*
+!data/.gitkeep
+artifacts/*
+!artifacts/.gitkeep

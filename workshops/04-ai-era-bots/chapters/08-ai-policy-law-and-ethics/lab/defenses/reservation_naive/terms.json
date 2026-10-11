@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "What the Terms of Service say and how they are accepted.",
+    "acceptance: 'browsewrap' (a footer link) or 'clickwrap' (an account holder clicked I agree).",
+    "automated_access_clause: the terms forbid automated access.",
+    "ai_training_clause: the terms reserve the right to use content for AI training / TDM, in words."
+  ],
+  "acceptance": "browsewrap",
+  "automated_access_clause": true,
+  "ai_training_clause": true
+}

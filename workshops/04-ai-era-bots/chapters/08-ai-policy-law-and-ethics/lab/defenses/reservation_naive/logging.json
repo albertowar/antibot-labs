@@ -1,0 +1,12 @@
+{
+  "_comment": [
+    "What the edge logs about each crawler, and for how long. None of this changes",
+    "whether a crawler ingests your content. All of it changes whether you can prove it."
+  ],
+  "robots_fetches": false,
+  "user_agent": true,
+  "asn": false,
+  "signature_verification": false,
+  "challenge_outcomes": false,
+  "retention_days": 7
+}

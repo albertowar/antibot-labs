@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.db
+*.db-*
+data/*
+!data/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
+rules/pending.json
+rules/audit.jsonl
+defenses/.backup-*/

@@ -1,0 +1,28 @@
+# Workshop Store crawler policy (Round 1).
+#
+# A preference, not a control: RFC 9309 binds only clients that choose to read it.
+# Enforcement for the tokens below comes from defenses/crawler_registry.py (L1) and
+# the verification of who really sent the request (L2).
+
+# Everyone, including search engines and user-triggered fetchers.
+User-agent: *
+Allow: /
+Disallow: /cart/
+Disallow: /account/
+# Content Signals (contentsignals.org, Cloudflare 2025): machine-readable preference
+# per use. Labels differ from the IETF aipref draft (train-ai / ai-use / search).
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+# Training crawlers: no product pages. Each operator documents its training token.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: meta-externalagent
+User-agent: Bytespider
+User-agent: Amazonbot
+Disallow: /products
+Disallow: /products/
+
+Sitemap: http://127.0.0.1:5000/sitemap.xml

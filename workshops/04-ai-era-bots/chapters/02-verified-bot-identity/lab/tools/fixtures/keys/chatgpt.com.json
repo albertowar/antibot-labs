@@ -1,0 +1,10 @@
+{
+  "owner": "chatgpt.com",
+  "seed_hex": "af273eb05d1a9e870e4c395c973a734cea73400e89df2a073db6caa499b7e708",
+  "jwk": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "JldYmantq9cfqKWyXrMg66v1Grsa-EoCeDO_wv2-FxA"
+  },
+  "thumbprint": "Em1v55KePjIo9pGn6f5eY9j4cV1j-XDDrVs5XA_9694"
+}

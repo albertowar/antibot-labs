@@ -1,0 +1,9 @@
+{
+  "_comment": [
+    "HTTP response headers the store adds to every page. The naive stack adds none.",
+    "Channels the fleet understands: Content-Usage (IETF aipref attach draft),",
+    "TDM-Reservation / TDM-Policy (W3C TDM Reservation Protocol), and a",
+    "Link: <...>; rel=\"license\"; type=\"application/rsl+xml\" pointing at an RSL licence."
+  ],
+  "headers": {}
+}

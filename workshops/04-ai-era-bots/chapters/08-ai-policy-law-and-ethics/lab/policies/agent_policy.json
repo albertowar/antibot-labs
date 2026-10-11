@@ -1,0 +1,30 @@
+{
+  "name": "yours",
+  "_comment": [
+    "Day one, after the first agent-driven scalping wave: 'no bots' in the terms and a",
+    "hard block on every signal an agent emits. It stops the farm. Run it and read who",
+    "else it stops: every shopper who let an agentic browser do the browsing, every",
+    "screen-reader user whose assistive agent drives the page, and every signed cloud",
+    "agent, which is the only kind you could ever identify."
+  ],
+  "rules": [
+    {"if_signal": "agent_ua", "action": "block"},
+    {"if_signal": "signature_agent", "action": "block"},
+    {"if_signal": "cdp_artifacts", "action": "block"},
+    {"if_signal": "no_pointer", "action": "block"},
+    {"if_signal": "datacenter_asn", "action": "challenge"}
+  ],
+  "weights": {
+    "headless_gpu": 40, "fp_reuse": 35, "ip_burst": 20, "timing_too_regular": 10, "new_account": 10
+  },
+  "challenge_at": 30,
+  "block_at": 60,
+  "exemptions": [],
+  "declaration": {"required": false, "undeclared_agent_action": "allow"},
+  "account_velocity": {"orders_per_hour": 0, "action": "allow"},
+  "checkout_step_up": "none",
+  "challenge_type": "captcha_image",
+  "terms": {"acceptance": "browsewrap", "agents_clause": "prohibited"},
+  "appeal_path": false,
+  "retention_days": 365
+}

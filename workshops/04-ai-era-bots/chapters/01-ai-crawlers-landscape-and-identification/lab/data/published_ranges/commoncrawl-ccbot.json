@@ -1,0 +1,9 @@
+{
+  "_comment": "LAB SNAPSHOT. Stands in for https://index.commoncrawl.org/ccbot.json. Prefixes are RFC 5737 documentation space, not Common Crawl's.",
+  "creationTime": "2026-10-01T00:00:00.000000",
+  "prefixes": [
+    {
+      "ipv4Prefix": "203.0.113.224/28"
+    }
+  ]
+}

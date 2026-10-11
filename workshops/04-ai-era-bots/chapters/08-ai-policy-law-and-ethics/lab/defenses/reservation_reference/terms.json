@@ -1,0 +1,5 @@
+{
+  "acceptance": "clickwrap",
+  "automated_access_clause": true,
+  "ai_training_clause": true
+}

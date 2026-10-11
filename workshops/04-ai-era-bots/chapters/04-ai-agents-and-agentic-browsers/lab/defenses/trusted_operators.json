@@ -1,0 +1,4 @@
+{
+  "_comment": "Agent operators whose signed requests this store trusts (Round 3). The key directory for each host is data/directories/<host>.json; in production it is fetched from https://<host>/.well-known/http-message-signatures-directory and cached. Adding a host here is a business decision, not a technical one.",
+  "trusted": ["agents.lab-provider.test"]
+}

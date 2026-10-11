@@ -1,0 +1,29 @@
+# W4 Chapter 7 lab: OPTIONAL PostgreSQL for the demo store's request log.
+#
+#   docker compose up -d --wait     # PostgreSQL on 127.0.0.1:5433
+#   docker compose down -v          # stop and wipe the data
+#
+# The default is SQLite and needs no Docker at all. To use PostgreSQL, export
+# in every terminal:
+#   export DATABASE_URL=postgresql+psycopg://workshop:workshop@localhost:5433/shop
+name: w4-ch07-llm
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
