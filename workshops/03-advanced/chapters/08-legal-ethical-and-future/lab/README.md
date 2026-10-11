@@ -10,7 +10,7 @@ Nothing in this lab touches a network. The decision log is generated from the do
 
 ```
 lab/
-  requirements.txt       Python 3.10+ standard library only. No Docker, no demo-site process.
+  requirements.txt       Python 3.12+ standard library only. No Docker, no demo-site process.
   data/world.json        the simulated internet from W2 Ch8 (documentation ranges, ASNs)
   data/decisions.jsonl   3,500 scored requests: 2,000 real people in eight cohorts, 5 bot campaigns of 300
   policies/              policy_blunt (day one) · policy_naive (the first fix) · policy (yours) · policy_reference
@@ -26,7 +26,7 @@ lab/
 
 ```bash
 cd workshops/03-advanced/chapters/07-legal-ethical-and-future/lab
-python3 --version                                   # 3.10 or newer
+python3 --version                                   # 3.12 or newer
 python3 tools/fp_audit.py --policy policies/policy_blunt.json
 ```
 
@@ -34,7 +34,7 @@ If the last command prints a scoreboard, you are ready. Print or open `exercises
 
 **Troubleshooting**
 
-- `ModuleNotFoundError`: you are running an old Python. Anything 3.10+ works; nothing needs installing.
+- `ModuleNotFoundError`: you are running an old Python. Anything 3.12+ works; nothing needs installing.
 - `data/decisions.jsonl` missing or edited: `python3 tools/make_log.py` rebuilds it.
 - Windows: use `python` instead of `python3`. Paths in this README are relative to `lab/`.
 
@@ -132,7 +132,7 @@ Fill in the scoreboard on the slide: Round 1 net score, Round 2 bots caught and 
 
 ## Instructor: expected results
 
-Verified with Python 3.10 on Linux; the log is deterministic (seed 2026), so these numbers do not drift.
+Verified with Python 3.12.15 on Linux, standard library only (no packages, no Docker; there is no store backend in this lab). `tools/make_log.py` regenerates `data/decisions.jsonl` byte-for-byte, the three policy scoreboards reproduce the table below, and `checkpoint.py 1`, `2`, `3` and `3 --roe` (blank template: 11/12) all run. The log is deterministic (seed 2026), so these numbers do not drift. The `docker compose` path does not apply to this chapter.
 
 | Policy ↓ / campaigns → | default (`scraper_dc`, `scraper_resi`) | hidden (`cgnat_burst`, `tor_hidden`, `a11y_mimic`) | Cohorts blocked (budget 2%) | Challenged | Exposure notes |
 |---|---|---|---|---|---|

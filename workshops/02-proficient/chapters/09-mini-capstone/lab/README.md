@@ -15,7 +15,7 @@ Everything you built across W2 is here as one stack: automation flags (Ch1), JS 
 
 ```
 lab/
-  docker-compose.yml   Redis 7.4 + PostgreSQL 16 (127.0.0.1 only)
+  docker-compose.yml   Redis 8.10 + PostgreSQL 18 (127.0.0.1 only)
   demo_site/           the store: app.py, the TLS+JA4 edge (edge.py, ja4.py), models, static JS
   defenses/            one module per layer; the risk engine fuses them
   attacks/             round0_naive … round4_stuffing, round4_token_farm
@@ -32,7 +32,7 @@ Why this stack: **Python** for the store, defenses and HTTP attackers; plain **J
 ```bash
 cd lab
 docker compose up -d --wait                       # Redis + PostgreSQL on 127.0.0.1
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                        # Round 0/1/4 attacks
 patchright install chromium                        # Round 1/4 (patched Chromium)
@@ -69,7 +69,7 @@ Debug endpoints, never gated: **`/whoami`** (how your current request scores, wi
 | Problem | Fix |
 |---|---|
 | Port 8443 in use | `PORT=8443` → pick another, e.g. `PORT=9443 DEFENSE_LEVEL=0 python demo_site/app.py`, then `export DEMO_URL=https://localhost:9443` in the shell you run attacks/tools from |
-| No Docker | Run Redis and PostgreSQL yourself and set `REDIS_URL` / `DATABASE_URL`. SQLite also works: `export DATABASE_URL=sqlite:///instance/shop.db` |
+| No Docker | Run Redis and PostgreSQL yourself and set `REDIS_URL` / `DATABASE_URL`. SQLite also works: `export DATABASE_URL=sqlite:///$PWD/instance/shop.db` from `lab/`, in every terminal (use an absolute path: Flask resolves a relative one against a different `instance/` folder for the app and for `tools/seed.py`) |
 | `connection refused` on 5432/6379 | `docker compose ps` — both must be `healthy` |
 | Fresh slate | `python tools/seed.py` (also: `docker compose down -v && docker compose up -d --wait`) |
 
@@ -191,7 +191,7 @@ Review it together: which layer caught the most, where the false positives lande
 
 ## Instructor: expected results
 
-Verified October 2026 with Playwright 1.62 / Patchright 1.63 (Chromium 153), Camoufox 0.5.8 (Firefox 156), curl_cffi 0.16.3, scikit-learn 1.9.1, Redis 7.4 and PostgreSQL 16. Pairs are out of 3 attacker sessions; "✅" means the round's checkpoint passes. Exact timings vary with hardware.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis-py 8.1.0 (served by fakeredis 2.39.0 over TCP, since no Redis server was installed), SQLite (no Docker; the `docker compose` path with Redis 8.10 and PostgreSQL 18 is verified separately), Playwright 1.62.0 / Patchright 1.63.0 (Chromium 153), Camoufox 0.5.8 (Firefox 156), curl_cffi 0.16.3, numpy 2.5.4 and scikit-learn 1.9.1. Each round ran with `--catch-up`; the model was retrained after the numpy/scikit-learn bump (threshold 0.5 at L1, 0.01 at L3). Pairs are out of 3 attacker sessions; "✅" means the round's checkpoint passes. Exact timings vary with hardware.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | First reason at the blocking level |
 |---|---|---|---|---|---|---|

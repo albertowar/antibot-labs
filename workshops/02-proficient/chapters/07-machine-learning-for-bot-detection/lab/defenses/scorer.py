@@ -89,6 +89,7 @@ class Scorer:
     def describe(self):
         if not self.version:
             return {"model": None}
+        self.reload()  # models trained after the site started (e.g. --catch-up) hot-load here too
         if self.missing():
             return {"model": f"v{self.version}", "missing": self.missing()}
         d = {"model": f"v{self.version}", "threshold": round(self.meta["threshold"], 4),

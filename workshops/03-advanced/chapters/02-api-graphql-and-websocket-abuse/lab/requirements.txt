@@ -1,18 +1,18 @@
-# W3 Ch2 lab — API, GraphQL & WebSocket abuse. Python 3.10+. Pins verified October 2026.
+# W3 Ch2 lab — API, GraphQL & WebSocket abuse. Python 3.12+. Pins verified October 2026.
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-SQLAlchemy==2.0.54
+SQLAlchemy==2.1.4
 # WebSocket route on the Flask app itself (one process, one port).
 flask-sock==0.7.0
 simple-websocket==1.1.0
 # GraphQL engine. >=0.316 clears CVE-2026-47707 (alias-amplification bypass).
-strawberry-graphql==0.332.1
+strawberry-graphql==0.333.0
 graphql-core==3.3.0
 # HTTP + WS clients for the attack scripts and the legitimate-traffic simulator.
 httpx==0.28.1
-websockets==15.0.1
+websockets==17.2
 # Bearer tokens for the versioned API (Round 5).
-PyJWT==2.10.1
+PyJWT==2.15.1
 # Redis client + an in-process fake so the lab runs with no Redis server.
 redis==8.1.0
 fakeredis==2.39.0

@@ -9,10 +9,10 @@
 #   DEFENSE_LEVEL=0 python demo_site/app.py
 services:
   redis:
-    image: redis:8.1-alpine
+    image: redis:8.10.2-alpine
     ports: ["127.0.0.1:6379:6379"]
   postgres:
-    image: postgres:16.4-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_USER: workshop
       POSTGRES_PASSWORD: workshop

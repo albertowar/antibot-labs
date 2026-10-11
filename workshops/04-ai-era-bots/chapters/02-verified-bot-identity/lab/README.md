@@ -18,7 +18,7 @@ which genuine crawlers your new check wrongly throttled.
 ```
 lab/
   README.md              this file
-  requirements.txt       pinned deps (Python 3.10+). No Docker.
+  requirements.txt       pinned deps (Python 3.12+). No Docker.
   demo_site/
     app.py               the store: 200 products, two crawl budgets, the gate hook, /robots.txt
     store.py             fakeredis by default (REDIS_URL=memory://)
@@ -52,7 +52,7 @@ the exact bytes an agent signs.
 
 ```bash
 cd lab
-python -m venv .venv && source .venv/bin/activate      # Python 3.10+
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 python tools/mock_internet.py                           # terminal 1: http://127.0.0.1:5001
 DEFENSE_LEVEL=0 python demo_site/app.py                 # terminal 2: http://127.0.0.1:5000
@@ -206,6 +206,8 @@ this lab) would still have been missing? Then hand off to Chapter 3: now that yo
 who a crawler is, what do you charge it?
 
 ## Instructor: expected results
+
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, httpx 0.28.1, cryptography 50.0.2, redis 8.1.0 and fakeredis 2.39.0 (`REDIS_URL=memory://`), with the reference solutions applied cumulatively; checkpoints 1–5 reproduce the numbers below.
 
 Catalogue pages scraped in one burst, out of 200. Bold marks the first level that holds the attack.
 

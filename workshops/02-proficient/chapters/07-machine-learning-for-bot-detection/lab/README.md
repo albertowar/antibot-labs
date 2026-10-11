@@ -53,7 +53,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 ```
 
@@ -173,7 +173,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 | 🔵 Exercise | `TODO (Round 1)` in `defenses/train.py`: try `FPR_BUDGET` 0.002 and 0.05 | the threshold barely moves: easy labels |
 | 🔵 Switch on | restart with `DEFENSE_LEVEL=1`, then `python attacks/round0_baseline.py` | 0/30 and 0/30 |
 | 🔴 Attack | read, then run `python attacks/round1_humanized.py` | ≈ 60/60 succeed |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | baseline ≤ 5% · humanized gets through · real users ≤ 3%, but keyboard-only ≈ 25% |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | baseline ≤ 5% · humanized gets through · real users ≤ 3%; keyboard-only up to ≈ 25% blocked in some runs (it depends on which sessions carry labels) |
 
 **Discuss:** the validation AUC was 1.000 and the model still lets every humanized bot through. What did the AUC measure? And why are keyboard-only users blocked? (`python defenses/explain.py --model 1 --sid <sid>` on one of them: look at `scrolls`.)
 
@@ -185,7 +185,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 |---|---|---|
 | 🔍 Triage | `python defenses/explain.py --model 1 --allowed 4` | every contribution says "human"; the `fp` column repeats |
 | 🔵 Label | `python tools/label_cluster.py`, answer `y` | the stealth profile: one fingerprint over dozens of /24s, labeled. iPhone clusters with verified customers: not labeled |
-| 🔵 Defend | `python defenses/train.py --round 2`, then `--random-split` | temporal holdout AUC collapses (unseen campaign); random split hides it; top features now cohort |
+| 🔵 Defend | `python defenses/train.py --round 2`, then `--random-split` | temporal holdout AUC collapses (unseen campaign; 0.72 for LightGBM on a log with one humanized wave, about 1.0 if extra humanized waves from earlier checkpoints are in the log); random split hides it; top features now cohort |
 | 🔵 Exercise | `TODO (Round 2)` in `defenses/cohort.py`: add your own cohort feature, retrain | – |
 | 🔵 Switch on | restart with `DEFENSE_LEVEL=2`, `python attacks/round1_humanized.py` | ≈ 0–3 of 60 get through; `explain.py --model 2 --sid <sid>` shows `fp_ip24_fanout_1h` doing the work |
 | ☕ | **Break (10 min)** | |
@@ -234,17 +234,17 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ## Instructor: expected results
 
-Reference run on 2026-10-10: Python 3.10, SQLite, `LAB_TIME_SCALE=0.02`, default seeds, on a shared WSL2 machine under heavy load. Success = share of that attack's checkouts confirmed. Checkpoint traffic per run: 200 real users, 40 baseline, 30 humanized, 30 farm, 30 prober-exploit sessions.
+Reference run on 2026-10-11: Python 3.12.15, Flask 3.1.3, SQLAlchemy 2.1.4, numpy 2.5.4, pandas 3.0.6, pyarrow 26.0.0, scikit-learn 1.9.1, LightGBM 4.7.0, httpx 0.28.1, SQLite (no Docker; the `docker compose` path is verified separately), `LAB_TIME_SCALE=0.02`, default seeds, on a shared WSL2 machine. Success = share of that attack's checkouts confirmed. Checkpoint traffic per run: 200 real users, 40 baseline, 30 humanized, 30 farm, 30 prober-exploit sessions.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 |
 |---|---|---|---|---|---|
 | `round0_baseline` (naive + headless) | 100% | **0%** | 0% | 0% | 0% |
-| `round1_humanized` | 100%¹ | 100% (60/60) | **0%** (0/30 checkpoint, 0/60 standalone) | 0–7% | 3% |
+| `round1_humanized` | 100%¹ | 100% (60/60) | **0%** (0/30 checkpoint, 0/60 standalone) | 0–7% | 0–10% |
 | `round2_farm` | 100%¹ | 100%¹ | 100% (60/60) | **0–3%** (0/60 standalone) | 0% |
 | `round3_oracle_prober`: probes to a pass | – | – | – | 6 sessions, ≈ $2 | default: none (buys the cheapest) · `--patient`: 32 sessions, ≈ $8.40, one review cycle |
 | `round3_oracle_prober`: exploit | – | – | – | 100% (30/30) | **0%** default · 100% `--patient` |
-| Real users blocked (of 200) | 0 | 3 (all keyboard-only: 3/13) | 0 | 0 | 1 (desktop) |
-| ML scoring p50 / p95, checkpoint load | – | 79 / 202 ms | 124 / 274 ms | 99 / 269 ms | 104 / 249 ms |
+| Real users blocked (of 200) | 0 | 0–3 (keyboard-only 3/13 on the 2026-10-10 run, 0/13 on 2026-10-11) | 0 | 1 (keyboard-only) | 1 (desktop) |
+| ML scoring p50 / p95, checkpoint load | – | 56 / 166 ms | 75 / 293 ms | 80 / 245 ms | 42 / 193 ms |
 | ML scoring p50 / p95, one checkout at a time | – | 0.8 / 1.1 ms | 2.1 / 2.3 ms | 1.6 / 2.4 ms | as level 3 |
 
 ¹ Not measured at that level. The attack beats an earlier, weaker level, so it can only succeed there too.
@@ -276,9 +276,9 @@ Training: v1 in ~1 s, v2 in ~2 s (5-fold out-of-fold threshold included), anomal
 | Tool | Why |
 |---|---|
 | LightGBM 4.7 (MIT) | Native missing values and categoricals, fast one-row inference, built-in TreeSHAP (`pred_contrib`), text model format (no pickle) |
-| scikit-learn 1.7 (BSD-3) | Logistic-regression baseline, metrics, `KFold` |
+| scikit-learn 1.9 (BSD-3) | Logistic-regression baseline, metrics, `KFold` |
 | pandas / numpy / pyarrow | Dataset assembly and the Parquet reference set for W3 Ch4 |
-| Flask 3.1 + SQLAlchemy 2.0 | The demo store, on PostgreSQL or SQLite with the same code |
+| Flask 3.1 + SQLAlchemy 2.1 | The demo store, on PostgreSQL or SQLite with the same code |
 | httpx 0.28 | Simulated customers and bots |
 
-The pins are the newest releases that still support Python 3.10 (the lab was verified on 3.10). On Python 3.11+, scikit-learn 1.9 and pandas 3.0 are current, but this lab has not been tested with them.
+The pins follow the series dependency baseline in `AGENTS.md` (Python 3.12+, scikit-learn 1.9, pandas 3.0, SQLAlchemy 2.1).

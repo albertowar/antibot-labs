@@ -40,12 +40,12 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # Redis on 127.0.0.1:6379
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-You need Python 3.10 or newer. Docker is optional (see Troubleshooting).
+You need Python 3.12 or newer. Docker is optional (see Troubleshooting).
 
 Start the demo store, and restart it with a new `DEFENSE_LEVEL` each round:
 
@@ -225,7 +225,7 @@ python attacks/round0_recon.py               # runs a page.fill()/page.click() b
 
 1. Open the bot's trace in `/behavior/view/<sid>`. `keyboard.type(text, delay=100)` holds each key for 100 ms and releases it, and the next key goes down about 2 ms later. Compare the bars with yours.
 2. The touch users' virtual keyboards report holds of ~0–5 ms. Why don't they trip "zero-dwell typing"? Find the `ime_keys` exemption.
-3. Run `python attacks/demo_agent_style.py` at levels 1 and 2. An agent that types `xdotool`-style is allowed at L1 (score 20) and blocked at L2 (score 70).
+3. Run `python attacks/demo_agent_style.py` at levels 1 and 2. An agent that types `xdotool`-style is allowed at L1 (score 20) and blocked at L2 (score 70; challenged at 55 on runs where no click lands within 1 px of the centre).
 
 ---
 
@@ -283,13 +283,13 @@ curl -s localhost:5000/behavior/sessions | python -m json.tool | less
 - Which synthetic users were challenged at each level, and which rule caused it? Is the voice-control user's challenge acceptable?
 - Your recorded traces are behavioral biometrics. What do you store, for how long, and who can see them? (GDPR Art. 9; see §3.8.)
 - Scoring costs ~5 ms in pure Python, and the collector uploads ~10–15 KB per user, up to ~95 KB for a 1000 Hz mouse. What would you cap, sample or move client-side?
-- Run `python attacks/demo_agent_style.py --dictate` at level 4. The "agent" is challenged (score 40) for the same reasons as the voice-control user. What signal would tell them apart? (Hint: W4 Ch2, verified bot identity.)
+- Run `python attacks/demo_agent_style.py --dictate` at level 4. The "agent" is challenged (score 40, or 55 when a click lands on the centre) for the same reasons as the voice-control user. What signal would tell them apart? (Hint: W4 Ch2, verified bot identity.)
 
 ---
 
 ## Instructor: expected results
 
-Verified with Playwright 1.63 (Chromium 153.0.8010.12, headless) on Linux and Python 3.10, with `STORE=memory`. The Redis back end was **not** exercised in this verification run, because Docker wasn't available.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, requests 2.34.2 and Playwright 1.63.0 (Chromium 153.0.8010.12, headless) on Linux, with `STORE=memory` (redis-py 8.1.0 installed but unused). Checkpoints 0 to 4 passed with the numbers below. The Redis back end and the docker compose path are verified separately.
 
 R = reserved · C = challenged · **B** = blocked. Bold marks the first level that stops the attack.
 
@@ -302,8 +302,8 @@ R = reserved · C = challenged · **B** = blocked. Bold marks the first level th
 | `round4_replay --forge` | R | R | R | R | **B** | `[L4]` click outside its target |
 | `round4_replay` (warped) | R | R | R | R | **B** after first use | `[L4]` replayed typing |
 | `round4_replay --jitter-keys` | R | R | R | R | mostly R (1/3 B) | `[L4]` replayed path, when it fires |
-| `demo_agent_style.py` | R | R (20) | **B** (70) | B | B | `[L2]` zero-dwell typing |
-| `demo_agent_style.py --dictate` | R | **C** (40) | C | C | C | `[L1]` teleport + text without keys |
+| `demo_agent_style.py` | R | R (20) | **B** (70), or C (55) when no click lands on the exact centre | B or C | B or C | `[L2]` zero-dwell typing |
+| `demo_agent_style.py --dictate` | R | **C** (40–55) | C | C | C | `[L1]` teleport + text without keys |
 | 40 synthetic humans | 0 B · 0 C | 0 B · 1 C | 0 B · 1 C | 0 B · 1 C | 0 B · 1 C | the C is the voice-control user (55) |
 
 Over 200 synthetic humans per level, we saw 0 blocks after the closing-speed fix. A password-manager user is challenged occasionally (bulk fill 5 + weak deceleration 25 = 30).

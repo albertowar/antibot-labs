@@ -30,7 +30,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # Redis on 127.0.0.1:6379 (skip: see troubleshooting)
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 ```
 
@@ -214,15 +214,15 @@ python tools/sweep.py --signal no_keystrokes       # the largest minority you ne
 
 ## Instructor: expected results
 
-Verified with Python 3.10, Flask 3.1.3, redis-py 7.4.0 and the `memory://` store. The population is seeded, so the counts are exact; pipeline timings vary with the machine.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, requests 2.34.2 and the `memory://` store (no Docker). Rounds 2 and 4 were also run through the redis-py 8.1.0 client against fakeredis 2.39.0 served over TCP, with the same counts. The `docker compose` path (real Redis 8) is verified separately. The population is seeded, so the counts are exact; pipeline timings vary with the machine.
 
 | `DEFENSE_LEVEL` | Real customers blocked | Challenged | Who | Pipeline p50 / p95 |
 |---|---|---|---|---|
-| 0 | 0 | 0 | – | 0.10 / 0.27 ms |
-| 1 | **21 (10.5%)** | 0 | vpn 9, privacy 8, tor 3, a11y 1 (two overlap) | 0.10 / 0.43 ms |
-| 2 | 1 (0.5%) | 6 (3.0%, all PoW) | blocked: tor+a11y · PoW: vpn 3, tor 2, a11y 1 | 0.10 / 0.18 ms |
-| 3 | 1 (0.5%) | 12 (6.0%, all PoW) | + every VPN user (`tz_geo_mismatch`) | 0.13 / 0.40 ms |
-| 4 | 1 (0.5%) | 12 (6.0%), step-up 0 | unchanged; no cluster is hot | 0.16 / 0.60 ms |
+| 0 | 0 | 0 | – | 0.05 / 0.15 ms |
+| 1 | **21 (10.5%)** | 0 | vpn 9, privacy 8, tor 3, a11y 1 (two overlap) | 0.07 / 0.17 ms |
+| 2 | 1 (0.5%) | 6 (3.0%, all PoW) | blocked: tor+a11y · PoW: vpn 3, tor 2, a11y 1 | 0.06 / 0.16 ms |
+| 3 | 1 (0.5%) | 12 (6.0%, all PoW) | + every VPN user (`tz_geo_mismatch`) | 0.09 / 0.22 ms |
+| 4 | 1 (0.5%) | 12 (6.0%), step-up 0 | unchanged; no cluster is hot | 0.08 / 0.19 ms |
 
 Attacker profiles, as scored by `tools/sweep.py --signals`:
 

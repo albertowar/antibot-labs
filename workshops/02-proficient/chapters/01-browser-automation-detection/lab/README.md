@@ -13,7 +13,7 @@ You play both sides. The attacker drives a real browser at the demo store. The d
 
 ```
 lab/
-  docker-compose.yml   PostgreSQL 16 (sensor verdicts, carts). Optional: SQLite works too
+  docker-compose.yml   PostgreSQL 18 (sensor verdicts, carts). Optional: SQLite works too
   demo_site/           Flask store · static/sensor.js (the in-page sensor) · templates/
   defenses/            automation_artifacts · consistency · lie_detection · interaction · scoring
     edge/              Workshop 1's header rules, always on
@@ -28,11 +28,11 @@ lab/
 
 ## Setup (before the session, ~10 min)
 
-You need Python 3.10 or newer. Docker is optional.
+You need Python 3.12 or newer. Docker is optional.
 
 ```bash
 cd lab
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 python -m playwright install chromium                   # Chromium + headless shell, ~250 MB
 python -m patchright install chromium                   # Round 4
@@ -247,7 +247,7 @@ Read `round5_forged_sensor.py`: it is `tools/legit_traffic.py` with a different 
 
 ## Instructor: expected results
 
-Verified on 2026-10-10 with Playwright 1.63.0 (Chromium 153.0.8010.12), patchright 1.63.0, playwright-stealth 2.0.3, Selenium 4.51.0 and Python 3.10, against the store running on SQLite. Each cell shows `/api/products` / `/api/cart`. **Bold** marks the first block, and `–` means the attack never reached the cart.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, Playwright 1.63.0 (Chromium 153.0.8010.12), patchright 1.63.0, playwright-stealth 2.0.3 and Selenium 4.51.0, against the store running on SQLite; every round's checkpoint (with `--catch-up`) and `scoreboard.py --bonus` at Level 4 reproduced the table below. Each cell shows `/api/products` / `/api/cart`. **Bold** marks the first block, and `–` means the attack never reached the cart.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
 |---|---|---|---|---|---|---|
@@ -278,7 +278,7 @@ Things to watch for:
 - **Version drift is the whole game.** When Playwright, patchright or Chrome update, rerun `scoreboard.py --bonus` at every level before the session. Then re-capture `tools/profiles/chromium-153-linux.json` with `/capture`, and update the version strings in the synthetic profiles.
 - **Synthetic profiles.** Twelve of the thirteen profiles are synthetic. Their header order and native-code strings come from the real Chromium capture, and the identity values (UA, brands, GPU, geometry) are edited per browser. The Firefox, Safari and resistFingerprinting values are representative, not captured. Ask students to add their own browsers with `/capture` in Round 0. That's the best false-positive data you will get in the room.
 - **Headed attacks.** Every attack runs headless, so no display is needed. If a student runs patchright headed on a real desktop, the SwiftShader signal disappears too.
-- **Docker.** The expected results above were verified on SQLite. The PostgreSQL path uses the same models and the same compose file as W1 Ch4.
+- **Docker.** The expected results above were verified on SQLite; the docker compose (PostgreSQL) path is verified separately. It uses the same models and the same compose file as W1 Ch4.
 
 ---
 

@@ -16,7 +16,7 @@ The demo store sits behind a JavaScript challenge that gets stronger every round
 
 ```
 lab/
-  docker-compose.yml   Redis 8.6 for single-use nonces and clearance budgets (optional)
+  docker-compose.yml   Redis 8.10 for single-use nonces and clearance budgets (optional)
   demo_site/app.py     Flask store; DEFENSE_LEVEL=0..5 picks the challenge
   defenses/            cookie_gate · tokens · variants · challenge_template.js · env_integrity · clearance
   attacks/             round1_requests_scraper … round5_resolve_loop, js/ (jsdom solver, webcrack)
@@ -33,12 +33,12 @@ lab/
 
 ## Setup (before the session, ~10 min)
 
-You need **Python 3.10+** and **Node 24 LTS (24.15 or later)**. Docker is optional.
+You need **Python 3.12+** and **Node 24 LTS (24.15 or later)**. Docker is optional.
 
 ```bash
 cd lab
 docker compose up -d --wait                 # optional: Redis on 127.0.0.1:6379
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium firefox         # firefox is optional (one simulated user)
 npm ci                                      # javascript-obfuscator, jsdom, webcrack
@@ -272,14 +272,14 @@ Run this before class if your machine is slow, and walk the table below. For eac
 
 ## Instructor: expected results
 
-Verified on 2026-10-10. Stack:
+Verified on 2026-10-11. Stack:
 
-- Python 3.10 and Node 24.13.
-- Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0).
-- javascript-obfuscator 5.8.0, jsdom 30.1.1, webcrack 2.16.0.
-- fakeredis 2.38.0, both in-process and as a TCP stand-in for Redis through redis-py 8.1.
+- Python 3.12.15 and Node 24.21.0 (`npm ci` from the committed lockfile).
+- Flask 3.1.3, requests 2.34.2, Playwright 1.63.0 (Chromium 153.0.8010.12, Firefox 155.0).
+- javascript-obfuscator 5.9.0, jsdom 30.1.2, webcrack 2.16.0.
+- redis-py 8.1.0 with fakeredis 2.39.0 (the in-process fallback, as in the no-Docker path above).
 
-**The Docker Redis container itself was not exercised in the build environment.**
+Every round's checkpoint (0 to 5) passed with the numbers in the table below. The docker compose path (the Redis container) is verified separately.
 
 Pages scraped out of 300 (blank = attack not invented yet):
 

@@ -21,6 +21,7 @@ layer costs the real customers running the app.
 lab/
   README.md            this file
   requirements.txt     pinned versions (Python 3.12+)
+  requirements-mitmproxy.txt  optional: mitmproxy for the live demo (pins cryptography 48, see inside)
   docker-compose.yml   OPTIONAL — only for the production-shaped Redis/Postgres path
   demo_site/
     app.py             the Lab Runner mobile API (DEFENSE_LEVEL 0–3)
@@ -48,8 +49,9 @@ lab/
 ## Setup (before the session)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
+pip install -r requirements-mitmproxy.txt   # optional: only for the live interception demo
 python tools/make_cert.py            # self-signed cert for the TLS edge (the pin target)
 python tools/seed.py                 # 12 customer accounts, clean slate
 python tools/doctor.py               # preflight: packages, cert, store
@@ -90,7 +92,7 @@ you're attested, your integrity level and how L0 scores you.
 | Port 8443 in use | `PORT=9443 python demo_site/app.py` and `export DEMO_URL=https://localhost:9443` |
 | `unknown command 'hello'` from Redis | you installed an old `fakeredis`; `pip install -r requirements.txt` (needs `fakeredis==2.39.0`) |
 | Checkpoint says "needs DEFENSE_LEVEL=N" | restart the store with that level (and `REDIS_URL=memory://`) |
-| mitmproxy won't install | it needs Python 3.12+. Skip it: the rounds and checkpoint don't need it, only the live interception demo does |
+| mitmproxy won't install | it is in `requirements-mitmproxy.txt`, not in `requirements.txt`, because mitmproxy 12.2 needs `cryptography<=48.1`. Install it only for the live interception demo; the rounds and checkpoint don't need it |
 | Want a clean slate | `python tools/seed.py` (wipes and reseeds) |
 
 ## How to measure a round
@@ -223,6 +225,8 @@ Defender scoring cost: ~4–7 ms median per buy on the SQLite + memory path.
 - The attacker's `device="emulator"` is not a cheat: `mobile_core.mint()` only
   stamps the honest verdict of the device profile passed in. Nobody holds the
   provider's private key but the lab itself (it stands in for Google/Apple).
+
+**Verified with** Python 3.12.15 on Linux, `requirements.txt` as pinned (Flask 3.1.3, SQLAlchemy 2.1.4, cryptography 50.0.2, redis 8.1.0, fakeredis 2.39.0), SQLite and in-memory Redis (`REDIS_URL=memory://`). Rounds 1-4 each pass `tools/checkpoint.py` with the reference solutions applied (`--catch-up`, store restarted per level), and the numbers match the table above. After `pip install -r requirements-mitmproxy.txt` in the same venv (mitmproxy 12.2.3, cryptography 48.0.1) `mitmdump --version` works and all four checkpoints still pass (Round 4 re-run with cryptography 48.0.1 for this check; the optional mitmproxy extra was checked with cryptography 48.0.1, then the baseline 50.0.2 was restored). The pip resolver prints a harmless `typing_extensions` conflict warning (mitmproxy pins 4.14, anyio wants 4.16). The `docker compose` path is verified separately.
 
 ## Bonus challenges
 

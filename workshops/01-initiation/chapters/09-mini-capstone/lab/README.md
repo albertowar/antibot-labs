@@ -14,7 +14,7 @@ Twenty limited-edition hoodies go on sale at once. Forty simulated shoppers want
 
 ```
 lab/
-  docker-compose.yml   Redis 8 + PostgreSQL 16, bound to 127.0.0.1
+  docker-compose.yml   Redis 8 + PostgreSQL 18, bound to 127.0.0.1
   demo_site/           app.py (the store and its gate) · lab_edge.py (pretend CDN, W1 Ch3)
   defenses/            pipeline.py ← YOU WIRE IT · policy.py ← YOU TUNE IT · ladder.py
                        rate_limit · headers (+ the four W1 Ch4 modules) · ip_reputation
@@ -37,7 +37,7 @@ lab/
 ```bash
 cd workshops/01-initiation/chapters/09-mini-capstone/lab
 docker compose up -d --wait                 # Redis on 127.0.0.1:6379, PostgreSQL on 127.0.0.1:5432
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # waves 3 and 4
 ```
@@ -127,7 +127,7 @@ Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 |---|---|---|
 | 🔵 Defend | Read `defenses/proof_of_work.py` and `session_guard.check_binding`. Follow `TODO (Round 4)`. Restart | – |
 | 🔴 Re-run | `python tools/drop.py --waves 3` | wave 3 sold **1–6** (never more than one per minted session), challenged ~20–40 times · VPN shoppers **slowed, not stopped** · only `no_js` stopped |
-| 🔴 Attack | `python tools/drop.py --waves 4` | wave 4 sold **4–7**: every HTTP-level signal is genuine |
+| 🔴 Attack | `python tools/drop.py --waves 4` | wave 4 sold **4–8**: every HTTP-level signal is genuine |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 4` | wave 3 capped (≤ 6) · wave 4 gets a few · only `no_js` stopped |
 
 Open `/drop` in your own browser and buy a hoodie: the "Checking your browser…" message is the page solving the proof of work with WebCrypto.
@@ -154,7 +154,7 @@ tail -n 5 logs/decisions.jsonl                 # every gate decision of the late
 
 ## Instructor: expected results
 
-Measured on 2026-10-10 on one laptop (WSL2, Python 3.10, Playwright 1.63 / Chromium 153), with **`REDIS_URL=fakeredis://` and `DATABASE_URL=sqlite:///shop.db`**. Docker wasn't available in the reference environment, so the Redis 8 + PostgreSQL 16 path is untested (see the notes below). Each cell shows the bot's hoodies out of 20 when it runs alone against the 40 shoppers, at the end of each round, with `tools/checkpoint.py --round N --all`.
+Measured on 2026-10-11 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis[lua] 2.39.0 with lupa 2.8, requests 2.34.2, user-agents 2.2.0, Playwright 1.63.0 / Chromium 153.0.8010.12 headless shell), with **`REDIS_URL=fakeredis://` and `DATABASE_URL=sqlite:///...`**. The Redis 8 + PostgreSQL 18 `docker compose` path is verified separately (see the notes below). Each cell shows the bot's hoodies out of 20 when it runs alone against the 40 shoppers, at the end of each round, with `tools/checkpoint.py --round N --all`.
 
 | Wave ↓ / end of round → | 0 | 1 | 2 | 3 | 4 | First stopped by |
 |---|---|---|---|---|---|---|
@@ -162,11 +162,11 @@ Measured on 2026-10-10 on one laptop (WSL2, Python 3.10, Playwright 1.63 / Chrom
 | wave 1 cloud fleet | 20 | **20** | 0 | 0 | 0 | IP reputation: `datacenter` 40 + `hosting_asn` 25 |
 | wave 2 residential filler | 20 | 20 | **20** | 0 (believes 60) | 0 (believes 60) | traps: `honeypot_field` 100 → fake success |
 | wave 3 session minting | – | – | – | **18–20** | 1–6 | one per session + network-bound PoW |
-| wave 4 full browser | – | – | – | – | **4–7** | nothing in W1 (Workshop 2) |
+| wave 4 full browser | – | – | – | – | **4–8** | nothing in W1 (Workshop 2) |
 | **Shoppers stopped** | 0 | 0 | 3 VPN | 3 VPN | 1 no-JS | |
 | **Shoppers slowed ≥ 1 s** | 0 | 0 | 0 | 0 | 1–3 (VPN, 17 bits) | |
 
-Bold cells are the attack that beats the round (the checkpoint's "wins" expectation). "–" means not run in that round. Drop Day with the Round 4 policy, across five runs: shoppers 12–16 of 20, bots 4–8 (wave 3: 2–3, wave 4: 2–5), 1 shopper stopped (no-JS), 2–3 slowed.
+Bold cells are the attack that beats the round (the checkpoint's "wins" expectation). "–" means not run in that round. Drop Day with the Round 4 policy, across seven runs: shoppers 11–16 of 20, bots 4–9 (wave 3: 2–4, wave 4: 2–6), 1 shopper stopped (no-JS), 2–3 slowed.
 
 Things to watch for:
 

@@ -13,7 +13,7 @@ You play both sides. In each round, the attacker runs a script against the demo 
 
 ```
 lab/
-  docker-compose.yml   PostgreSQL 16 for the header logs
+  docker-compose.yml   PostgreSQL 18 for the header logs
   demo_site/app.py     Flask store; DEFENSE_LEVEL=0..4 picks the defense layers
   defenses/            ua_inspector · header_inspector · client_hints · header_order · accept_ch · scoring
   attacks/             round0_recon … round5_playwright_ua_override
@@ -27,7 +27,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # Round 5 attack
 ```
@@ -238,7 +238,7 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ## Instructor: expected results
 
-Verified with Playwright 1.63 (Chromium 153), real Chrome 145 and Firefox 155 on Linux, and PostgreSQL 16.4. "403" means every scraping request was blocked.
+Verified with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, psycopg 3.3.6, requests 2.34.2, user-agents 2.2.0 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell) on Linux, on the no-Docker path (`DATABASE_URL=sqlite:///...`); the shipped `tools/profiles/` come from real Chrome 145 and Firefox 155. The `docker compose` path (PostgreSQL 18) was also run end to end on 2026-10-11; every checkpoint passes. "403" means every scraping request was blocked.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
 |---|---|---|---|---|---|---|

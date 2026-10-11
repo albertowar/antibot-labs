@@ -1,14 +1,14 @@
-# W4 Ch2 lab — Verified Bot Identity. Python 3.10+. Pins verified October 2026.
+# W4 Ch2 lab — Verified Bot Identity. Python 3.12+. Pins verified October 2026.
 Flask==3.1.3
 # HTTP client for the attacks, the legitimate-traffic simulator and the store's
 # calls to the mock operator sites (range lists, key directories, DNS fixture).
 httpx==0.28.1
 # Ed25519 keys and signatures for RFC 9421 / Web Bot Auth (defenses/httpsig.py).
-cryptography==46.0.7
+cryptography==50.0.2
 # Budgets, verdict caches and the nonce replay cache. fakeredis in-process by
 # default (REDIS_URL=memory://), so no Docker is needed.
 redis==8.1.0
 fakeredis==2.39.0
 # ONLY for the optional tools/verify_real.py bonus (real reverse DNS of an IP
 # from your own logs). Everything else in the lab is offline.
-dnspython==2.8.0
+dnspython==2.9.0

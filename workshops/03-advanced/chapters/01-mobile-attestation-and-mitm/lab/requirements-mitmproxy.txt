@@ -1,0 +1,16 @@
+# W3 Ch1 optional extra: the live interception demo (Round 1/2, instructor-driven).
+#
+#   pip install -r requirements-mitmproxy.txt      # after requirements.txt, same venv
+#
+# mitmproxy 12.2.3 requires cryptography<=48.1 (and pyOpenSSL<=27), so this file
+# downgrades cryptography from the series baseline (50.0.2) inside this venv.
+# The store and the attacks only use HMAC/Ed25519 through APIs that are
+# identical in 48 and 50. Keep this out of the shared baseline on purpose.
+#
+# Known advisories (pip-audit, Oct 2026): mitmproxy 12.2.3 also caps tornado at
+# 6.5.5, which carries GHSA-3hv7-mjh2-fv65, GHSA-wwv5-g3v4-889x and
+# GHSA-8423-8fgw-73vq (all in tornado's HTTP server, fixed in 6.5.8/6.5.9).
+# mitmproxy uses tornado only for the mitmweb UI. Run the demo with `mitmdump`
+# or the `mitmproxy` console on 127.0.0.1 and do not start mitmweb.
+mitmproxy==12.2.3
+cryptography==48.0.1

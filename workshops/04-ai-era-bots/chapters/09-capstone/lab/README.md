@@ -30,10 +30,10 @@ Score scale is the series' usual: `score < 30` allow, `30–59` challenge, `≥ 
 
 ## Setup (under 10 minutes)
 
-Python 3.10+ (3.12 recommended). No Docker, no browser.
+Python 3.12+. No Docker, no browser.
 
 ```bash
-python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 python tools/seed.py                               # 120 products + the drop + honeypots, 52 accounts, operator keys
 python tools/doctor.py                             # preflight (packages, keys, seed)
@@ -162,8 +162,11 @@ weighted friction and decide whether it is worth it.
 
 ## Instructor: expected results
 
-Verified October 2026 on Python 3.12, fakeredis + SQLite, the deterministic mock
-LLM, with the reference solutions applied cumulatively.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
+SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, cryptography 50.0.2, requests 2.34.2
+and httpx 0.28.1, on fakeredis + SQLite with the deterministic mock LLM, through
+`tools/verify.py --round N --defended --checkpoint` (reference solutions applied
+cumulatively; `--ops` for Round 4). The `docker compose` path is verified separately.
 
 | Round (level) | Attack result | Legit |
 |---|---|---|

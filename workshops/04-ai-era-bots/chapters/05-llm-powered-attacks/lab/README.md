@@ -37,7 +37,7 @@ model call, which keeps the lab to one language.
 
 ```bash
 cd lab
-python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 python tools/seed.py                               # synthetic catalogue, users, cohorts
 python demo_site/app.py                            # http://127.0.0.1:5000
@@ -99,8 +99,11 @@ pixels.
 
 ## Instructor expected results
 
-Measured on the default `fakeredis` + SQLite backend with the mock LLM (Python
-3.12, `tools/seed.py` defaults). Numbers are deterministic.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
+redis 8.1.0, fakeredis 2.39.0, requests 2.34.2 and Pillow 12.3.0, on the default
+`fakeredis` + SQLite backend with the mock LLM (`tools/seed.py` defaults); all four
+checkpoints pass with `--catch-up`. Numbers are deterministic. The `docker compose`
+path is verified separately.
 
 | Round | Metric | Un-wired (stub) | Wired (solution) | Legit customers blocked |
 |---|---|---|---|---|

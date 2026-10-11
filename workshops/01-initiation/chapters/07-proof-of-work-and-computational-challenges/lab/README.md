@@ -38,12 +38,12 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # Redis on 127.0.0.1:6379
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # Round 5 only
 ```
 
-Python 3.10 or newer. Start the demo site, and restart it with a new `DEFENSE_LEVEL` each round:
+Python 3.12 or newer. Start the demo site, and restart it with a new `DEFENSE_LEVEL` each round:
 
 ```bash
 cd demo_site
@@ -268,7 +268,7 @@ python tools/legit_traffic.py               # per-device wait at the current lev
 
 **Test setup:**
 
-- **Verified on:** Python 3.10.12, Flask 3.1.3, httpx 0.28.1, Playwright 1.63.0 (Chromium), with both `STORE=memory` and a Redis-protocol server. The Redis runs used `fakeredis` 2.39 in TCP mode, because Docker wasn't available on the test machine. The `docker compose` path itself is not yet verified against a real Redis container.
+- **Verified on:** Python 3.12.15, Flask 3.1.3, httpx 0.28.1, redis 8.1.0 (client only) and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell), with `STORE=memory`. Checkpoints 0-5 all pass and reproduce the table below. The `docker compose` path (Redis 8.10) was also run end to end on 2026-10-11 (`RedisStore`, checkpoints 0-5); every checkpoint passes.
 - **Hardware:** a shared 6-core Xeon W-2133 under WSL2. It measured Python at ≈ 0.3 MH/s per core and the browser solver at ≈ 0.9 MH/s per worker (2.2 MH/s on 4 workers). An unloaded laptop is typically 2–4× faster in Python, so CPU-seconds will be lower and the ratios the same.
 
 Pages scraped out of 200 (Round 5: out of 60). **Bold** marks the level where the attack stops:

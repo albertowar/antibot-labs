@@ -30,7 +30,7 @@ store runs on an in-process `fakeredis` and a SQLite file by default.
 
 ```bash
 cd lab
-python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 python tools/seed.py                               # synthetic catalogue, users, fixtures
 python demo_site/app.py                            # http://127.0.0.1:5000
@@ -76,6 +76,8 @@ python attacks/round5_click_fraud.py --sivt        # sophisticated invalid traff
 
 Measured on the default fakeredis + SQLite backend (`DROP_STOCK=50`, 1000-row combo
 list, 10 real hits). Numbers are deterministic up to small timing jitter.
+
+**Verified with** Python 3.12.15 on Linux, `requirements.txt` as pinned (Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, requests 2.34.2, redis 8.1.0, fakeredis 2.39.0), SQLite and in-process fakeredis. Each stub attack and each round's checkpoint (`--catch-up`) reproduces the table below, as do the three evolved attacks (`--skip-view`, `--clean-emails`, `--sivt`). The `docker compose` path is verified separately.
 
 | Round | Metric | Un-wired (stub) | Wired (solution) | Legit customers blocked |
 |---|---|---|---|---|

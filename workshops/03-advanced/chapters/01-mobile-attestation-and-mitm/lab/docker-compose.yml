@@ -16,7 +16,7 @@ name: w3-ch01-mobile
 
 services:
   redis:
-    image: redis:7.4.11-alpine
+    image: redis:8.10.2-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
       - "127.0.0.1:6379:6379"
@@ -27,7 +27,7 @@ services:
       retries: 15
 
   postgres:
-    image: postgres:16.4-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_USER: workshop
       POSTGRES_PASSWORD: workshop
@@ -35,7 +35,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
       interval: 2s

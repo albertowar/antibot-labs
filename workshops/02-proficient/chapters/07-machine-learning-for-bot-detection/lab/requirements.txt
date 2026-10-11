@@ -1,10 +1,10 @@
-# Newest releases that still support Python 3.10 (verified on 3.10). See README "Why these tools".
+# W2 Ch7 lab. Python 3.12+. Pins verified October 2026. See README "Why these tools".
 Flask==3.1.3
-SQLAlchemy==2.0.54
+SQLAlchemy==2.1.4
 psycopg[binary]==3.3.6
 httpx==0.28.1
-numpy==2.2.6
-pandas==2.3.3
-pyarrow==25.0.1
-scikit-learn==1.7.2
+numpy==2.5.4
+pandas==3.0.6
+pyarrow==26.0.0
+scikit-learn==1.9.1
 lightgbm==4.7.0

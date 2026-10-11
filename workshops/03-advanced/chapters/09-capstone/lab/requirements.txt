@@ -1,5 +1,4 @@
-# W3 Ch9 Capstone lab. Python 3.12+ recommended (built and verified on 3.10 too).
-# Exact pins, verified October 2026.
+# W3 Ch9 Capstone lab. Python 3.12+. Pins verified October 2026.
 
 # --- demo store ---
 Flask==3.1.3
@@ -8,8 +7,8 @@ SQLAlchemy==2.1.4
 psycopg[binary]==3.3.6
 redis==8.1.0
 cryptography==50.0.2
-PyJWT==2.11.0              # L5: API tokens bound to the JA4 fingerprint
-websockets==15.1          # the price-update WebSocket + its flood attack (Round 1)
+PyJWT==2.15.1              # L5: API tokens bound to the JA4 fingerprint
+websockets==17.2          # the price-update WebSocket + its flood attack (Round 1)
 
 # --- attackers & simulators ---
 requests==2.34.2
@@ -19,7 +18,7 @@ patchright==1.63.0        # patched Playwright (optional, Round 4 bonus)
 camoufox==0.5.8           # native-spoofing Firefox (optional, Round 4 bonus)
 
 # --- ML (inherited L3 session model) ---
-numpy==2.5.3
+numpy==2.5.4
 scikit-learn==1.9.1
 
 # --- optional: the `prod` streaming profile (STREAM_BACKEND=kafka) ---

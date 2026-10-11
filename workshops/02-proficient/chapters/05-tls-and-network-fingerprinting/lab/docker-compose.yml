@@ -11,7 +11,7 @@ name: w2-ch05-tls
 
 services:
   postgres:
-    image: postgres:16.4-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_USER: workshop
       POSTGRES_PASSWORD: workshop
@@ -19,7 +19,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
       interval: 2s

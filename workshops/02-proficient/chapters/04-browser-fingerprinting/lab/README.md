@@ -16,7 +16,7 @@ The demo store gives every new account a €10 welcome credit, so a bot wants hu
 
 ```
 lab/
-  docker-compose.yml       PostgreSQL 16 for fingerprints and sign-ups
+  docker-compose.yml       PostgreSQL 18 for fingerprints and sign-ups
   demo_site/app.py         Flask store; DEFENSE_LEVEL=0..4 picks the layers
   demo_site/static/fp_collector.js   the collector (reports raw observations, judges nothing)
   defenses/                render_stack · lie_detector · stable_id · population · linking · fuzzy_cluster · scoring
@@ -38,7 +38,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # every attack drives Chromium
 ```
@@ -264,7 +264,7 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ## Instructor: expected results
 
-Verified with Playwright 1.63 (Chromium 153), Python 3.10, and the SQLite fallback. Numbers are accounts created out of 20 sign-ups (the scripts' default; the checkpoint uses 10). Each attack starts from an empty store.
+Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, Playwright 1.63.0 (Chromium 153) and the SQLite fallback (no Docker). The `docker compose` path is verified separately. Every checkpoint (rounds 0-4) passed, and the `LINK_MODE=naive` runs gave 2/40 (L3) and 10/40 (L4) refused. Numbers are accounts created out of 20 sign-ups (the scripts' default; the checkpoint uses 10). Each attack starts from an empty store.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first stop |
 |---|---|---|---|---|---|---|
@@ -289,7 +289,7 @@ Things to watch for:
   - Does headless still report SwiftShader? (Chrome dropped the automatic SwiftShader fallback in 139. Playwright enables it explicitly.)
   - Is `MAX_TEXTURE_SIZE` still 8192?
 - **Synthesized profiles.** Every shipped real-user profile is marked `synthesized`. They are built from real Chromium and Firefox captures plus each browser's documented behaviour, *not* captured on those exact devices. Ask students on Safari, Brave and phones to add their captures in Round 0, and treat any refusal of a captured profile as a bug in the defense.
-- **PostgreSQL.** The lab was verified on the SQLite fallback. The queries are plain SQLAlchemy, but run one full checkpoint on PostgreSQL before teaching.
+- **PostgreSQL.** The no-Docker run above used the SQLite fallback. The queries are plain SQLAlchemy; the PostgreSQL path is covered by the separate `docker compose` verification.
 
 ---
 

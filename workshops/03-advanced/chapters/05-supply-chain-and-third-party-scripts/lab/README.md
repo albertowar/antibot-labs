@@ -40,11 +40,11 @@ lab/
 
 ## Setup (before the session)
 
-No Docker, no database. You need Python 3.10+ and a Chromium for Playwright.
+No Docker, no database. You need Python 3.12+ and a Chromium for Playwright.
 
 ```bash
 cd lab
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium
 ```
@@ -170,8 +170,11 @@ policy out of report-only, and keeping the monitor's allowlist current.
 
 ## Instructor: expected results
 
-Verified on Linux with Python 3.10, Flask 3.1.3, Playwright 1.63 (Chromium 153),
-on the no-Docker path. Each round below is the *solved* end state; the negative
+Verified on Linux with Python 3.12.15, Flask 3.1.3, httpx 0.28.1, Playwright 1.63.0
+(Chromium 153.0.8010.12), on the no-Docker path (no Redis or database in this lab).
+Rounds 1-4 each pass `tools/checkpoint.py` with the store restarted at that round's
+flags, and the numbers match the table below. The `docker compose` path is verified
+separately. Each round below is the *solved* end state; the negative
 control shows the prior defense genuinely failing.
 
 | Round | End state | Attack result | Detection signal | Shoppers blocked |

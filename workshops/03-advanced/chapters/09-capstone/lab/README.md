@@ -61,7 +61,7 @@ ops/          prometheus.yml + grafana provisioning for the optional `prod` prof
 ```bash
 cd lab
 docker compose up -d --wait                 # Redis + PostgreSQL, bound to 127.0.0.1
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # for Round 0 and the Round 4 browser bonus
 patchright install chromium                 # optional (Round 4 bonus)
@@ -76,10 +76,12 @@ DEFENSE_LEVEL=4 python demo_site/app.py      # https://localhost:8443 ; raise th
 Each round runs the store at its own level, so restart with a new `DEFENSE_LEVEL`
 when the round table says so (0→`4`, 1→`5`, 2→`6`, 3→`7`, 4→`7`).
 
-**No-Docker fallback:** set `DATABASE_URL=sqlite:///instance/shop.db`. Redis has no
-pure-Python drop-in that is shared across processes, so install a local
-`redis-server` or keep the Redis container (it is the only thing Docker is
-required for in the default path).
+**No-Docker fallback:** set `DATABASE_URL=sqlite:////absolute/path/to/lab/instance/shop.db`
+(four slashes; a relative `sqlite:///instance/...` resolves under `demo_site/`, which
+does not exist there). The store needs a Redis shared across processes: install a local
+`redis-server`, keep the Redis container, or run fakeredis as a TCP server
+(`pip install "fakeredis[lua]==2.39.0"`, then
+`python -c "from fakeredis import TcpFakeServer as S; S(('127.0.0.1', 6379), server_type='redis').serve_forever()"`).
 
 **Optional production-like stack** (`prod` profile): real Redpanda + Prometheus +
 Grafana, locally, no cloud account.
@@ -224,6 +226,8 @@ Attack ↓ / `DEFENSE_LEVEL` →, with the first blocking level in **bold**:
 | `round4_integrated` | — | **L7**: 0 pairs | recon `[L5] cost`, evade `[L6] CV`, purchase `[L0] no telemetry` |
 | Legit (40 customers) | 0 blocked at every level | — | friction only: `firefox-rfp`, `vdi-citrix`, `new-laptop` challenged |
 | Legit API (3 clients) | 0 blocked at every level | — | JA4-bound token valid, velocity under limit |
+
+**Verified with** Python 3.12.15 on Linux, `requirements.txt` as pinned (Flask 3.1.3, SQLAlchemy 2.1.4, redis 8.1.0, PyJWT 2.15.1, websockets 17.2, numpy 2.5.4, scikit-learn 1.9.1, curl_cffi 0.16.3, playwright 1.62.0 with Chromium 151.0.7922.34, patchright 1.63.0 and camoufox 0.5.8 installed and importing), SQLite, the in-process stream backend, and fakeredis 2.39.0 served over TCP as the Redis (the Redis 8.10 image is exercised by the `docker compose` path, which is verified separately). `tools/train_model.py` was re-run after the numpy/scikit-learn bump (42 human + 11 bot sessions, threshold 0.010, bot recall 80%, human FPR 0% on validation). Rounds 0-4 each pass `tools/checkpoint.py` with the cumulative reference solutions applied and the store restarted at the round's level: 0 customers or API clients blocked, 5 of 49 challenged (`firefox-rfp`, `new-laptop`, `vdi-citrix`). The optional Round 4 browser bonus (patchright, camoufox) was not run end to end.
 
 Defender cost in the default path: scoring median ~15 ms, p95 ~75 ms per action.
 Attacker cost per attempt: `curl_cffi` API calls ~0.05 s; the low-and-slow poll

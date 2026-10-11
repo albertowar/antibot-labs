@@ -9,8 +9,8 @@
     "deobfuscate": "node attacks/js/deobfuscate.mjs"
   },
   "dependencies": {
-    "javascript-obfuscator": "5.8.0",
-    "jsdom": "30.1.1",
+    "javascript-obfuscator": "5.9.0",
+    "jsdom": "30.1.2",
     "webcrack": "2.16.0"
   }
 }

@@ -76,7 +76,7 @@ def verify_token(token, *, remoteip, expected_action, expected_hostnames,
     # TODO (Round 1): reject if outcome["hostname"] is not in expected_hostnames.
     # TODO (Round 1): reject if outcome["action"] != expected_action.
     # TODO (Round 1): reject if outcome["challenge_ts"] is older than MAX_TOKEN_AGE_S
-    #   It looks like "2026-10-10T09:15:02.123Z"; on Python 3.10, replace the
+    #   It looks like "2026-10-10T09:15:02.123Z"; before Python 3.11, replace the
     #   trailing "Z" with "+00:00" before datetime.fromisoformat().
     return Verdict(True, "provider accepted token", outcome)
 

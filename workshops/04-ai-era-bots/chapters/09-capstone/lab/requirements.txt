@@ -1,4 +1,4 @@
-# W4 Ch9 Capstone lab: Govern the Agents. Python 3.10+ (3.12 recommended). Exact pins, verified October 2026.
+# W4 Ch9 Capstone lab: Govern the Agents. Python 3.12+. Pins verified October 2026.
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.1.4

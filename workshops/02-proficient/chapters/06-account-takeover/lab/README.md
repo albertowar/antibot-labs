@@ -25,7 +25,7 @@ lab/
 ## Setup (before the session)
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
+python -m venv .venv && . .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 python tools/seed.py                       # builds data/ (users, combo list, corpus, ...)
 DEFENSE_LEVEL=0 python demo_site/app.py     # terminal 1 — the store, on :5000
@@ -146,8 +146,8 @@ screen, device/context) cost recoverable friction instead of hard blocks.
 
 ## Instructor: expected results
 
-Verified with the reference solutions (installed with `--catch-up`) on Python 3.10,
-`fakeredis` + SQLite, 1000-pair combo list, 145 simulated users. Small run-to-run
+Verified on 2026-10-11 with the reference solutions (installed with `--catch-up`) on Python 3.12.15,
+Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, `fakeredis` 2.39.0, pyotp 2.10.0, httpx 0.28.1 and SQLite (no Docker; the `docker compose` path is verified separately), 1000-pair combo list, 145 simulated users. Small run-to-run
 variation of ±1 ATO on the stuffers is normal (which valid pairs land before a
 cohort trips). "ATO" = a session obtained through the front door.
 

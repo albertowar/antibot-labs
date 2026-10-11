@@ -1,4 +1,4 @@
-# W3 Ch1 Mobile Apps, Attestation & MitM lab. Python 3.12+. Exact pins, verified October 2026.
+# W3 Ch1 Mobile Apps, Attestation & MitM lab. Python 3.12+. Pins verified October 2026.
 #
 # Core store + attacker + tools. The lab runs with no Docker: the store defaults
 # to SQLite and an in-memory Redis (fakeredis). Install PostgreSQL/Redis only if
@@ -12,10 +12,10 @@ httpx==0.28.1
 fakeredis==2.39.0
 redis==8.1.0
 
-# Live interception demo only (Round 1/2). mitmproxy needs Python 3.12+.
-# The scripted rounds and tools/checkpoint.py do NOT need it, so if this wheel
-# will not build on your machine you can still complete every round.
-mitmproxy==12.2.3
+# Live interception demo only (Round 1/2): mitmproxy lives in
+# requirements-mitmproxy.txt because mitmproxy 12.2.3 requires cryptography<=48.1
+# and this file follows the series baseline (cryptography 50). The scripted
+# rounds and tools/checkpoint.py do NOT need it. See the README.
 
 # Optional production-shaped path (PostgreSQL). Uncomment if you run docker compose.
 # psycopg[binary]==3.3.6

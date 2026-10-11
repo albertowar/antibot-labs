@@ -7,7 +7,7 @@
 name: w3-ch03-streaming
 services:
   redis:
-    image: redis:8.2.10-alpine
+    image: redis:8.10.2-alpine
     command: redis-server --save "" --appendonly no
     ports:
       - "127.0.0.1:6379:6379"

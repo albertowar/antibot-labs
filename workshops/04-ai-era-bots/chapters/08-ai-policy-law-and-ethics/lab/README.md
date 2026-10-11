@@ -10,7 +10,7 @@ Nothing in this lab touches a network. The crawler fleet and the agent farm are 
 
 ```
 lab/
-  requirements.txt            Python 3.10+ standard library only. No Docker, no demo-site process.
+  requirements.txt            Python 3.12+ standard library only. No Docker, no demo-site process.
   data/world.json             the simulated internet from W2 Ch8 (documentation ranges, ASNs)
   data/agent_sessions.jsonl   3,000 sessions: 2,000 real people in six cohorts, 4 bot campaigns of 250
   defenses/reservation/       your Round 1 stack: robots.txt · headers.json · terms.json · logging.json
@@ -29,7 +29,7 @@ lab/
 
 ```bash
 cd workshops/04-ai-era-bots/chapters/08-ai-policy-law-and-ethics/lab
-python3 --version                                                  # 3.10 or newer
+python3 --version                                                  # 3.12 or newer
 python3 tools/reservation_audit.py --stack defenses/reservation    # Round 1 scoreboard
 python3 tools/agent_audit.py --policy policies/agent_policy.json   # Round 2 scoreboard
 ```
@@ -38,7 +38,7 @@ If both commands print a scoreboard, you are ready. Print or open `exercises/rou
 
 **Troubleshooting**
 
-- `ModuleNotFoundError`: you are running an old Python. Anything 3.10+ works; nothing needs installing.
+- `ModuleNotFoundError`: you are running an old Python. Use 3.12+ (the series floor); nothing needs installing.
 - `data/agent_sessions.jsonl` missing or edited: `python3 tools/make_log.py` rebuilds it.
 - You broke `defenses/reservation/` or `policies/agent_policy.json`: `cp defenses/reservation_naive/* defenses/reservation/` or `cp policies/agent_policy_blunt.json policies/agent_policy.json` to start over.
 - Windows: use `python` instead of `python3`. Paths in this README are relative to `lab/`.
@@ -167,7 +167,7 @@ Fill in the scoreboard on the slide: Round 1 honoured / ingested / evidence on y
 
 ## Instructor: expected results
 
-Verified with Python 3.10 on Linux; the fleet is deterministic and the session log is seeded (2026), so these numbers do not drift.
+Verified on 2026-10-11 with Python 3.12.15 on Linux (standard library only; all three checkpoints run clean); the fleet is deterministic and the session log is seeded (2026), so these numbers do not drift.
 
 **Round 1** (`tools/reservation_audit.py --fleet all`)
 

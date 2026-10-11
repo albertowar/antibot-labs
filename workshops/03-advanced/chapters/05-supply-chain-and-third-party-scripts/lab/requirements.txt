@@ -1,4 +1,4 @@
-# W3 Ch5 — Supply Chain & Third-Party Scripts lab. Python 3.10+. Exact pins.
+# W3 Ch5 — Supply Chain & Third-Party Scripts lab. Python 3.12+. Pins verified October 2026.
 # No Docker, Redis or PostgreSQL: this chapter is about code running in the
 # browser, so it needs only Flask (two small apps) and a real Chromium.
 Flask==3.1.3

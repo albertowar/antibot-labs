@@ -45,7 +45,7 @@ lab/
 
 ```bash
 cd workshops/01-initiation/chapters/06-captchas-and-captcha-solving/lab
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 
 docker compose up -d --wait          # Redis 8 on 127.0.0.1:6379
@@ -231,7 +231,7 @@ Then use the discussion questions in the content doc (§6.6).
 
 ## Instructor: expected results
 
-Measured on Python 3.10.12 (Linux, WSL2) with fakeredis 2.39 standing in for Redis, `LAB_TIME_SCALE=5`, and the reference solutions. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
+Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, redis 8.1.0, fakeredis 2.39.0 standing in for Redis, httpx 0.28.1, Pillow 12.3.0, numpy 2.5.4 and scikit-learn 1.9.1, `LAB_TIME_SCALE=5`, and the reference solutions (`--catch-up`). The `docker compose` path (Redis 8.10) was also run end to end on 2026-10-11 (Rounds 0-4 with `--catch-up`); every checkpoint passes. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
 
 | Attack ↓ / state → | L0 | L1 before | L1 after | L2 before | L2 after | L3 before | L3 after | L4 before | L4 after |
 |---|---|---|---|---|---|---|---|---|---|

@@ -16,7 +16,7 @@ defense that catches each one, measuring the cost to real users at every step.
 ```
 lab/
   README.md            this file
-  requirements.txt     pinned deps (Python 3.10+)
+  requirements.txt     pinned deps (Python 3.12+)
   docker-compose.yml   OPTIONAL Redis + PostgreSQL; the lab runs without Docker
   demo_site/           the shared store, now behind three API surfaces
     app.py             Flask app; DEFENSE_LEVEL gate; Server-Timing cost header
@@ -48,7 +48,7 @@ the lab stays light.
 ## Setup (before the session)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 python tools/seed.py
 DEFENSE_LEVEL=0 python demo_site/app.py        # http://127.0.0.1:5000
@@ -204,8 +204,7 @@ should show real users caught = 0. That is the number that justifies the defense
 
 ## Instructor: expected results
 
-Verified October 2026 with Python 3.10, Flask 3.1.3, strawberry-graphql 0.332.1,
-flask-sock 0.7.0, websockets 15.0.1, on the fakeredis + SQLite default. A cell is the
+Verified October 2026 with Python 3.12.15, Flask 3.1.3, SQLAlchemy 2.1.4, strawberry-graphql 0.333.0, flask-sock 0.7.0, websockets 17.2, PyJWT 2.15.1, redis 8.1.0, fakeredis 2.39.0, on the fakeredis + SQLite default (levels 1-5 pass `tools/checkpoint.py --catch-up` with 40/40 legitimate clients served; every attack run at level 0 reproduces the first column). The `docker compose` path is verified separately. A cell is the
 attack's outcome at that cumulative `DEFENSE_LEVEL`; **bold** marks the level that first
 stops it.
 

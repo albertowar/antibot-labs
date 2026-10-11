@@ -13,7 +13,7 @@ The W1 Ch4 attacker copies every header from DevTools, so nothing at the HTTP la
 
 ```
 lab/
-  docker-compose.yml   PostgreSQL 16 for the request log (optional: SQLite works too)
+  docker-compose.yml   PostgreSQL 18 for the request log (optional: SQLite works too)
   demo_site/app.py     Flask store behind the edge; DEFENSE_LEVEL=0..4 picks the layers
   defenses/            ja4 (parser) · edge_headers · ja4_denylist · tls_family · h2_fingerprint ·
                        browser_proof · scoring · known_fingerprints.json
@@ -34,11 +34,11 @@ lab/
 
 ## Setup (before the session, about 10 min)
 
-Requirements: Python ≥ 3.10. Docker is optional.
+Requirements: Python ≥ 3.12. Docker is optional.
 
 ```bash
 cd lab
-python -m venv venv && source venv/bin/activate       # Windows: venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate       # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
 playwright install chromium firefox                   # + webkit if you want that persona
 python tools/make_cert.py                              # certs/tls.crt, tls.key for https://localhost
@@ -116,7 +116,7 @@ Bot traffic                         blocked   expected        attacker req/s
 
 Real users                          blocked
   ✅ partner-api                    0/3
-  ⚠️  corporate-proxy                3/3  documented false positive: ['[L2] UA claims chromium but JA4 t13d2212h1_da033aef09f1 matches no browser family']
+  ⚠️  corporate-proxy                3/3  documented false positive: ['[L2] UA claims chromium but JA4 t13d1912h1_121de08f9505 matches no browser family']
   ✅ chromium-user                  0/3
   ✅ firefox-user                   0/3
   ⏭️  webkit-user                    skipped: missing system libraries (playwright install-deps webkit)
@@ -155,7 +155,7 @@ Fill in this table from the recon output:
 
 | | python-requests | curl_cffi chrome | impit chrome | Playwright Chromium | Playwright Firefox |
 |---|---|---|---|---|---|
-| Cipher count (JA4_a) | 18 | 15 | | | |
+| Cipher count (JA4_a) | 17 | 15 | | | |
 | Extension count | | | | | |
 | ALPN | | | | | |
 | HTTP/2 SETTINGS | – | | | | |
@@ -178,7 +178,7 @@ Fill in this table from the recon output:
 | 🛡️ Defend | `python tools/capture_fingerprints.py`, then fill in `TODO (Round 1)` in `defenses/ja4_denylist.py` | `local_fingerprints.json` holds *your* requests/httpx/urllib JA4s |
 | 🛡️ Restart | `DEFENSE_LEVEL=1 python demo_site/app.py` | – |
 | 🗡️ Re-run | `python attacks/round1_naive_requests.py` | `403`, `[L1] JA4 on library denylist: python-requests …` |
-| 🗡️ Attack back | `python attacks/round1_cipher_tweak.py` | `200`: a new JA4 (`t13d1012h1_…`) the denylist has never seen |
+| 🗡️ Attack back | `python attacks/round1_cipher_tweak.py` | `200`: a new JA4 (`t13d0912h1_…`) the denylist has never seen |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 1` | naive blocked, tweak gets through, 0 real users blocked |
 
 **False-positive check:** comment out the `is_partner` lines and rerun the checkpoint. `partner-api` gets blocked: it uses python-requests too. Every library denylist needs an authenticated exception path for your own integrations.
@@ -192,7 +192,7 @@ Fill in this table from the recon output:
 | Step | Do | Expected |
 |---|---|---|
 | 🛡️ Defend | Fill in `TODO (Round 2)` in `defenses/tls_family.py`; restart with `DEFENSE_LEVEL=2` | – |
-| 🗡️ Re-run | `python attacks/round1_cipher_tweak.py` | `403`, `[L2] UA claims chromium but JA4 t13d1012h1_… matches no browser family` |
+| 🗡️ Re-run | `python attacks/round1_cipher_tweak.py` | `403`, `[L2] UA claims chromium but JA4 t13d0912h1_… matches no browser family` |
 | ⚠️ Cost | `python tools/legit_traffic.py --no-browser` | `corporate-proxy` blocked: Chrome UA, but the TLS comes from a middlebox |
 | 🗡️ Attack back | `python attacks/round2_impit_chrome.py` | `200`. impit's JA4 a+b is Chrome's exactly |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 2` | tweak blocked, impit gets through, corporate-proxy ⚠️ documented |
@@ -265,17 +265,17 @@ Real Chromium, curl_cffi and the Playwright bot all land in the first cluster. Y
 
 ## Instructor: expected results
 
-Verified 2026-10-10 on Linux x86_64 (WSL2), Python 3.10.12 with OpenSSL 3.0.2, fingerproxy v1.2.3, Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0), curl_cffi 0.16.3, impit 0.14.1, SQLite fallback. Every level was run with the reference solutions installed (`--catch-up`). Two things were not verified: PostgreSQL (no Docker on the test machine; the same SQLAlchemy model as W1 Ch4) and the WebKit persona (missing system libraries).
+Verified on 2026-10-11 on Linux x86_64 (WSL2) with Python 3.12.15 (OpenSSL 3.5.9), Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, fingerproxy v1.2.3, Playwright 1.63.0 (Chromium 153, Firefox 155.0), curl_cffi 0.16.3, impit 0.14.1 and the SQLite fallback. Every level was run with the reference solutions installed (`--catch-up`), after `tools/capture_fingerprints.py` (Round 1 step). The `docker compose` path is verified separately. The WebKit persona was not verified (missing system libraries).
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
 |---|---|---|---|---|---|---|
 | `round1_naive_requests` | 200 | **403** | 403 | 403 | 403 | `[L1] JA4 on library denylist: python-requests …` |
-| `round1_cipher_tweak` | 200 | 200 | **403** | 403 | 403 | `[L2] UA claims chromium but JA4 t13d1012h1_61a7ad8aa9b6 matches no browser family` |
+| `round1_cipher_tweak` | 200 | 200 | **403** | 403 | 403 | `[L2] UA claims chromium but JA4 t13d0912h1_f91f431d341e matches no browser family` |
 | `round2_impit_chrome` | 200 | 200 | 200 | **403** | 403 | `[L3] HTTP/2 SETTINGS don't match chromium: 2:0;4:6291456;5:16384;6:262144\|15597570\|m,a,s,p` |
 | `round3_curl_cffi_chrome` | 200 | 200 | 200 | 200 | **403** | `[L4] chromium TLS but no valid engine_proof cookie` |
 | `round4_playwright_chromium` | 200 | 200 | 200 | 200 | 200 | – |
 | `partner-api` | 200 | 200 | 200 | 200 | 200 | 403 from L1 if the `is_partner` exemption is missing |
-| `corporate-proxy` ⚠️ | 200 | 200 | **403** | 403 | 403 | `[L2] UA claims chromium but JA4 t13d2212h1_da033aef09f1 …` |
+| `corporate-proxy` ⚠️ | 200 | 200 | **403** | 403 | 403 | `[L2] UA claims chromium but JA4 t13d1912h1_121de08f9505 …` |
 | `chromium-user`, `firefox-user` | 200 | 200 | 200 | 200 | 200 | – |
 | `noscript-firefox` ⚠️ | 200 | 200 | 200 | 200 | **403** | `[L4] gecko TLS but no valid engine_proof cookie` |
 | `webkit-user` | – | – | – | – | – | Not verified (needs `playwright install-deps webkit`). Expect a Safari UA on a non-Apple TLS stack, i.e. an L2 false positive |

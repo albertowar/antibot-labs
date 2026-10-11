@@ -38,13 +38,13 @@ lab/
 
 ```bash
 cd lab
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 export REDIS_URL=memory://                       # no Docker needed; see the note below
 python demo_site/app.py                          # http://localhost:5000
 ```
 
-Leave the store running for the whole chapter; the five weeks accumulate in one decision log. In a second terminal (same `venv`), drive the weeks and read the scoreboard:
+Leave the store running for the whole chapter; the five weeks accumulate in one decision log. In a second terminal (same `.venv`), drive the weeks and read the scoreboard:
 
 ```bash
 export DEMO_URL=http://localhost:5000
@@ -230,7 +230,7 @@ python tools/label.py --audit            # how wrong "obviously fine" labels wer
 
 ## Instructor: expected results
 
-Verified end to end on Python 3.10 with the pinned `requirements.txt` and `REDIS_URL=memory://`. The population and the bots are seeded, so counts are exact; pipeline timings vary with the machine. Each `checkpoint.py --round N` resets and replays weeks 1..N with every fix applied, so the numbers reproduce.
+Verified end to end on Python 3.12.15 with the pinned `requirements.txt` (Flask 3.1.3, redis 8.1.0, numpy 2.5.4, pandas 3.0.6, scikit-learn 1.9.1, lightgbm 4.7.0, prometheus-client 0.26.0) and `REDIS_URL=memory://`; checkpoints for rounds 0-4 pass, and the five-week table below reproduces exactly. The population and the bots are seeded, so counts are exact; pipeline timings vary with the machine. Each `checkpoint.py --round N` resets and replays weeks 1..N with every fix applied, so the numbers reproduce.
 
 Five-week scoreboard (`tools/ops.py --all` after `checkpoint.py --round 4`):
 
@@ -256,7 +256,7 @@ Things to watch for:
 
 - **A proof-of-work is not a stop.** The scoreboard counts `pow` as "acted" for precision/recall, but the bot solves it. "Bots that reached an account" is the honest loss. Weeks 3–5 show high FN because the evaders are invisible to the rules and to `v1`.
 - **The model's value is shown offline.** `v1` is prod through weeks 3–5 and never catches the signal-less evaders live. `tools/shadow_report.py` and `defenses/gate.py` show what `v3` would do, which is the whole point of shadow mode.
-- **Redis vs. memory.** Counts are identical; only the store line in `/lab/status` changes. The Docker Redis path and the Prometheus/Grafana `monitoring` profile were not run in the build environment (no Docker); `docker-compose.yml` and the dashboard JSON are syntactically valid.
+- **Redis vs. memory.** Counts are identical; only the store line in `/lab/status` changes. The `docker compose` path (real Redis, Prometheus/Grafana `monitoring` profile) is verified separately.
 - **`grep -rn '\bactor\b' defenses` is empty.** No defense reads the ground-truth label; only the tools do.
 
 ---

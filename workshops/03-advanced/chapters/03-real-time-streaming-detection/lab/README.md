@@ -18,7 +18,7 @@ that beats it, and every attack by the defense that catches it."
 ```
 lab/
   README.md            this file
-  requirements.txt     pinned deps (Python 3.10+)
+  requirements.txt     pinned deps (Python 3.12+)
   docker-compose.yml   OPTIONAL real Redis 8 (the default needs no Docker)
   demo_site/
     app.py             Flask store; after_request XADDs an event; a thread runs the consumer
@@ -52,7 +52,7 @@ lab/
 
 ```bash
 cd lab
-python -m venv venv && . venv/bin/activate
+python -m venv .venv && . .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 ```
 
@@ -61,7 +61,7 @@ probabilistic commands (Count-Min, Top-K, HyperLogLog), so **no Docker is requir
 the identical code against a real Redis 8 instead:
 
 ```bash
-docker compose up -d --wait        # redis:8.2.10-alpine on 127.0.0.1:6379
+docker compose up -d --wait        # redis:8.10.2-alpine on 127.0.0.1:6379
 export REDIS_URL=redis://localhost:6379/0
 ```
 
@@ -171,9 +171,7 @@ the monitoring, drift and retraining that keep these signals honest over time.
 
 ## Instructor: expected results
 
-Verified on Python 3.10 with the `memory://` store (fakeredis 2.39.0). The real Redis 8 path
-(`docker compose`) runs the identical code; it was not exercised in the build environment
-(no working Docker), so confirm it in the room if you use it. Counts are deterministic (seeded).
+Verified on Python 3.12.15 with Flask 3.1.3, redis 8.1.0, fakeredis 2.39.0 (`probabilistic` extra) and httpx 0.28.1 on the `memory://` store: checkpoints for rounds 0-4 pass with the numbers below, and the `--live` replay against the app at L2 works. The real Redis 8 path (`docker compose`) runs the identical code; the `docker compose` path is verified separately. Counts are deterministic (seeded).
 
 | Round | Level | Attack | Bots flagged | Humans flagged | Catcher / note |
 |---|---|---|---|---|---|
@@ -192,7 +190,7 @@ Rounds 3 and 4 are intentionally not 100%: detection latency (Round 3) and a pat
 |---|---|
 | `ModuleNotFoundError: store` / `stream` | Run from `lab/` (e.g. `python tools/checkpoint.py`); `tools/lab.py` sets the import paths. |
 | `Cannot reach Redis at redis://…` | Start it (`docker compose up -d --wait`) or use the default `REDIS_URL=memory://`. |
-| CMS/TopK errors on a real server | You are on Redis < 8. Use Redis 8 (the compose file pins `8.2.10-alpine`) or the `memory://` store. |
+| CMS/TopK errors on a real server | You are on Redis < 8. Use Redis 8 (the compose file pins `8.10.2-alpine`) or the `memory://` store. |
 | `--live`: verdicts don't appear | Start the app first: `DEFENSE_LEVEL=2 python demo_site/app.py`, then run an attack with `--live`. A separate app + consumer process needs real Redis, not `memory://`. |
 | Port 5000 in use | `PORT=5055 DEMO_URL=http://localhost:5055 python demo_site/app.py` and pass `--live` with the same `DEMO_URL`. |
 
@@ -206,7 +204,7 @@ Rounds 3 and 4 are intentionally not 100%: detection latency (Round 3) and a pat
 
 ## Why these tools
 
-One primary language, Python 3.10+, because the whole series is Flask + Redis and Redis Streams
+One primary language, Python 3.12+, because the whole series is Flask + Redis and Redis Streams
 is the native event log — `XADD` to emit, consumer groups to read, and the probabilistic
 commands in the same server. No secondary language, no broker, no per-detector worker. Kafka,
 Faust, Bytewax and Flink are the scale-out answer discussed in §3.7; Redpanda is capable but not

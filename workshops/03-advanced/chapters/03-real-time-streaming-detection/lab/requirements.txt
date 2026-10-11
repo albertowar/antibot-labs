@@ -1,5 +1,5 @@
 # W3 Ch3 — Real-Time Streaming Detection lab
-# Python 3.10+. Exact pins, verified October 2026.
+# Python 3.12+. Pins verified October 2026.
 #
 # The lab runs with no Docker on the memory:// store (fakeredis), which now
 # implements Redis Streams and the probabilistic commands (Count-Min, Top-K,

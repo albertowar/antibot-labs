@@ -1,4 +1,4 @@
-# W4 Ch3 lab — pinned, verified October 2026. Python 3.10+.
+# W4 Ch3 lab. Python 3.12+. Pins verified October 2026.
 # Runs dependency-free: fakeredis + SQLite, no server and no Docker needed.
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1

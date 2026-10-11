@@ -30,7 +30,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # Redis on 127.0.0.1:6379 (optional, see below)
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 playwright install chromium                 # Round 2 and 3 attacks, and the simulated users
 ```
@@ -250,7 +250,7 @@ curl -s localhost:5000/trap-logs | python -m json.tool | head -40
 
 ## Instructor: expected results
 
-Verified with Python 3.10, Flask 3.1.3, Playwright 1.63.0 (Chromium) and `REDIS_URL=memory://` (fakeredis 2.39.0). Levels 2–4 assume the Round 2 and Round 3 fixes are in. Level 4 is `quarantine` / `session`.
+Verified with Python 3.12.15, Flask 3.1.3, redis 8.1.0, fakeredis 2.39.0 (`REDIS_URL=memory://`), httpx 0.28.1 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell). The `docker compose` path (Redis 8 container) is verified separately. Levels 2–4 assume the Round 2 and Round 3 fixes are in. Level 4 is `quarantine` / `session`.
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Trap at the first catch |
 |---|---|---|---|---|---|---|

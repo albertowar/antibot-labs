@@ -53,7 +53,7 @@ lab/
 ```bash
 cd lab
 docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
 pip install -r requirements.txt
 ```
 
@@ -276,9 +276,9 @@ Training: v1 in ~1 s, v2 in ~2 s (5-fold out-of-fold threshold included), anomal
 | Tool | Why |
 |---|---|
 | LightGBM 4.7 (MIT) | Native missing values and categoricals, fast one-row inference, built-in TreeSHAP (`pred_contrib`), text model format (no pickle) |
-| scikit-learn 1.7 (BSD-3) | Logistic-regression baseline, metrics, `KFold` |
+| scikit-learn 1.9 (BSD-3) | Logistic-regression baseline, metrics, `KFold` |
 | pandas / numpy / pyarrow | Dataset assembly and the Parquet reference set for W3 Ch4 |
-| Flask 3.1 + SQLAlchemy 2.0 | The demo store, on PostgreSQL or SQLite with the same code |
+| Flask 3.1 + SQLAlchemy 2.1 | The demo store, on PostgreSQL or SQLite with the same code |
 | httpx 0.28 | Simulated customers and bots |
 
-The pins are the newest releases that still support Python 3.10 (the lab was verified on 3.10). On Python 3.11+, scikit-learn 1.9 and pandas 3.0 are current, but this lab has not been tested with them.
+The pins follow the series dependency baseline in `AGENTS.md` (Python 3.12+, scikit-learn 1.9, pandas 3.0, SQLAlchemy 2.1).
