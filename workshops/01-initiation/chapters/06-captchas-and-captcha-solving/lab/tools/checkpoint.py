@@ -10,12 +10,12 @@ and to measure BOTH sides of the defense:
   - defender cost: siteverify, CAPTCHA generation and check time (Server-Timing)
 
 Fell behind? --catch-up copies the reference solutions for rounds 1..N into
-defenses/ (your versions are backed up to defenses/_backup/), waits for the
+defenses/ (your versions are kept as .bak; --restore puts them back), waits for the
 demo site to reload, then runs the checkpoint.
 
 Run:
-    python tools/checkpoint.py 2
-    python tools/checkpoint.py 2 --catch-up
+    python tools/checkpoint.py --round 2
+    python tools/checkpoint.py --round 2 --catch-up
 """
 
 import argparse
@@ -50,6 +50,10 @@ MIN_SUCCESS_WHEN_OPEN = 0.9
 HUMAN_BUDGET = {4: {"max_lost": 3, "max_challenged": 8}}
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def load(name):
     spec = importlib.util.spec_from_file_location(name, LAB / "attacks" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
@@ -67,17 +71,12 @@ def status():
 
 
 def catch_up(round_no):
-    backup = LAB / "defenses" / "_backup" / time.strftime("%Y%m%d-%H%M%S")
-    for k in range(1, round_no + 1):
-        for src in sorted((LAB / "solutions" / f"round{k}").glob("*.py")):
-            dst = LAB / "defenses" / src.name
-            if dst.exists() and dst.read_bytes() != src.read_bytes():
-                backup.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(dst, backup / src.name)
-            shutil.copyfile(src, dst)        # fresh mtime, so the reloader notices
-            print(f"  installed solutions/round{k}/{src.name}")
-    if backup.exists():
-        print(f"  your previous versions are in {backup.relative_to(LAB)}")
+    """Install the reference solutions for rounds 1..round_no (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(str(LAB), round_no)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     want = disk_hashes()
     for _ in range(40):                      # the Flask reloader takes a second or two
         time.sleep(0.5)
@@ -98,10 +97,15 @@ def percentile(values, q):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("round", type=int, choices=range(0, 5))
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
     parser.add_argument("--catch-up", action="store_true",
                         help="install the reference solutions for rounds 1..N first")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(str(LAB))
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
     require_local()
 
     try:

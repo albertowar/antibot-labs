@@ -24,9 +24,16 @@ see it.
 
 import os
 import sys
-from urllib.parse import urlparse
 
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target as _target, require_local, require_local_env  # noqa: E402
+BASE_URL = _target("DEMO_URL", "http://localhost:5000")
+
+
+def target():
+    """The guarded demo-store URL (see labnet.py)."""
+    return BASE_URL
+
 
 # A fixed base time so windows, sketch buckets and CVs are identical every run.
 BASE_TS = 1_700_000_000.0
@@ -36,14 +43,6 @@ BOT_NET_A = "198.51.100."      # TEST-NET-2, bot IPs
 BOT_NET_B = "192.0.2."         # TEST-NET-1, more bot IPs
 
 ASSET_MARKERS = ("/static/", ".js", ".css", ".png", ".woff", ".ico")
-
-
-def target():
-    url = os.environ.get("DEMO_URL", "http://localhost:5000").rstrip("/")
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"🛑 Refusing to attack {host!r}. Lab attacks only run against your own local demo store.")
-    return url
 
 
 def make_event(ts, sid, ip, path, status=200, method="GET", user="", actor="", ua="python-lab"):

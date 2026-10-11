@@ -307,4 +307,4 @@ def forbidden(e):
 if __name__ == "__main__":
     print(f" * Defense level {DEFENSE_LEVEL} · store {type(store).__name__}")
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050
-    app.run(debug=True, port=int(os.environ.get("PORT", "5000")), threaded=True)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), threaded=True, debug=os.environ.get("LAB_DEBUG") == "1", use_reloader=True)

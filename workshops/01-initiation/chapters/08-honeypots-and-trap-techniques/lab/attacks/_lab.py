@@ -13,24 +13,20 @@ uses it to make a decision; a real bot obviously wouldn't send it.
 """
 
 import os
+import sys
 import re
 import secrets
 from html.parser import HTMLParser
-from urllib.parse import urlparse
 
 import httpx
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000").rstrip("/")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36")
 TEXT_TYPES = {"text", "email", "password", "tel", "url", "search", ""}
-
-
-def require_local(url=BASE_URL):
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        raise SystemExit(f"Refusing to run against {host!r}: lab scripts only target localhost.")
 
 
 def lab_headers(actor, ip):

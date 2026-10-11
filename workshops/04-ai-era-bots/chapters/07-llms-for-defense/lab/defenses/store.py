@@ -20,7 +20,7 @@ attack on SQLite and crash on PostgreSQL. The site caps each stored value at
 MAX_FIELD_BYTES so the database itself is not the resource the flood eats.
 
 Timestamps are real Unix seconds. Every *duration* the session summary uses
-is divided by LAB_TIME_SCALE (see tools/labnet.py), so the simulators can
+is divided by LAB_TIME_SCALE (see tools/labclient.py), so the simulators can
 compress a shopping session of minutes into about a second.
 """
 

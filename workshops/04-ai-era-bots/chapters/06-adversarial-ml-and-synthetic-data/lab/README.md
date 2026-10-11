@@ -4,7 +4,12 @@
 
 It is drop day at the demo store: a limited sneaker release. You play both sides. As the **defender**, you train a model on the store's event log and switch it on at checkout. As the **attacker**, you run the bot that beats it. Every round ends with a checkpoint that reports bots caught *and* real customers blocked.
 
-> ⚠️ **Rules of engagement.** Run these scripts only against the local demo site. Every client goes through `tools/labnet.py`, which refuses any `DEMO_URL` that is not `localhost`. Residential proxies, VPNs and carriers are *simulated* with private address ranges. No lab traffic goes through a real proxy or anyone else's infrastructure. All users, accounts and fingerprints are synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Residential proxies, VPNs and carriers are *simulated* with private address ranges in a lab-only header (`tools/labclient.py`). All users, accounts and fingerprints are synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -29,7 +34,7 @@ lab/
     round2_farm.py       a randomized fingerprint per session
     round3_oracle_prober.py  black-box search over bot configurations
   tools/
-    labnet.py            localhost guard, simulated proxy pools, lab time
+    labclient.py         localhost guard, simulated proxy pools, lab time
     shopper.py           the shopping-session engine shared by users and bots
     simulate.py          a drop day: 600 real users in six cohorts + baseline bots
     label_cluster.py     analyst triage: label fingerprint clusters (Round 2)

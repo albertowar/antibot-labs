@@ -14,7 +14,7 @@ check where you are:
     python tools/checkpoint.py --round N
 Fell behind? Install the reference version of this file for round N, then
 restart the store:
-    python tools/checkpoint.py --round N --apply
+    python tools/checkpoint.py --round N --catch-up
 """
 
 # Every layer is imported for you; LAYERS below decides which ones run.

@@ -31,7 +31,7 @@ the reason, and never score without the client learning nothing extra.
 #     aliases. Put the ceiling above the honest page and below the scrape.
 #   - GRAPHQL_MAX_DEPTH: honest queries are 2-3 deep; a recursive abuse query is
 #     much deeper.
-# The reference solution is in solutions/round1/api_hardening.py.
+# The reference solution is in solutions/round1/defenses/api_hardening.py.
 INTROSPECTION_ENABLED = True      # TODO (Round 1): False
 GRAPHQL_MAX_COST = 10_000         # TODO (Round 1): ~50
 GRAPHQL_MAX_DEPTH = 100           # TODO (Round 1): ~6

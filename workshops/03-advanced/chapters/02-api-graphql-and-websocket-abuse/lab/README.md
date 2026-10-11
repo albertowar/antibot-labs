@@ -6,13 +6,12 @@ You play both sides. Bots attack the data plane of the "Lab Runner 9" store — 
 versioned REST API, its GraphQL endpoint and its WebSocket feed — and you add the
 defense that catches each one, measuring the cost to real users at every step.
 
-> ⚠️ **Rules of engagement.** These scripts target **only** the local demo store you
-> run yourself. Every attack refuses a non-loopback target in code
-> (`attacks/_common.py:require_local_target`). Do not edit that out. All accounts,
-> products, tokens and egress IPs here are synthetic; "egress" IPs are claimed in a
-> header the app honours only from loopback, drawn from the documentation ranges in
-> RFC 5737 (192.0.2.0/24 is the attacker's datacenter). Lab traffic never touches a
-> third party, a public proxy, or anyone else's infrastructure.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- All accounts, products, tokens and egress IPs here are synthetic. "Egress" IPs are claimed in a header the app honours only from loopback, drawn from RFC 5737 (192.0.2.0/24 is the attacker's datacenter).
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

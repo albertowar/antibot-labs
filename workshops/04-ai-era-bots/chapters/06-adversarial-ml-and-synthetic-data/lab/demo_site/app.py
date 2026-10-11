@@ -19,7 +19,7 @@ DATABASE_URL=sqlite:///ml_lab.db to run without Docker (run every lab
 command from the lab/ folder so they all find the same file).
 
 Network: the client IP comes from `X-Lab-Client-IP` (the simulated edge,
-tools/labnet.py), and is only trusted from 127.0.0.1.
+tools/labclient.py), and is only trusted from 127.0.0.1.
 
 Every checkout response carries `Server-Timing: mlscore;dur=<ms>`, so the
 checkpoint can report what the model costs, not just what it catches.
@@ -235,4 +235,4 @@ if __name__ == "__main__":
     # debug=False: the reloader and debugger slow every request, which would
     # distort the latency numbers the checkpoint reports.
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050
-    app.run(port=int(os.environ.get("PORT", "5000")), threaded=True)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), threaded=True)

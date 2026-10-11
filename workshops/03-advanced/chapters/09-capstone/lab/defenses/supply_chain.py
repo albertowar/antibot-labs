@@ -33,7 +33,7 @@ SELF_ORIGIN = "https://localhost:8443"
 # exfil succeeds and you only get a report. Turn CSP to enforce and lock
 # connect-src to the origins the page legitimately talks to (its own). Do NOT
 # add the collector origin. Keep 'self' for scripts plus the per-request nonce.
-# Reference solution: solutions/round3/supply_chain.py.
+# Reference solution: solutions/round3/defenses/supply_chain.py.
 CSP_ENFORCE = False                                 # TODO (Round 3): True
 CONNECT_SRC = ["'self'", "https:"]                  # TODO (Round 3): ["'self'"]
 # ----------------------------------------------------------------------------

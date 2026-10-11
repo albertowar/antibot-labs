@@ -239,8 +239,7 @@ def change_email():
 
 @app.get("/lab/info")
 def lab_info():
-    return jsonify({"level": DEFENSE_LEVEL, "use_solutions": os.environ.get("USE_SOLUTIONS") == "1",
-                    "simulated_edge": SIMULATED_EDGE})
+    return jsonify({"level": DEFENSE_LEVEL, "simulated_edge": SIMULATED_EDGE})
 
 
 @app.get("/lab/events")
@@ -323,7 +322,5 @@ with app.app_context():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    print(f"demo store: DEFENSE_LEVEL={DEFENSE_LEVEL} "
-          f"USE_SOLUTIONS={os.environ.get('USE_SOLUTIONS') == '1'} "
-          f"simulated_edge={SIMULATED_EDGE} on http://127.0.0.1:{port}")
+    print(f"demo store: DEFENSE_LEVEL={DEFENSE_LEVEL} simulated_edge={SIMULATED_EDGE} on http://127.0.0.1:{port}")
     app.run(host="127.0.0.1", port=port, threaded=True)

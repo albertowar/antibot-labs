@@ -6,7 +6,13 @@ The W2 stack is in production. The eight sensors, the correlation layer, the ris
 
 The lab compresses five weeks of production into a few minutes. A seeded replayer (`tools/weeks.py`) sends each week's 200 customers, 10 monitors and that week's bots through the live store, stamped with a lab calendar so every tool can slice by week.
 
-> ⚠️ **Rules of engagement.** Everything runs against the local demo site only. `tools/labclient.py` refuses any `DEMO_URL` that is not localhost. Every address is a documentation range (RFC 5737/3849), every ASN a documentation ASN, every account a synthetic `*@example.test`. The five adversary profiles in `attacks/` exist to train you against your own store; each is only as strong as it needs to be to beat the previous round. No lab traffic ever touches a real proxy, network or person.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Every address is a documentation range (RFC 5737/3849), every ASN a documentation ASN, every account a synthetic `*@example.test`. The five adversary profiles in `attacks/` are only as strong as they need to be to beat the previous round.
+- The optional Prometheus and Grafana containers publish their ports on 127.0.0.1 only.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

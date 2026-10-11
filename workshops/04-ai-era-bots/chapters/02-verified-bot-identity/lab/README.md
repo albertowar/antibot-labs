@@ -8,15 +8,12 @@ client gets. Scrapers want that lane. In every round you play the scraper that t
 then the defender who closes the door, and you measure both what the impostor got and
 which genuine crawlers your new check wrongly throttled.
 
-> ⚠️ **Rules of engagement.** These scripts target **only** the local demo store and the
-> local "mock internet" you run yourself. Every attack refuses a non-loopback target in
-> code (`attacks/_common.py:require_local_target`). Do not edit that out. All egress IPs
-> are RFC 5737 documentation addresses claimed in a header the store honours only from
-> loopback; the operator hostnames are real suffixes on synthetic addresses, served by
-> the mock; every key is generated for this lab. Nothing here sends traffic to a real
-> operator, a real resolver or anyone else's infrastructure. The one networked tool,
-> `tools/verify_real.py`, is an optional bonus that only looks up an IP from **your own**
-> logs and downloads an operator's published range file.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `MOCK_URL`. Do not remove that check.
+- The "mock internet" (`tools/mock_internet.py`) answers the DNS and range-file lookups locally. Operator hostnames are real suffixes on synthetic addresses, every egress IP is an RFC 5737 address claimed in a header the store honours only from loopback, and every key is generated for this lab.
+- **Outbound network:** none during the rounds. The optional bonus `tools/verify_real.py` resolves an IP from **your own** logs and downloads an operator's published range file; it sends nothing to the operator's crawler or to the address. Do not point it at addresses from logs you do not own.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

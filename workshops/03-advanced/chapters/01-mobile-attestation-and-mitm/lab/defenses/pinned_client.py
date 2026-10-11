@@ -17,7 +17,7 @@ on and traffic routed through a proxy, the connection is refused.
 
 >>> TODO (Round 1): implement check_pin so a wrong certificate is rejected.
 >>> The stub trusts any certificate (the pre-pinning app), so interception
->>> succeeds until you implement it. Reference: solutions/round1/pinned_client.py
+>>> succeeds until you implement it. Reference: solutions/round1/defenses/pinned_client.py
 """
 
 import base64

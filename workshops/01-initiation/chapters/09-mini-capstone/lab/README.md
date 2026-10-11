@@ -4,7 +4,13 @@
 
 Twenty limited-edition hoodies go on sale at once. Forty simulated shoppers want one each, and five waves of scalper bots want all of them. You wire the W1 defenses into one gate, round by round, and after every round you read both halves of the scoreboard: who got the hoodies, and what your defense cost the shoppers.
 
-> ⚠️ Everything runs on your machine. The store only answers loopback, and every script refuses a non-local `DEMO_URL`. The "IPs" are pretend: each actor names an address from `data/world.json`, and the store's lab edge treats it as the client address. No proxy, VPN or Tor node is ever contacted.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The "IPs" are pretend: each actor names an address from `data/world.json`, and the store's lab edge treats it as the client address, for requests from loopback only. No proxy, VPN or Tor node is ever contacted.
+- The reputation feeds in `data/feeds/` are shipped snapshots. Nothing downloads them at run time.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -14,9 +20,10 @@ lab/
                        rate_limit · headers (+ the four W1 Ch4 modules) · ip_reputation
                        session_guard · traps · proof_of_work · store
   attacks/             wave0_naive_scalper … wave4_full_browser · browser_kit.py
-  tools/               drop.py · checkpoint.py · humans.py · labnet.py · browsers.py
-                       solutions/pipeline_round{0..4}.py · profiles/ (W1 Ch4 captures)
+  tools/               drop.py · checkpoint.py · humans.py · labclient.py · browsers.py
+                       profiles/ (W1 Ch4 captures)
   data/                world.json (IP pools) · feeds/ (W1 Ch3 snapshot, trimmed)
+  solutions/roundN/    defenses/pipeline.py as it stands after Round N (installed by --catch-up)
 ```
 
 **Why Python only:** every layer is server-side HTTP logic (Flask), the attackers are `requests` scripts and Playwright, and the only browser-side code is two short inline scripts in the store's pages (the JS cookie and the proof-of-work solver). A second language would add setup without teaching anything W1 needs.
@@ -51,7 +58,7 @@ Open `http://localhost:5000/` and `http://localhost:5000/whoami` in your browser
 |---|---|
 | `python tools/drop.py --waves 2` | Restocks, then releases the 40 shoppers and wave 2 at the same moment, and prints the scoreboard. `--waves 0,1,2,3,4` for Drop Day, `--waves none` for shoppers only |
 | `python tools/checkpoint.py --round N` | Checks your pipeline, runs the wave the round must stop and the wave that beats it, and checks which shoppers were stopped |
-| `python tools/checkpoint.py --round N --apply` | Fell behind: installs `tools/solutions/pipeline_roundN.py` as your `defenses/pipeline.py` (yours is kept as `pipeline.py.bak`). Restart the store afterwards |
+| `python tools/checkpoint.py --round N --catch-up` | Fell behind: installs the reference `defenses/pipeline.py` for Round N from `solutions/roundN/` (yours is kept as `pipeline.py.bak`; `--restore` puts it back). Restart the store afterwards |
 
 Reading the scoreboard:
 

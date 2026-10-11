@@ -31,7 +31,7 @@ from typing import Callable, Optional
 
 import httpx
 
-import labnet
+import labclient as labnet
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 TRUTH_FILE = os.path.join(DATA_DIR, "truth.jsonl")

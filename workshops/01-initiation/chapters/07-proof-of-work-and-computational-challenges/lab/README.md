@@ -9,7 +9,12 @@ PoW never really says "no". It says "that will cost you". So every round measure
 - what the bot paid, in CPU-seconds and dollars per 1,000 pages
 - what real users paid, as seconds of waiting on their device
 
-> ⚠️ Run these scripts only against the local demo site. They refuse any target other than `localhost`.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Simulated client addresses are sent in `X-Sim-Client-IP`, which the store trusts only from loopback. The CPU cost is real, but it is your own CPU.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

@@ -5,16 +5,18 @@ both sides: run the attacker, read the defense, wire it in, run the attacker
 again. Every round also runs ~145 simulated real users, so you see the cost of a
 defense next to what it blocks. See `../chapter_06_content.md` §6.6.
 
-> ⚠️ **Rules of engagement.** These scripts target **only** the local demo store
-> you run yourself. Every attack refuses a non-loopback target in code
-> (`attacks/_common.py:require_local_target`). Do not edit that out. All
-> credentials, IPs, breach data and session cookies here are synthetic. Lab
-> traffic never touches a third party, a public proxy, or anyone else's machine.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- All credentials, IPs, breach data and session cookies here are synthetic. The breach corpus is a small offline fixture.
+- Simulated client addresses are sent in `X-Lab-Client-IP`, which the store trusts only from loopback.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
   demo_site/      the Flask store: login pipeline, routes, event log
-  defenses/       the layers you implement (solutions/ holds the reference)
+  defenses/       the layers you implement (the reference is in solutions/roundN/)
   attacks/        one stuffer/replay per round
   tools/          seed, legit-traffic simulator, scoreboard, checkpoint
   data/           synthetic combo list, breach corpus, users (seeded)
@@ -40,13 +42,14 @@ taken, use `PORT=5055 ... ` and `export DEMO_URL=http://127.0.0.1:5055` for the
 tools.
 
 **You implement the defenses.** The modules in `defenses/` are stubs with
-`TODO (Round N)` markers; the working reference is in `defenses/solutions/`. Run
-the store with `USE_SOLUTIONS=1` to use the reference (what the checkpoint and the
-expected-results table assume). To catch up on a round:
+`TODO (Round N)` markers; the reference for each round is in
+`solutions/roundN/defenses/`. The expected-results table assumes the reference.
+To catch up on a round:
 
 ```bash
-USE_SOLUTIONS=1 DEFENSE_LEVEL=<N> python demo_site/app.py
-python tools/checkpoint.py --round <N> --catch-up
+python tools/checkpoint.py --round <N> --catch-up   # installs rounds 1..N, keeps yours as .bak
+DEFENSE_LEVEL=<N> python demo_site/app.py          # restart the store at that level
+python tools/checkpoint.py --restore                 # later: put your own files back
 ```
 
 ## How to measure a round
@@ -143,7 +146,7 @@ screen, device/context) cost recoverable friction instead of hard blocks.
 
 ## Instructor: expected results
 
-Verified with the reference solutions (`USE_SOLUTIONS=1`) on Python 3.10,
+Verified with the reference solutions (installed with `--catch-up`) on Python 3.10,
 `fakeredis` + SQLite, 1000-pair combo list, 145 simulated users. Small run-to-run
 variation of ±1 ATO on the stuffers is normal (which valid pairs land before a
 cohort trips). "ATO" = a session obtained through the front door.
@@ -165,7 +168,7 @@ not a false positive), 125/145 from L1 on (15 typos + 5 CGNAT blocked).
 |---|---|
 | `Port 5000 is in use` | `PORT=5055 DEFENSE_LEVEL=<N> python demo_site/app.py`, then `export DEMO_URL=http://127.0.0.1:5055` |
 | Checkpoint says the store is at the wrong level | Restart the store with the `DEFENSE_LEVEL` it prints |
-| Checkpoint fails right after you edit a defense | You are running the stub. Restart the store with `USE_SOLUTIONS=1` (or finish the `TODO`) |
+| Checkpoint fails right after you edit a defense | You are running the stub. Finish the `TODO`, or run `python tools/checkpoint.py --round <N> --catch-up` and restart the store |
 | Numbers look stale between rounds | The checkpoint calls `/lab/reset`; if you ran an attack by hand, re-run the checkpoint to reset first |
 | Want a clean slate | Stop the store, `rm -f data/shop.db*`, `python tools/seed.py` |
 | Use real Redis/PostgreSQL | `docker compose up -d` and set `REDIS_URL` / `DATABASE_URL` before seeding |

@@ -30,7 +30,7 @@ import os
 import random
 from collections import Counter
 
-import labnet
+import labclient as labnet
 import shopper
 from shopper import UA, Persona, browser_headers, human_think, pick_locale
 

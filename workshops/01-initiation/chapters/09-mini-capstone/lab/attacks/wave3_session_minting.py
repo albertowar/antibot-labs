@@ -44,7 +44,7 @@ from playwright.async_api import async_playwright
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 from browser_kit import MAJOR, new_page  # noqa: E402
 from browsers import chrome  # noqa: E402
-from labnet import BASE_URL, LabClient, form_fields, pow_bits, world_pool  # noqa: E402
+from labclient import BASE_URL, LabClient, form_fields, pow_bits, world_pool  # noqa: E402
 
 SESSIONS = 6         # browser sessions to mint
 MINTERS = 6          # browser contexts minting in parallel

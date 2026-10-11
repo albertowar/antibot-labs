@@ -21,9 +21,12 @@ Run (demo store up):
 import argparse
 import json
 import os
+import sys
 import urllib.request
 
-BASE = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE = target("DEMO_URL", "http://127.0.0.1:5000")
 
 
 def shop_once(base: str) -> dict:

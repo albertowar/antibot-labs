@@ -400,4 +400,4 @@ if __name__ == "__main__":
     print(f" * Defense level {DEFENSE_LEVEL}, response mode {responses.mode(DEFENSE_LEVEL)}"
           + (f", sanction key {responses.SANCTION_KEY}" if DEFENSE_LEVEL >= 4 else ""))
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050
-    app.run(debug=True, port=int(os.environ.get("PORT", "5000")))
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), debug=os.environ.get("LAB_DEBUG") == "1", use_reloader=True)

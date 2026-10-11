@@ -7,7 +7,12 @@ The demo store sits behind a JavaScript challenge that gets stronger every round
 - The **attacker** climbs a ladder: skip the JavaScript, forge its output, port it, run it in an emulator, run it in a real browser, then harvest what the browser earned.
 - The **defender** turns on the next layer and measures what it stops **and** what it costs: real users hurt, latency added, bytes shipped.
 
-> ⚠️ Run these scripts only against the local demo site. Every attack refuses non-localhost targets. Don't point them, or anything you build from them, at someone else's site.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The Node tools work on files in this lab. The jsdom solver only receives a URL the Python wrapper has already checked.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

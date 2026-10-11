@@ -4,7 +4,12 @@
 
 You play both sides. In each round, the attacker runs a script against the demo store. The defender then turns on the next defense layer and measures two things: what it catches, and what it costs. Then the attacker works out what to try next.
 
-> ⚠️ Run these scripts only against the local demo site, or other systems you own.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Every request comes from your own machine; the browser profiles in `tools/profiles/` are header sets, not people.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

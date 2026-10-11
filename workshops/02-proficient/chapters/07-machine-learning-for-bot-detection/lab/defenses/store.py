@@ -14,7 +14,7 @@ Storage: PostgreSQL from ../docker-compose.yml by default. Set
 DATABASE_URL=sqlite:///ml_lab.db to run without Docker.
 
 Timestamps are real Unix seconds. Every *duration* the features use is
-divided by LAB_TIME_SCALE (see tools/labnet.py), so the simulators can
+divided by LAB_TIME_SCALE (see tools/labclient.py), so the simulators can
 compress a shopping session of minutes into about a second.
 """
 

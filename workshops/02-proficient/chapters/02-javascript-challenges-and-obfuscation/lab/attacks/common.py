@@ -12,23 +12,18 @@ import os
 import statistics
 import sys
 import time
-from urllib.parse import urlparse
 
 import requests
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 PAGES = int(os.environ.get("PAGES", "300"))
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 # What a scraper puts in User-Agent once it has been blocked for python-requests (W1 Ch4)
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
-
-
-def require_local(url=BASE_URL):
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"Refusing to attack {host!r}: lab attacks only run against your own localhost demo site.")
 
 
 # Server-Timing "gate" durations of requests that got through: what the defense

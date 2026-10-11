@@ -277,7 +277,7 @@ def lab_status():
 
 
 if __name__ == "__main__":
-    # debug=True for the auto-reloader; bound to 127.0.0.1 so the debugger
-    # is never reachable from the network.
+    # The reloader restarts the store when a defense file is saved. The Werkzeug
+    # debugger stays off unless LAB_DEBUG=1: it can run code in the process.
     app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")),
-            debug=True, threaded=True)
+            debug=os.environ.get("LAB_DEBUG") == "1", use_reloader=True, threaded=True)

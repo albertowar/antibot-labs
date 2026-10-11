@@ -15,16 +15,13 @@ Thresholds:
     score >= 20  suspicious  (logged, allowed through)
     score <  20  clean
 
-Fell behind? Start the demo site with USE_SOLUTIONS=1 to load the reference
-versions from defenses/solutions/ instead of your TODOs.
+Fell behind? `python tools/checkpoint.py --round N --catch-up` installs the
+reference versions from solutions/roundN/defenses/ over these files.
 """
 
 import os
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if os.environ.get("USE_SOLUTIONS") == "1":
-    sys.path.insert(0, os.path.join(HERE, "solutions"))
 
 from browser_proof import score_browser_proof  # noqa: E402
 from h2_fingerprint import score_h2  # noqa: E402

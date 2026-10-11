@@ -35,7 +35,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-import labnet  # noqa: E402
+import labclient as labnet  # noqa: E402
 import shopper  # noqa: E402
 from shopper import (UA, Persona, browser_headers, desktop_behavior,  # noqa: E402
                      fingerprint, human_think)

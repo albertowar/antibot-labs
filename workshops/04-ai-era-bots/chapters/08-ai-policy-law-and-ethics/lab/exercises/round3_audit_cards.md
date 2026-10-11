@@ -28,4 +28,4 @@ Keep it honest. The aim is a record that survives an audit, not a trick.
 | Card the record does not address | +2 red |
 | Blue patches a hole within the three minutes with a concrete rule | +1 blue |
 
-Target for a team's record: 10 of the 12 checklist items covered (`python tools/checkpoint.py 3 --record`), and no card left in the "doesn't say" column.
+Target for a team's record: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --record`), and no card left in the "doesn't say" column.

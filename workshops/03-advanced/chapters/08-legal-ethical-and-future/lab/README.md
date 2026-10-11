@@ -4,7 +4,9 @@
 
 This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the other team reading your rules of engagement for the hole they will use this afternoon. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 
-> ⚠️ Nothing in this lab touches a network. The decision log is generated from the documentation address ranges in `data/world.json` (RFC 5737 / RFC 3849), the people in it are the W2 Ch8 synthetic population, and every name, account and case in the exercises is invented. Nothing here is legal advice.
+## Rules of engagement
+
+Nothing in this lab touches a network. The decision log is generated from the documentation address ranges in `data/world.json` (RFC 5737 / RFC 3849), the people in it are the W2 Ch8 synthetic population, and every name, account and case in the exercises is invented. Nothing here is legal advice.
 
 ```
 lab/
@@ -46,7 +48,7 @@ Every round reports three things, and the instructor table at the bottom is in t
 - **Real users hurt.** Round 1: the customers whose data was in the log. Round 2: blocked and challenged rate **per cohort**, against a 2% blocked budget (the Capstone rubric). Round 3: the cohort the rules forget to protect.
 - **Defender cost.** Round 1: what the logs would have had to contain. Round 2: friction (challenges served to real people) and the exposure notes. Round 3: the clauses you had to add.
 
-**Fell behind?** `python3 tools/checkpoint.py N` prints the round's answer key, reference scoreboard or checklist.
+**Fell behind?** `python3 tools/checkpoint.py --round N` prints the round's answer key, reference scoreboard or checklist.
 
 ---
 
@@ -59,7 +61,7 @@ Pairs: one 🔵 store's counsel, one 🔴 scraper's counsel. Three fact patterns
 | 🔵 Defend | Store's counsel lists the claims that survive per case (CFAA, contract, DMCA §1201, trespass, fraud, GDPR) | Most teams over-claim CFAA on public pages |
 | 🔴 Attack | Scraper's counsel answers each with the case that kills it (*Van Buren*, *hiQ*, *Meta v. Bright Data*, *Ryanair*, *Feist*) | Case A collapses to a narrow §1201 claim at best; Case C flips: the store is exposed, not just the scraper |
 | 🔵 Re-run | Fill the verdict sheet; 5 min reveal against the key | Net score out of +6 |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 1` | prints `exercises/round1_answer_key.md` |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 1` | prints `exercises/round1_answer_key.md` |
 
 **Discuss:** for each surviving claim, what would the detection log have needed to contain? (The key's last section.) That question is the bridge to Round 2: the evidence that convicts a scraper is a store of personal data about every customer you scored.
 
@@ -75,7 +77,7 @@ You inherit `policies/policy_blunt.json`: hard blocks on Tor exits, datacenter A
 | 🔵 Defend (edit) | Copy `policy_blunt.json` over `policy.json` and edit it until every cohort is at or under 2% blocked with bots still ≥ 85% caught. Levers: delete hard rules, lower the weights that single cohorts trip alone, add `exemptions`. Re-run after each change. | Most teams land near `policy_naive.json`: no rules, `tor_exit`/`no_pointer`/`ip_elevated` exempted with `"max_action": "allow"`. Default scrapers still 100% caught |
 | 🔴 Attack | `python3 tools/fp_audit.py --policy policies/policy.json --campaigns cgnat_burst,tor_hidden,a11y_mimic` (try it on `policy_naive.json` too) | Against the naive fix: **0% caught, 900 of 900 allowed**. The exemptions are the hole: a bot over Tor, or sending no pointer events, is never even challenged |
 | 🔵 Re-run | Change every `"max_action": "allow"` to `"challenge"`, move Tor and datacenter from rules to small weights, put the weight on automation evidence (`headless_gpu`, `cdp_artifacts`, `fp_reuse`, `timing_too_regular`), switch `challenge_type` to `pow`, set `appeal_path` true and `retention_days` to 30. Run with `--campaigns all` | Reference: bots 100% caught (802 blocked, 698 challenged); 0 cohorts blocked; **tor 100% and a11y 61% challenged**; exposure notes: none |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 2` then `cp policies/policy_reference.json policies/policy.json` | reference scoreboard |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 2` then `cp policies/policy_reference.json policies/policy.json` | reference scoreboard |
 
 What the scoreboard reports:
 
@@ -110,10 +112,10 @@ This afternoon each team attacks another team's deployment. Nothing in the Capst
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔵 Defend | 4 min: fill `exercises/round3_roe_template.md` for your team, with numbers in the blanks | `python3 tools/checkpoint.py 3 --roe <file>` ≥ 10/12 (the blank template scores 11: traffic limits need a number) |
+| 🔵 Defend | 4 min: fill `exercises/round3_roe_template.md` for your team, with numbers in the blanks | `python3 tools/checkpoint.py --round 3 --roe <file>` ≥ 10/12 (the blank template scores 11: traffic limits need a number) |
 | 🔴 Attack | 4 min: swap drafts; the other team answers `exercises/round3_loophole_cards.md` against yours: allowed / forbidden / **doesn't say** | Typical first drafts miss the opponent's Redis, the CAPTCHA-solving service, and what happens to captured logs after the workshop |
 | 🔵 Re-run | 2 min: patch every "doesn't say" with a concrete rule | 0 unanswered cards |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 3` | the 12-item checklist |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 3` | the 12-item checklist |
 
 **Discuss:** which of the twelve items would you have skipped if the other team had not been reading? That one is the clause that gets written after an incident in production.
 
@@ -143,7 +145,7 @@ Verified with Python 3.10 on Linux; the log is deterministic (seed 2026), so the
 |---|---|---|
 | 1 | Net verdict score (max +6) | ≥ +3; every pair marks Case C "store has no exposure" as **No** |
 | 2 | Final policy with `--campaigns all` | bots ≥ 85% caught, 0 cohorts over budget, 0 exposure notes |
-| 3 | `checkpoint.py 3 --roe` and loophole cards | ≥ 10/12 covered, 0 cards unanswered after the patch |
+| 3 | `checkpoint.py --round 3 --roe` and loophole cards | ≥ 10/12 covered, 0 cards unanswered after the patch |
 
 Things to watch for:
 

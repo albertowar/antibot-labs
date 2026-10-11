@@ -39,7 +39,10 @@ try:
 except Exception:  # pragma: no cover
     ws_connect = None
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+
 MOBILE_UA = "LabRunnerApp/4.2 (iOS 18)"
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0 Safari/537.36"
 N_BROWSERS, N_MOBILE, N_FEED = 30, 6, 4

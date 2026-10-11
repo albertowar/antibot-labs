@@ -4,7 +4,9 @@
 
 This chapter's attacker is three different things. In Round 1 it is a fleet of AI crawlers, honest and otherwise, reading the signals you publish. In Round 2 it is a scalping farm that has learned that, since *Amazon v. Perplexity* (9th Cir., August 2026), a shopper's own agent is legally the shopper, and hides behind that. In Round 3 it is the other team, reading your AI governance record the way an auditor would. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 
-> ⚠️ Nothing in this lab touches a network. The crawler fleet and the agent farm are models that read your local policy files; the session log is generated from the documentation address ranges in `data/world.json` (RFC 5737 / RFC 3849); every vendor, crawler token, account and case fact in the exercises is invented unless it carries a citation. Nothing here is legal advice. Case law and regulation are current to October 2026; check before teaching.
+## Rules of engagement
+
+Nothing in this lab touches a network. The crawler fleet and the agent farm are models that read your local policy files; the session log is generated from the documentation address ranges in `data/world.json` (RFC 5737 / RFC 3849); every vendor, crawler token, account and case fact in the exercises is invented unless it carries a citation. Nothing here is legal advice. Case law and regulation are current to October 2026; check before teaching.
 
 ```
 lab/
@@ -51,7 +53,7 @@ Every round reports three things, and the instructor table at the bottom is in t
 - **Real users hurt.** Round 1: search visibility lost, and the lawful research crawler you turned away. Round 2: blocked and challenged rate **per cohort** against a 2 % blocked budget, with agent shoppers and assistive agents as separate rows. Round 3: the cohort the record forgets to measure.
 - **Defender cost.** Round 1: the logging you must keep (and justify) to make any lever work. Round 2: friction (challenges and human confirmations served to real people) and the exposure notes. Round 3: the clauses you had to add.
 
-**Fell behind?** `python3 tools/checkpoint.py N` prints the round's key, reference scoreboard or checklist.
+**Fell behind?** `python3 tools/checkpoint.py --round N` prints the round's key, reference scoreboard or checklist.
 
 ---
 
@@ -65,7 +67,7 @@ You inherit `defenses/reservation_naive/`, already copied into `defenses/reserva
 | 🔵 Defend (edit) | Edit the four files in `defenses/reservation/` until the reservation is machine-readable and the declared crawlers honour it. Re-run after each change. | Most teams write `User-agent: *` / `Disallow: /`: honoured 3/3, **search visibility: LOST** |
 | 🔴 Attack | `python3 attacks/round1_crawler_fleet.py --stack defenses/reservation --fleet all` then `python3 tools/reservation_audit.py --stack defenses/reservation --fleet all` | Against the blanket Disallow: stealth crawler, intermediary and mirror ingest anyway; **evidence sufficient 0/2**; the only thing you lost was search |
 | 🔵 Re-run | Separate access from usage: `Allow: /` for `*` with `Content-Signal: search=yes, ai-input=no, ai-train=no` and `Content-Usage: train-ai=n, ai-use=n`; the same `Content-Usage`, `TDM-Reservation: 1` and an RSL `Link` in `headers.json`; `clickwrap` in `terms.json`; every logging field on and `retention_days` 90 | Reference: honoured 2/6 (signatory; search for training), ingested 5/6, **search kept, evidence 2/2**, exposure notes: none |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 1` then `cp defenses/reservation_reference/* defenses/reservation/` | prints `exercises/round1_fleet_key.md` and the reference scoreboard |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 1` then `cp defenses/reservation_reference/* defenses/reservation/` | prints `exercises/round1_fleet_key.md` and the reference scoreboard |
 
 What the scoreboard reports:
 
@@ -105,7 +107,7 @@ You inherit `policies/agent_policy_blunt.json`, copied into `agent_policy.json`:
 | 🔵 Defend (edit) | Edit `agent_policy.json` until every cohort is at or under 2 % blocked with the scalper still ≥ 85 % caught. Levers: delete the hard rules, exempt the agent and screen-reader signals, lower weights. Re-run after each change. | Most teams land near `agent_policy_naive.json`: no rules, `agent_ua` / `signature_agent` / `no_pointer` / `screen_reader_api` exempted with `"max_action": "allow"`. Scalper still 100 % caught, nobody blocked |
 | 🔴 Attack | `python3 attacks/round2_agent_farm.py --policy policies/agent_policy.json` (try `agent_policy_naive.json` too) | Against the naive fix: **750 of 750 hidden sessions reached the shop, 0 % caught.** The farm looks like an agent shopper per session; the mimic lives inside the assistive-technology exemption |
 | 🔵 Re-run | Change every `"max_action": "allow"` to `"challenge"` and drop the `no_pointer` exemption (weight 5 never blocks anyone alone); set `declaration.required` true with `undeclared_agent_action` `challenge`; `account_velocity` 4 orders/hour → `block`; `checkout_step_up` `human_confirm`; `challenge_type` `pow`; terms `clickwrap` + `declared_only`; `appeal_path` true; `retention_days` 90. Run `--campaigns all` | Reference: **96.7 % caught** (646 blocked, 321 stopped at the human step-up), 0 cohorts blocked, exposure notes: none. Cost: agent_shopper 38.9 % challenged + 39.3 % step-ups, cloud_undeclared 70.8 % challenged, a11y_agent 53.2 % challenged |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 2` then `cp policies/agent_policy_reference.json policies/agent_policy.json` | reference scoreboard |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 2` then `cp policies/agent_policy_reference.json policies/agent_policy.json` | reference scoreboard |
 
 What the scoreboard reports:
 
@@ -145,10 +147,10 @@ The detection stack now contains an adversarially trained classifier (W4 Ch6) an
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔵 Defend | 5 min: fill `exercises/round3_governance_record_template.md` for your team, with names and numbers in the blanks | `python3 tools/checkpoint.py 3 --record <file>` ≥ 10/12 (the blank template scores 11: retention needs a number) |
+| 🔵 Defend | 5 min: fill `exercises/round3_governance_record_template.md` for your team, with names and numbers in the blanks | `python3 tools/checkpoint.py --round 3 --record <file>` ≥ 10/12 (the blank template scores 11: retention needs a number) |
 | 🔴 Attack | 5 min: swap records; the other team answers `exercises/round3_audit_cards.md` against yours: answered / vague / **doesn't say** | Typical first drafts have no lawful basis for *training* on session logs, no Art 50 wording for the appeal assistant, and nothing about who the labyrinth may be served to |
 | 🔵 Re-run | 3 min: patch every "doesn't say" with a concrete rule | 0 unanswered cards |
-| ✅ Checkpoint | `python3 tools/checkpoint.py 3` | the 12-item checklist |
+| ✅ Checkpoint | `python3 tools/checkpoint.py --round 3` | the 12-item checklist |
 
 **Discuss:** which of the twelve items would you have skipped if the other team had not been reading? That one is the paragraph that gets written after the regulator's letter.
 
@@ -188,7 +190,7 @@ Verified with Python 3.10 on Linux; the fleet is deterministic and the session l
 |---|---|---|
 | 1 | Final stack with `--fleet all` | machine-readable yes, search kept, evidence 2/2, 0 exposure notes |
 | 2 | Final policy with `--campaigns all` | bots ≥ 85 % caught, 0 cohorts over budget, 0 exposure notes |
-| 3 | `checkpoint.py 3 --record` and audit cards | ≥ 10/12 covered, 0 cards unanswered after the patch |
+| 3 | `checkpoint.py --round 3 --record` and audit cards | ≥ 10/12 covered, 0 cards unanswered after the patch |
 
 Things to watch for:
 

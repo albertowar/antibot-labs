@@ -22,8 +22,11 @@ HERE = os.path.dirname(__file__)
 LAB = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB, "attacks"))
 
-BASE = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
-COLLECTOR = os.environ.get("COLLECTOR_URL", "http://127.0.0.1:5001")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE = target("DEMO_URL", "http://127.0.0.1:5000")
+COLLECTOR = target("COLLECTOR_URL", "http://127.0.0.1:5001")
+
 PY = sys.executable
 
 # Per round: the server state the student should be running, and what "passing"

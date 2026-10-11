@@ -10,8 +10,9 @@ measure BOTH sides of the defense:
                    false positives reported as cost, not hidden
   - defender cost: scoring time per request (Server-Timing)
 
-Fell behind? Restart the demo site with the reference solutions:
-    USE_SOLUTIONS=1 DEFENSE_LEVEL=<round> python demo_site/app.py
+Fell behind? --catch-up installs the reference solutions for rounds 1..N over
+your defenses/ files (yours are kept as .bak; --restore puts them back):
+    python tools/checkpoint.py --round <round> --catch-up
 
 Run:
     python tools/checkpoint.py --round 2
@@ -44,6 +45,12 @@ FIRST_BLOCKED_AT = {
     "round4_playwright_chromium": None,
 }
 BROWSER_ATTACKS = {"round4_playwright_chromium"}
+
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+LAB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 
 
 def load_attack(name):
@@ -111,11 +118,29 @@ def check_users(level, skip_browser):
     return failures
 
 
+def catch_up(rnd):
+    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, rnd)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
+    print("   The demo site reloads on save; if it did not, restart it.\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Chapter 5 round checkpoint")
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 5))
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
+    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     parser.add_argument("--skip-browser", action="store_true", help="skip Playwright attack and personas")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
+    if args.catch_up:
+        catch_up(args.round)
 
     try:
         level = server_level()
@@ -132,7 +157,7 @@ def main():
     print()
     if failures:
         print(f"❌ {failures} check(s) differ from the expected results.")
-        print(f"   Fell behind? USE_SOLUTIONS=1 DEFENSE_LEVEL={args.round} python demo_site/app.py")
+        print(f"   Fell behind? python tools/checkpoint.py --round {args.round} --catch-up")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

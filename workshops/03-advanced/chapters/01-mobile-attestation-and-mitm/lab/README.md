@@ -8,13 +8,14 @@ tokens, and finally farm genuine ones from emulators. After each attack you put
 on the defender's hat and add the layer that stops it — and measure what that
 layer costs the real customers running the app.
 
-> ⚠️ **Rules of engagement.** Every script here targets your own local store and
-> refuses any other host. The accounts, credentials and device ids are
-> synthetic. "Egress" IPs are *claimed* with a header from a documentation range
-> (RFC 5737, e.g. `198.51.100.0/24`) — the lab never routes through a real proxy,
-> a proxy list, or anyone else's infrastructure. Certificate-pinning bypass with
-> Frida / objection needs a rooted device and is **discussed on the slides, not
-> run here**; this lab models it by toggling the client's pin check. Keep it that way.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The accounts, credentials and device ids are synthetic. "Egress" IPs are *claimed* with a header from a documentation range (RFC 5737, e.g. `198.51.100.0/24`); the lab never routes through a real proxy or a proxy list.
+- The optional mitmproxy demo only intercepts your own local traffic, and `attacks/mitm_capture.py` drops any flow that is not to this machine. The lab never asks you to add the mitmproxy CA to your system trust store.
+- Certificate-pinning bypass with Frida / objection needs a rooted device and is **discussed on the slides, not run here**; this lab models it by toggling the client's pin check.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

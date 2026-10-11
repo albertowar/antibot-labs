@@ -12,7 +12,7 @@ prints what each side achieved and a verdict:
   shown but not judged: it is supposed to get through. That is the next round.
 
 Catch-up copies solutions/round{1..N}/ over defenses/ (and Round 1's robots.txt over
-demo_site/robots.txt), backing your files up under defenses/_backup/<timestamp>/.
+demo_site/robots.txt), keeping each of your files once as .bak (--restore puts them back).
 The store reloads defense files on the fly; only DEFENSE_LEVEL needs a restart.
 """
 
@@ -53,31 +53,17 @@ SOLUTION_FILES = {1: ["crawler_registry.py"], 2: ["crawler_verify.py"],
                   3: ["crawl_signature.py"], 4: ["policy.py"]}
 
 
-def catch_up(upto: int) -> None:
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    backup = os.path.join(LAB_DIR, "defenses", "_backup", stamp)
-    changed = []
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
 
-    def install(src, dst):
-        if os.path.exists(dst) and open(src).read() == open(dst).read():
-            return
-        os.makedirs(backup, exist_ok=True)
-        if os.path.exists(dst):
-            shutil.copy2(dst, os.path.join(backup, os.path.basename(dst)))
-        shutil.copy2(src, dst)
-        changed.append(os.path.relpath(dst, LAB_DIR))
 
-    for r in range(1, upto + 1):
-        for name in SOLUTION_FILES[r]:
-            install(os.path.join(LAB_DIR, "solutions", f"round{r}", name),
-                    os.path.join(LAB_DIR, "defenses", name))
-    if upto >= 1:
-        install(os.path.join(LAB_DIR, "solutions", "round1", "robots.txt"),
-                os.path.join(LAB_DIR, "demo_site", "robots.txt"))
-    if changed:
-        print("[catch-up] installed: " + ", ".join(changed) + f"   (your files saved under defenses/_backup/{stamp}/)")
-    else:
-        print("[catch-up] nothing to install: defenses already match the reference solutions")
+def catch_up(upto):
+    """Install the reference solutions for rounds 1..upto (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, upto)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     print(f"[catch-up] make sure the store runs at DEFENSE_LEVEL={upto}: DEFENSE_LEVEL={upto} python demo_site/app.py")
 
 
@@ -178,10 +164,15 @@ def run(round_: int, base: str = BASE_URL) -> bool:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--round", type=int, choices=[0, 1, 2, 3, 4], required=True)
+    ap.add_argument("--round", type=int, choices=[0, 1, 2, 3, 4], required="--restore" not in sys.argv)
     ap.add_argument("--catch-up", action="store_true")
+    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     ap.add_argument("--url", default=BASE_URL)
     a = ap.parse_args()
+    if a.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        sys.exit(0)
     if a.catch_up:
         catch_up(a.round)
         sys.exit(0)

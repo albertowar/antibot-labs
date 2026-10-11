@@ -12,17 +12,22 @@ comparison that tells you whether a defense is worth running.
 from __future__ import annotations
 
 import argparse
+import os
 import statistics
+import sys
 from collections import Counter, defaultdict
 
 import httpx
 
-BASE_URL = "http://127.0.0.1:5000"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import require_local, target  # noqa: E402
+
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default=BASE_URL)
+    ap.add_argument("--base", default=BASE_URL, type=require_local)
     ap.add_argument("--surface")
     ap.add_argument("--limit", type=int, default=2000)
     args = ap.parse_args()

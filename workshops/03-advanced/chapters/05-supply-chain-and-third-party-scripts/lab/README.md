@@ -7,9 +7,13 @@ round you add one browser-enforced control and watch what it does — and does n
 — stop. The store is a small slice of the workshop shop: just a checkout page
 with a card field and a login page, the two forms a skimmer cares about.
 
-> ⚠️ Run these scripts only against the local demo store and the local
-> collector, both bound to `127.0.0.1`. The attacks refuse any non-local target.
-> Use only the synthetic data already in the forms — never a real card number.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `COLLECTOR_URL`. Do not remove that check.
+- The store and the skimmer's collector both bind `127.0.0.1`.
+- Use only the synthetic data already in the forms, never a real card number. `TRUSTED_ANALYTICS` only adds an origin to the store's CSP; the store never fetches it.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -77,7 +81,7 @@ the collector's `/captured`.
 | `Address already in use` on 5000/5001 | Another app holds the port. Set `PORT=5055 python app.py` (store) / `PORT=5056 python collector.py`, and export `DEMO_URL`/`COLLECTOR_URL` to match. |
 | Playwright `Executable doesn't exist` | Run `playwright install chromium` inside the venv. |
 | Checkpoint says "not in this round's state" | Restart the store with the flags it prints. |
-| Round 1 "did you build the baseline?" | Build it from the clean release first — see `defenses/solutions/round1/README.md`. |
+| Round 1 "did you build the baseline?" | Build it from the clean release first — see `solutions/round1/README.md`. |
 
 ## How to measure a round
 
@@ -91,7 +95,8 @@ Round 1 is the exception — there it confirms the change-monitor fired *and* th
 the card still got out, because detection is not prevention.
 
 Fell behind? `python tools/checkpoint.py --round N --catch-up` prints the exact
-commands, and each `defenses/solutions/roundN/README.md` has them too.
+commands, and each `solutions/roundN/README.md` has them too. This lab is configured,
+not coded, so there are no files to install.
 
 ## Round 1: Inventory & change detection (18 min)
 

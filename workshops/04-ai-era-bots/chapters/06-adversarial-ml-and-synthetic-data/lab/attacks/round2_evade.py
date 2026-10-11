@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "defenses"))
 
 import advlib  # noqa: E402
-import labnet  # noqa: E402
+import labclient as labnet  # noqa: E402
 import shopper  # noqa: E402
 from round1_extract import SURROGATE, SURROGATE_META  # noqa: E402
 

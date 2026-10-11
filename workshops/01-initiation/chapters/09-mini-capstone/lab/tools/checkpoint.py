@@ -10,7 +10,7 @@ W1 Ch9 — Round checkpoint: are you where you should be?
 
 Fell behind? Install the reference pipeline for the round, restart the
 store, and run the checkpoint again:
-    python tools/checkpoint.py --round 3 --apply
+    python tools/checkpoint.py --round 3 --catch-up
     (Ctrl+C the store, then: python demo_site/app.py)
     python tools/checkpoint.py --round 3
 
@@ -25,7 +25,7 @@ import shutil
 import sys
 
 from drop import BROWSER_WAVES, FALSE_POSITIVE, print_scoreboard, run_drop
-from labnet import wait_for_store
+from labclient import wait_for_store
 
 LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 BASE_LAYERS = ["rate_limit.check", "headers.check"]
@@ -48,12 +48,17 @@ DESCRIBE = {"wins": "takes ≥10 of 20", "stopped": "gets ≤4 of 20", "capped":
             "some": "still gets a few"}
 
 
-def apply(round_no):
-    target = os.path.join(LAB, "defenses", "pipeline.py")
-    backup = target + ".bak"
-    shutil.copy(target, backup)
-    shutil.copy(os.path.join(LAB, "tools", "solutions", f"pipeline_round{round_no}.py"), target)
-    print(f"Installed the reference pipeline for Round {round_no} (your version: defenses/pipeline.py.bak).")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
+def catch_up(round_no):
+    """Install the reference solutions for rounds 1..round_no (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB, round_no)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     print("Restart the store (Ctrl+C, then python demo_site/app.py), then run:")
     print(f"    python tools/checkpoint.py --round {round_no}")
 
@@ -78,14 +83,19 @@ def check_config(round_no, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Check a round of the W1 Ch9 lab.")
-    parser.add_argument("--round", type=int, required=True, choices=sorted(EXPECTED))
-    parser.add_argument("--apply", action="store_true", help="install the reference pipeline for this round")
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(EXPECTED))
+    parser.add_argument("--catch-up", action="store_true", help="install the reference pipeline for this round")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     parser.add_argument("--all", action="store_true", help="run every wave up to the next one")
     parser.add_argument("--skip-browser", action="store_true", help="skip waves 3 and 4")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
 
-    if args.apply:
-        apply(args.round)
+    if args.catch_up:
+        catch_up(args.round)
         return 0
 
     _, _, _, key_waves, allowed_fp = EXPECTED[args.round]
@@ -96,7 +106,7 @@ def main():
         print("❌ defenses/pipeline.py doesn't match this round:")
         for p in problems:
             print(f"     - {p}")
-        print(f"\n   Fix it and restart the store, or: python tools/checkpoint.py --round {args.round} --apply")
+        print(f"\n   Fix it and restart the store, or: python tools/checkpoint.py --round {args.round} --catch-up")
         return 1
     print(f"✅ pipeline: {', '.join(config['layers']) or 'no layers'}"
           f"{' + proof of work + 1 per session' if config['challenge_enabled'] else ''}\n")
@@ -126,7 +136,7 @@ def main():
 
     if failures:
         print(f"❌ {failures} check(s) differ from the expected results. Compare with the "
-              f"reference: tools/solutions/pipeline_round{args.round}.py and defenses/policy.py.")
+              f"reference: solutions/round{args.round}/defenses/pipeline.py and defenses/policy.py.")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

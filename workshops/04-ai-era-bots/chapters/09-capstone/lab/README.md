@@ -21,13 +21,12 @@ Score scale is the series' usual: `score < 30` allow, `30–59` challenge, `≥ 
 
 ## Rules of engagement
 
-Every attack script refuses any target that is not `localhost` / `127.0.0.1`.
-"Egress IPs" are *claimed* with an `X-Lab-Egress` header drawn from RFC 5737
-documentation ranges — no real proxy, no proxy list, no third-party
-infrastructure. Accounts, addresses, keys and the "stolen" details are synthetic
-(`@mail.example`, `@customers.example`). Every LLM call goes through
-`tools/llm.py`, a deterministic local mock by default; nothing leaves your
-machine and no API key is needed. Run this only against your own copy of the store.
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `LLM_URL`. Do not remove that check.
+- "Egress IPs" are *claimed* with an `X-Lab-Egress` header drawn from RFC 5737 documentation ranges; no real proxy or proxy list is ever used.
+- Accounts, addresses, keys and the "stolen" details are synthetic (`@mail.example`, `@customers.example`).
+- Every LLM call goes through `tools/llm.py`, a deterministic local mock by default. A real model must run on this machine, so no API key is needed and nothing leaves your machine.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ## Setup (under 10 minutes)
 

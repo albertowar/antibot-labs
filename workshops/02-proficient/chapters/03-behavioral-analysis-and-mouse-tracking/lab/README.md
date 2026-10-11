@@ -12,10 +12,12 @@ You play both sides. Every round follows the same loop:
 2. The defender turns on the next layer and measures two things: the bots it stops, and the real users it stops by mistake.
 3. The attacker works out what to try next.
 
-> ⚠️ **Rules of engagement.** Run these scripts only against the local demo store.
-> - Every attack script refuses non-localhost targets.
-> - Lab traffic never goes through a proxy.
-> - All names, emails and traces are synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Lab traffic never goes through a proxy. All names, emails and traces are synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

@@ -6,8 +6,8 @@ resets the drop and the log, runs the round's attack and the legitimate mix,
 and prints whether the round's targets are met AND no legitimate user is
 blocked. Challenges are friction, not failure.
 
-Fell behind, or want the finished defence? --catch-up copies this round's
-reference solution over your edit (saving a .bak) and, for Round 2, the
+Fell behind, or want the finished defence? --catch-up installs the reference
+solutions for rounds 1..N over your files (saving a .bak) and, for Round 2, the
 reference policy. Restart the store afterwards.
 
     DEMO_URL=http://127.0.0.1:8409 python tools/checkpoint.py --round 1
@@ -37,18 +37,17 @@ ATTACK = {0: "round0_naive", 1: "round1_crawler_fleet", 2: "round2_agent_farm",
           3: ("round3_llm_extract", "round3_injector"), 4: "round4_integrated"}
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def catch_up(rnd):
-    for name in SOLUTIONS.get(rnd, []):
-        src = os.path.join(LAB_DIR, "solutions", f"round{rnd}", name)
-        dst = os.path.join(LAB_DIR, "defenses", name)
-        if os.path.exists(src):
-            shutil.copy2(dst, dst + ".bak")
-            shutil.copy2(src, dst)
-            print(f"✅ solutions/round{rnd}/{name} -> defenses/{name} (yours saved as {name}.bak)")
-    if rnd == 2:
-        shutil.copy2(os.path.join(LAB_DIR, "policies", "agent_policy_reference.json"),
-                     os.path.join(LAB_DIR, "policies", "agent_policy.json"))
-        print("✅ policies/agent_policy_reference.json -> policies/agent_policy.json")
+    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, rnd)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     print("   Restart the demo site for the change to take effect.\n")
 
 
@@ -101,10 +100,15 @@ def run_attack(rnd, base):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--round", type=int, required=True, choices=[0, 1, 2, 3, 4])
+    ap.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=[0, 1, 2, 3, 4])
     ap.add_argument("--catch-up", action="store_true")
+    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     ap.add_argument("--record", help="Round 4: score a governance record against the 12-item checklist")
     args = ap.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
     ensure_local()
     if args.catch_up:
         catch_up(args.round)

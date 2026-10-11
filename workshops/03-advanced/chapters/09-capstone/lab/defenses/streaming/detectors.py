@@ -31,7 +31,7 @@ REG_MIN_SAMPLES = 8
 # stuffer sleeps a near-constant interval, so its CV is tiny. Run
 # attacks/round2_streaming.py and watch the "low_and_slow" session's CV in
 # tools/signalhealth.py, then set the ceiling below it and above the humans.
-# Reference solution: solutions/round2/detectors.py.
+# Reference solution: solutions/round2/defenses/streaming/detectors.py.
 REG_MAX_CV = 0.0                  # TODO (Round 2): ~0.15
 # ----------------------------------------------------------------------------
 REG_POINTS = 55

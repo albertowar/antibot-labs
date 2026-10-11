@@ -30,7 +30,7 @@ Honest cost: sanitization can also drop a genuinely rare bot that happens to
 look human, and if you are too aggressive you throw away real signal. It
 trades a little recall for not being weaponized against your own users.
 
-Reference: solutions/round3/provenance.py.
+Reference: solutions/round3/defenses/provenance.py.
 
 Run:
     python defenses/provenance.py            # writes artifacts/model_v4.*
@@ -83,7 +83,7 @@ def main():
     print(f"=== Sanitized model (STUB): {meta['n_bot']} bot / {meta['n_human']} human, "
           f"threshold {meta['threshold']:.3f} ===")
     print("  Poison left in: the model will block real privacy-browser users.")
-    print("  Implement sanitize() (or see solutions/round3/provenance.py).")
+    print("  Implement sanitize() (or see solutions/round3/defenses/provenance.py).")
 
 
 if __name__ == "__main__":

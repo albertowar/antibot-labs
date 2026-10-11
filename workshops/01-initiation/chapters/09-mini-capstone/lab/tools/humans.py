@@ -36,7 +36,7 @@ import time
 from dataclasses import dataclass, field
 
 import browsers
-from labnet import BASE_URL, LabClient, form_fields, js_nonce, pow_bits, world_pool
+from labclient import BASE_URL, LabClient, form_fields, js_nonce, pow_bits, world_pool
 
 BROWSER_HASHES_PER_SECOND = 80_000   # measured: WebCrypto in headless Chromium 153, one hash per await
 AUTOFILL_NAMES = {"email", "email2", "phone", "tel", "name", "fullname", "address", "zip", "postcode", "city"}

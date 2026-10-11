@@ -20,8 +20,8 @@ links or not). Just strong enough to beat the previous round; not a tool.
 from __future__ import annotations
 
 import base64
-import ipaddress
 import os
+import sys
 import re
 import secrets
 import time
@@ -33,7 +33,10 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+
 KEYS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys")
 
 TRAINBOT_UA = "Mozilla/5.0 (compatible; LabTrainBot/1.0; +https://trainbot.example/bot)"
@@ -47,21 +50,6 @@ DATACENTER = [f"192.0.2.{i}" for i in range(1, 255)]           # unpublished
 RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)]
 
 SKU_RE = re.compile(r"/product/(p\d{3})")
-
-
-def require_local(url: str) -> str:
-    host = urlparse(url).hostname or ""
-    if host == "localhost":
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(
-        f"Refusing to run against non-local target {host!r}. "
-        f"This lab only ever targets the local demo store (127.0.0.1). "
-        f"Do not remove this check to 'try it on something real'.")
 
 
 # --- Web Bot Auth-style signer (the crawler side of defenses/bot_identity.py) ------

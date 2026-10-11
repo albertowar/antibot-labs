@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import statistics
 from collections import Counter, defaultdict
 
 import httpx
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
 
 
 def main():

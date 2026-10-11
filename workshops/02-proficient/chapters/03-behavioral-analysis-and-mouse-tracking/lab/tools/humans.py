@@ -35,11 +35,15 @@ import argparse
 import json
 import math
 import os
+import sys
 import random
 
 import requests
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRACES_DIR = os.path.join(HERE, "traces")
 

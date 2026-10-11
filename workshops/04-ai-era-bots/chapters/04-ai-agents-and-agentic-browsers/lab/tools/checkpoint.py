@@ -13,8 +13,8 @@ Run at the end of each round, with the store at that round's DEFENSE_LEVEL. It:
 A round passes when the round's bot meets its expectation (see ROUNDS) AND no
 HUMAN customer is blocked. Challenges are friction, not failure.
 
-Fell behind, or want the finished defence? --catch-up copies this round's
-reference solution over your edit (saving a .bak). Restart the store afterwards.
+Fell behind, or want the finished defence? --catch-up installs the reference
+solutions for rounds 1..N over your files (saving a .bak). Restart the store afterwards.
 
 Run (from lab/):
     DEMO_URL=http://127.0.0.1:8404 python tools/checkpoint.py --round 2
@@ -51,15 +51,17 @@ SOLUTIONS = {1: "agent_policy.py", 2: "agent_behavior.py", 3: "agent_identity.py
 CAP = 2  # 'capped' rounds: this many drop units or fewer is a pass
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def catch_up(rnd):
-    name = SOLUTIONS[rnd]
-    src = os.path.join(LAB_DIR, "solutions", f"round{rnd}", name)
-    dst = os.path.join(LAB_DIR, "defenses", name)
-    if not os.path.exists(src):
-        sys.exit(f"No reference solution at {os.path.relpath(src, LAB_DIR)}")
-    shutil.copy2(dst, dst + ".bak")
-    shutil.copy2(src, dst)
-    print(f"✅ Copied solutions/round{rnd}/{name} -> defenses/{name} (your version saved as {name}.bak)")
+    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, rnd)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     print("   Restart the demo site for the change to take effect.\n")
 
 
@@ -71,10 +73,15 @@ def run_attack(spec, base):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--round", type=int, required=True, choices=sorted(ROUNDS))
-    parser.add_argument("--catch-up", action="store_true", help="apply this round's reference solution")
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(ROUNDS))
+    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     parser.add_argument("--skip-bot", action="store_true", help="only measure the legitimate users")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
     ensure_local()
     if args.catch_up:
         catch_up(args.round)

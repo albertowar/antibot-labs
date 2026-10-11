@@ -37,6 +37,12 @@ ROUND_ATTACKS = {
 }
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+LAB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+
 def load_attack(name):
     spec = importlib.util.spec_from_file_location(name, os.path.join(ATTACKS, f"{name}.py"))
     mod = importlib.util.module_from_spec(spec)
@@ -92,12 +98,26 @@ def check_expectations(round_no, results, legit):
     return checks
 
 
+def catch_up(rnd):
+    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, rnd)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 5))
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
     parser.add_argument("--catch-up", action="store_true",
-                        help="print the command that runs this round with the reference solutions")
+                        help="install the reference solutions for rounds 1..N (your files are kept as .bak)")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
 
     try:
         state = server_state()
@@ -105,15 +125,14 @@ def main():
         print(f"❌ Can't reach the demo store at {BASE_URL}. Start it first.")
         return 1
 
+    if args.catch_up:
+        catch_up(args.round)
+        print(f"ℹ️  Restart the store at DEFENSE_LEVEL={args.round}, then run the checkpoint again without --catch-up.")
+        return 0
     if state["level"] != args.round:
-        sol = "USE_SOLUTIONS=1 " if args.catch_up else ""
         print(f"❌ The demo store is at DEFENSE_LEVEL={state['level']} but this is Round "
               f"{args.round}. Restart it with:\n"
-              f"     {sol}DEFENSE_LEVEL={args.round} python demo_site/app.py")
-        return 1
-    if args.catch_up and not state["use_solutions"]:
-        print("ℹ️  --catch-up: restart the store with the reference solutions:\n"
-              f"     USE_SOLUTIONS=1 DEFENSE_LEVEL={args.round} python demo_site/app.py")
+              f"     DEFENSE_LEVEL={args.round} python demo_site/app.py")
         return 1
 
     httpx.post(f"{BASE_URL}/lab/reset", timeout=10)

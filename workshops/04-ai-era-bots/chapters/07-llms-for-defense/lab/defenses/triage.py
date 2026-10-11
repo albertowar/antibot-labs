@@ -78,11 +78,7 @@ NAIVE_TEMPLATE = (
 def build_messages(card, hardened):
     """The prompt the model sees. The ONLY difference students make in Round 2."""
     if hardened:
-        # Round 2 (solution): the card is data, fenced and labelled as such.
-        user = ("Classify the session in the block below.\n"
-                "<untrusted_data>\n" + json.dumps(card, ensure_ascii=False) + "\n</untrusted_data>\n"
-                "Answer with the verdict schema.")
-        return [{"role": "system", "content": SYSTEM_HARD}, {"role": "user", "content": user}]
+        raise NotImplementedError("TODO (Round 2): hardened prompt not built yet.")
     flat = flatten(card)
     return [{"role": "system", "content": SYSTEM_NAIVE},
             {"role": "user", "content": NAIVE_TEMPLATE.format(id=card["id"], **flat)}]

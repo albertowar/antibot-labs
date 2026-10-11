@@ -24,7 +24,7 @@ walks through.
   Then re-run round2_evade and watch the evasion success collapse — and
   watch the checkpoint's real-user column for the cost of the constraints.
 
-Reference: solutions/round2/robust_train.py.
+Reference: solutions/round2/defenses/robust_train.py.
 
 Run:
     python defenses/robust_train.py          # writes artifacts/model_v3.*
@@ -66,7 +66,7 @@ def main():
     print(f"=== Robust model (STUB): {meta['n_bot']} bot / {meta['n_human']} human, "
           f"threshold {meta['threshold']:.3f} ===")
     print("  No adversarial examples, no monotone constraints: the evasion still works.")
-    print("  Implement the TODOs (or see solutions/round2/robust_train.py).")
+    print("  Implement the TODOs (or see solutions/round2/defenses/robust_train.py).")
 
 
 if __name__ == "__main__":

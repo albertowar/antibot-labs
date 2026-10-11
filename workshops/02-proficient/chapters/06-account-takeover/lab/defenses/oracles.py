@@ -7,7 +7,7 @@ Two leaks to close at L3:
     clock is not a timing oracle (``equalize_timing``).
 
 The timing guard is called from the login pipeline; the response is called from
-app.py. Fill in the TODOs. Reference: defenses/solutions/oracles.py
+app.py. Fill in the TODOs. Reference: solutions/round3/defenses/oracles.py
 """
 
 from __future__ import annotations

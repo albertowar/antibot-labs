@@ -30,7 +30,7 @@ defenses), so the rare family still gets through.
   real-user column, because interpolated points can spill into the real
   mobile region and cost you false positives.
 
-Reference: solutions/round4/augment.py.
+Reference: solutions/round4/defenses/augment.py.
 
 Run:
     python defenses/augment.py               # writes artifacts/model_v5.*
@@ -65,7 +65,7 @@ def main():
     print(f"=== Augmented model (STUB): {meta['n_bot']} bot / {meta['n_human']} human, "
           f"threshold {meta['threshold']:.3f} ===")
     print("  No synthetic minority: the rare family still gets through.")
-    print("  Implement synthesize() (or see solutions/round4/augment.py).")
+    print("  Implement synthesize() (or see solutions/round4/defenses/augment.py).")
 
 
 if __name__ == "__main__":

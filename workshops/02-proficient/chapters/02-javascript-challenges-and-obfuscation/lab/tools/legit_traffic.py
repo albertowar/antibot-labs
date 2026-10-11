@@ -31,13 +31,16 @@ Run the demo site first, then:
 """
 
 import os
+import sys
 import statistics
 import time
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 # (name, engine, pages, cpu_throttle, javascript)
 USERS = [

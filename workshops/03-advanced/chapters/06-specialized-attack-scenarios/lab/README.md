@@ -17,13 +17,10 @@ round shows where they fall short and what catches the rest.
 
 ## Rules of engagement
 
-Every script targets **only** the local demo store you run yourself. The ethics
-guard in `attacks/_common.py` refuses any non-loopback target before sending a
-request. Do not remove it. Every credential, email, IP, fingerprint and session in
-this lab is synthetic. The "source IPs" are RFC 5737 documentation ranges, honoured
-only from loopback — no real host is ever contacted. The one optional outbound call
-is the Round 1 breach check, and only if you set `HIBP_LIVE=1`; by default it reads
-an offline k-anonymity fixture, so the whole lab runs with no network.
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Every credential, email, IP, fingerprint and session in this lab is synthetic. The "source IPs" are RFC 5737 documentation ranges, honoured only from loopback.
+- **Outbound network:** none by default. The Round 1 breach check reads an offline k-anonymity fixture. With `HIBP_LIVE=1` it queries the real Pwned Passwords range API instead, sending only the first five hex characters of a SHA-1 hash. Leave it off in class.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ## Setup (under 10 minutes)
 

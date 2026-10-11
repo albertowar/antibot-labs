@@ -11,19 +11,12 @@ Rules of engagement, enforced in code:
 import os
 import secrets
 import sys
-from urllib.parse import urlparse
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 PASSWORD = "Synthetic-Passw0rd!"
-
-
-def require_local(url=BASE_URL):
-    """Refuse to run against anything that isn't this machine."""
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"Refusing to attack {host!r}: lab scripts only target localhost.")
-    return url
 
 
 def lab_ip(i):

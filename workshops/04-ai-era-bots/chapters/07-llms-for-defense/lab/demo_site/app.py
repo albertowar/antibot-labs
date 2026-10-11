@@ -21,7 +21,7 @@ Storage: SQLite by default (DATABASE_URL=sqlite:///llm_lab.db); run every
 lab command from the lab/ folder so they all find the same file.
 
 Network: the client IP comes from `X-Lab-Client-IP` (the simulated edge,
-tools/labnet.py) and is only trusted from 127.0.0.1. `X-Lab-Run` tags the
+tools/labclient.py) and is only trusted from 127.0.0.1. `X-Lab-Run` tags the
 session with the script that sent it, lab bookkeeping that stands in for the
 time window you would select in production.
 

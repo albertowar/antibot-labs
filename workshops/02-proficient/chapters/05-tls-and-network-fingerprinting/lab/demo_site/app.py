@@ -14,7 +14,8 @@ logged. Restart the server with a higher level at each round:
     DEFENSE_LEVEL=3 python demo_site/app.py   # + HTTP/2 fingerprint ↔ TLS family
     DEFENSE_LEVEL=4 python demo_site/app.py   # + JS engine proof for browser TLS
 
-Add USE_SOLUTIONS=1 to load defenses/solutions/ instead of your TODOs.
+Fell behind? `python tools/checkpoint.py --round N --catch-up` installs the
+reference solutions over your defenses/ files.
 
 - Score >= 40: blocked as bot (403)
 - Score >= 20: logged as suspicious, allowed through
@@ -254,8 +255,8 @@ def forbidden(e):
 
 
 if __name__ == "__main__":
-    print(f" * Defense level {DEFENSE_LEVEL}"
-          f"{' (reference solutions)' if os.environ.get('USE_SOLUTIONS') == '1' else ''}")
+    print(f" * Defense level {DEFENSE_LEVEL}")
     # Bind to loopback only: the edge is the only thing that should reach us.
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050 (and the same for tools/edge.py)
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), debug=True)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")),
+            debug=os.environ.get("LAB_DEBUG") == "1", use_reloader=True)

@@ -1,10 +1,10 @@
 """
 Chapter 8: catch-up checkpoints for the three rounds.
 
-    python tools/checkpoint.py 1                     Round 1: the fleet key, and the reference stack's scoreboard
-    python tools/checkpoint.py 2                     Round 2: the reference agent policy's scoreboard, and how to adopt it
-    python tools/checkpoint.py 3                     Round 3: the 12 items an AI governance record must cover
-    python tools/checkpoint.py 3 --record my.md      score a drafted governance record against the checklist
+    python tools/checkpoint.py --round 1                     Round 1: the fleet key, and the reference stack's scoreboard
+    python tools/checkpoint.py --round 2                     Round 2: the reference agent policy's scoreboard, and how to adopt it
+    python tools/checkpoint.py --round 3                     Round 3: the 12 items an AI governance record must cover
+    python tools/checkpoint.py --round 3 --record my.md      score a drafted governance record against the checklist
 
 Round 3 scoring is keyword matching, on purpose. It checks that a topic is
 addressed, not that it is addressed well; the audit cards in the other team's
@@ -77,7 +77,7 @@ def round3(record_path=None):
         print("Round 3: an AI governance record for the detection stack must cover these 12 items.\n")
         for i, (name, what, _) in enumerate(RECORD_CHECKLIST, 1):
             print(f"  {i:>2}. {name:<32} {what}")
-        print("\nTemplate: exercises/round3_governance_record_template.md    Score a draft: checkpoint.py 3 --record <file>")
+        print("\nTemplate: exercises/round3_governance_record_template.md    Score a draft: checkpoint.py --round 3 --record <file>")
         return
     with open(record_path) as f:
         text = f.read().lower()
@@ -94,7 +94,7 @@ def round3(record_path=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("round", type=int, choices=[1, 2, 3])
+    ap.add_argument("--round", type=int, required=True, choices=[1, 2, 3])
     ap.add_argument("--record", help="Round 3: path to a drafted governance record (markdown)")
     args = ap.parse_args()
     {1: round1, 2: round2, 3: lambda: round3(args.record)}[args.round]()

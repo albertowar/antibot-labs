@@ -2,10 +2,13 @@
 
 **Format:** 5 rounds of attack ⚔️ defend, ~132 min. See `../chapter_03_content.md`, §3.6.
 
-> ⚠️ **Rules of engagement.** These scripts run only against your own local demo store.
-> Every IP is from a documentation range (RFC 5737); no real proxy, no proxy list, no third
-> party is ever used. Usernames, sessions and timings are synthetic. The `--live` mode only
-> ever talks to `localhost`.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Every IP is from a documentation range (RFC 5737). Usernames, sessions and timings are synthetic.
+- By default the attacks write events straight to the local stream. `--live` sends them through the store instead, and is guarded like everything else.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 This lab is one Flask store that grows a streaming detector across five rounds. Every HTTP
 request becomes one event on a **Redis Stream**; a consumer reads the stream and runs the
@@ -105,6 +108,10 @@ Defender cost
 A round passes when the attack is flagged at or above the expected rate **and no legitimate
 customer is flagged**. Add `--slow` to any round to add 1 ms of processing per event and watch
 the detection latency grow (a lagging consumer).
+
+**Fell behind?** There is nothing to install. Every detector is pre-written, and the
+checkpoint runs the whole pipeline in one process at the round's level, so run
+`python tools/checkpoint.py --round N` for the round the class is on.
 
 ---
 

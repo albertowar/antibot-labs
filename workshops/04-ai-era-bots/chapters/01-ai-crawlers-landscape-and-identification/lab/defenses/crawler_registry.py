@@ -17,7 +17,7 @@ per token). Nothing here verifies a claim. That is Round 2.
 
 As shipped, identify() recognises nobody, so the store treats every client as a
 browser. Complete the two TODOs, then edit demo_site/robots.txt to say what each
-purpose may do (see solutions/round1/robots.txt for one policy).
+purpose may do (see solutions/round1/demo_site/robots.txt for one policy).
 """
 
 from __future__ import annotations

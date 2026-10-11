@@ -13,12 +13,14 @@ would rent. The point of the lab is to train defenders against your own app.
 
 from __future__ import annotations
 
-import ipaddress
 import os
+import sys
 import random
-from urllib.parse import urlparse
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+
 DATA = os.path.join(os.path.dirname(__file__), "..", "data")
 
 RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)] + [f"203.0.113.{i}" for i in range(1, 255)]
@@ -26,21 +28,6 @@ DATACENTER = [f"192.0.2.{i}" for i in range(1, 255)]
 
 REAL_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
            "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
-
-
-def require_local(url: str) -> str:
-    host = urlparse(url).hostname or ""
-    if host == "localhost":
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(
-        f"Refusing to run against non-local target {host!r}. "
-        f"This lab only ever targets the local demo store (127.0.0.1). "
-        f"Do not remove this check to 'try it on something real'.")
 
 
 def headers(actor, client_ip, fp="", session="", ua=REAL_UA, referer=""):

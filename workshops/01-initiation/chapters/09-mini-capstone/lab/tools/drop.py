@@ -24,7 +24,7 @@ import subprocess
 import sys
 from collections import Counter
 
-from labnet import admin, wait_for_store
+from labclient import admin, wait_for_store
 
 LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 BROWSER_WAVES = {3, 4}

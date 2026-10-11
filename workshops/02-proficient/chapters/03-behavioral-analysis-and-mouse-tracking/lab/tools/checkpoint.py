@@ -36,7 +36,9 @@ sys.path[:0] = [ATTACKS, os.path.join(HERE, "..", "defenses")]
 import humans                       # noqa: E402
 from scoring import score_offline   # noqa: E402
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 # (label, module, kwargs, first level that stops it, runs, how many must be stopped there)
 ATTACKS_PLAN = [

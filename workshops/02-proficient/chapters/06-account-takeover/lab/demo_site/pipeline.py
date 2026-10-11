@@ -15,14 +15,13 @@ run *before* we touch the password. Credentials are verified once. Everything
 after that — population stats, breach screening, risk — reasons about the result,
 because "a correct password from the wrong place" is the whole ballgame in ATO.
 
-Which implementation runs is chosen by USE_SOLUTIONS: the student stubs in
-``defenses/`` while you work, the reference modules in ``defenses/solutions/``
-once you (or ``checkpoint.py --catch-up``) switch them on.
+The modules in ``defenses/`` are student stubs until you fill them in;
+``tools/checkpoint.py --round N --catch-up`` installs the reference versions
+from ``solutions/roundN/defenses/`` over them (yours are kept as .bak).
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 
 from werkzeug.security import check_password_hash
@@ -45,16 +44,13 @@ class Decision:
 
 
 def _pkg():
-    """The package holding the active defense modules: stubs or reference."""
-    if os.environ.get("USE_SOLUTIONS") == "1":
-        import defenses.solutions as pkg
-    else:
-        import defenses as pkg
+    """The package holding the active defense modules."""
+    import defenses as pkg
     return pkg
 
 
 def _impl():
-    """Pick the student stubs or the reference solutions."""
+    """Import the four round modules from defenses/."""
     pkg = _pkg()
     from importlib import import_module
 

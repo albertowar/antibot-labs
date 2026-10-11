@@ -7,7 +7,7 @@ step-up reason instead of being allowed through to a session.
 Helper (already written): ``defenses/breachcorpus.py``
     breachcorpus.pwned_count(password) -> int   # 0 means not found
 
-Reference solution: defenses/solutions/breached_passwords.py
+Reference solution: solutions/round3/defenses/breached_passwords.py
 """
 
 from __future__ import annotations

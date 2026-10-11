@@ -9,7 +9,7 @@ record the context after a clean login so the next visit is frictionless, and
 Redis shape used by the reference: sets ``dev:<uid>`` (device ids),
 ``asn:<uid>`` (ASNs) and ``sig:<uid>`` (client signatures).
 
-Reference solution: defenses/solutions/risk_engine.py
+Reference solution: solutions/round4/defenses/risk_engine.py
 """
 
 from __future__ import annotations

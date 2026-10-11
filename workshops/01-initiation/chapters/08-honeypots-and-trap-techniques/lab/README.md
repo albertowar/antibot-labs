@@ -4,8 +4,12 @@
 
 You play both sides. Each round, the defender turns on the next trap and the attacker runs the script that walks into it. Then the attacker runs the script that walks around it. Every checkpoint measures two things: the bots a trap catches, and the real people it catches by mistake. The second number is the one honeypot tutorials leave out.
 
-> ⚠️ Run these scripts only against the local demo store. They refuse any target that isn't `localhost`.
-> All traffic stays on your machine, and every user, email and IP address is synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- All traffic stays on your machine, and every user, email and IP address is synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

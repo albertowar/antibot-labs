@@ -1,4 +1,4 @@
-"""Round 3 defense (REFERENCE SOLUTION) — a poisoned maze for crawlers that ignore the rules.
+"""Round 3 defense [STUDENT FILE] — a poisoned maze for crawlers that ignore the rules.
 
 Rounds 1-2 govern crawlers that identify themselves. The stealth crawler does
 not, so the only lever left is cost: make every page it fetches worth less and
@@ -27,6 +27,9 @@ The maze has four parts, and each has a cost or a false positive to name:
 
 Defender cost you will see in the checkpoint: generation time per page (sub-ms),
 bytes served, and how often the cap was hit.
+
+TODO (Round 3): entry_link() and tagged() below; _token(), record_hit() and
+render() are given. Fell behind? python tools/checkpoint.py --round 3 --catch-up
 """
 
 from __future__ import annotations
@@ -47,10 +50,15 @@ def _token(secret: str, *parts) -> str:
 
 
 def entry_link(ctx, secret: str) -> str:
-    """Hidden entry link for a real page. Unique per client so trails are attributable."""
-    tok = _token(secret, "entry", ctx["client_ip"])
-    return (f'<a class="hp" href="{MAZE_PREFIX}{tok}" rel="nofollow" tabindex="-1" '
-            f'aria-hidden="true">Catalogue archive</a>')
+    """TODO (Round 3): the hidden entry link for a real page.
+
+    An <a> to MAZE_PREFIX + _token(secret, "entry", ctx["client_ip"]) (unique per
+    client, so trails are attributable) with class="hp", rel="nofollow",
+    tabindex="-1" and aria-hidden="true": browsers never show it, polite
+    prefetchers skip it, robots.txt already Disallows the prefix.
+    Until then: no entry link, so no crawler ever finds the maze.
+    """
+    return ""
 
 
 def record_hit(rds, ip: str) -> int:
@@ -60,7 +68,10 @@ def record_hit(rds, ip: str) -> int:
 
 
 def tagged(rds, ip: str) -> bool:
-    return int(rds.get(f"maze:hits:{ip}") or 0) >= TAG_AFTER
+    """TODO (Round 3): True once this IP fetched >= TAG_AFTER maze pages
+    (record_hit() keeps the counter at maze:hits:<ip> with TAG_TTL). A tagged
+    client gets the maze instead of the catalogue. Until then: never."""
+    return False
 
 
 def render(token: str, babbler, secret: str):

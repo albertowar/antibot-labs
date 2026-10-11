@@ -30,21 +30,22 @@ except ImportError:
     resource = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target as _target, require_local, require_local_env  # noqa: E402
+BASE_URL = _target("DEMO_URL", "https://localhost:8443")
+
+
+def target():
+    """The guarded demo-store URL (see labnet.py)."""
+    return BASE_URL
+
+
 FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn", "avery", "rowan"]
 LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright", "scott", "green"]
 RESHIPPER_UNITS = ["Unit {n}", "Apt {n}", "#{n}", "Ste {n}", "Suite {n}"]
 DROP = "/drop/lab-runner-9"
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
-
-
-def target():
-    url = os.environ.get("DEMO_URL", "https://localhost:8443").rstrip("/")
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"🛑 Refusing to attack {host!r}. Lab attacks only run against your own local demo store.")
-    return url
 
 
 def egress_pool():

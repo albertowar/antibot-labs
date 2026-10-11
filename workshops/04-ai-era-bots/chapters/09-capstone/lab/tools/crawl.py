@@ -19,8 +19,8 @@ hidden links or not). Just strong enough to beat the previous round.
 """
 
 import base64
-import ipaddress
 import os
+import sys
 import re
 import secrets
 import time
@@ -34,7 +34,10 @@ import httpx
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 KEYS = os.path.join(LAB_DIR, "attacks", "keys")
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:8409").rstrip("/")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:8409")
+
 CATALOGUE_SIZE = 120
 
 TRAINBOT_UA = "Mozilla/5.0 (compatible; LabTrainBot/1.0; +https://trainbot.example/bot)"
@@ -51,19 +54,6 @@ RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)]
 
 SKU_RE = re.compile(r"/product/([a-z0-9\-]+)")
 MD_SKU = re.compile(r"\b(cat-\d{3})\b")
-
-
-def require_local(url):
-    host = urlparse(url).hostname or ""
-    if host == "localhost":
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(f"Refusing to run against non-local target {host!r}. This lab only ever targets the "
-                     f"local demo store (127.0.0.1). Do not remove this check to 'try it on something real'.")
 
 
 class Signer:

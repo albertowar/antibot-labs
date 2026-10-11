@@ -20,7 +20,6 @@ import random
 import sys
 import time
 import warnings
-from urllib.parse import urlparse
 
 try:
     import resource  # Unix only; on Windows CPU cost is reported as 0
@@ -30,17 +29,18 @@ except ImportError:
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn"]
-LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright"]
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target as _target, require_local, require_local_env  # noqa: E402
+BASE_URL = _target("DEMO_URL", "https://localhost:8443")
 
 
 def target():
-    url = os.environ.get("DEMO_URL", "https://localhost:8443").rstrip("/")
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"🛑 Refusing to attack {host!r}. Lab attacks only run against your own local demo store.")
-    return url
+    """The guarded demo-store URL (see labnet.py)."""
+    return BASE_URL
+
+
+FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn"]
+LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright"]
 
 
 def egress_pool():

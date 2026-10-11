@@ -12,11 +12,9 @@ third party, and nothing should be adapted to.
 
 from __future__ import annotations
 
-import ipaddress
 import os
 import sys
 import time
-from urllib.parse import urlparse
 
 import httpx
 
@@ -24,8 +22,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
-MOCK_URL = os.environ.get("MOCK_URL", "http://127.0.0.1:5001")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+MOCK_URL = target("MOCK_URL", "http://127.0.0.1:5001")
+require_local_target = require_local
 
 ATTACKER_IP = "192.0.2.77"            # a box in the attacker's hosting allocation
 SQUAT_IP = "203.0.113.99"             # a tenant VM on shared cloud egress (App Engine style)
@@ -35,20 +36,6 @@ UA_GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/b
 UA_GPTBOT = "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.3; +https://openai.com/gptbot"
 UA_READ_ALOUD = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36 (compatible; Google-Read-Aloud; +https://support.google.com/webmasters/answer/1061943)"
 UA_SCRAPER = "python-httpx/0.28 scraper"
-
-
-def require_local_target(url: str) -> str:
-    """Refuse any target that is not loopback. A safety control, not a setting."""
-    host = urlparse(url).hostname or ""
-    if host == "localhost":
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(f"Refusing to run against non-local target {host!r}. "
-                     f"This lab only ever targets the local demo store and mock internet.")
 
 
 def headers(actor: str, egress_ip: str, ua: str, extra: dict | None = None) -> dict:

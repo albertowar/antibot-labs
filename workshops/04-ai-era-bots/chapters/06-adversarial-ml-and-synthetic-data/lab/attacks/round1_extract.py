@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
 import advlib  # noqa: E402
-import labnet  # noqa: E402
+import labclient as labnet  # noqa: E402
 import shopper  # noqa: E402
 
 DATA = os.path.join(os.path.dirname(__file__), "..", "data")

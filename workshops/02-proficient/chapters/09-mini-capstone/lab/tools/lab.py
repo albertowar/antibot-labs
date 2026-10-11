@@ -10,26 +10,20 @@ import hashlib
 import os
 import sys
 import warnings
-from urllib.parse import urlparse
 
 import requests
 import urllib3
 
 LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INSTANCE = os.path.join(LAB_DIR, "instance")
-BASE_URL = os.environ.get("DEMO_URL", "https://localhost:8443").rstrip("/")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "https://localhost:8443")
+ensure_local = require_local
 
 # The lab certificate is self-signed; verification is skipped for localhost only.
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
-
-
-def ensure_local(url=BASE_URL):
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"Refusing to run against {host!r}: lab tools only target this machine.")
-    return url
 
 
 def admin_key():

@@ -390,4 +390,4 @@ def config():
 
 if __name__ == '__main__':
     print(f"Drop store on http://localhost:{PORT}  layers: {pipeline_config()['layers'] or 'none'}")
-    app.run(port=PORT, threaded=True)
+    app.run(host="127.0.0.1", port=PORT, threaded=True)

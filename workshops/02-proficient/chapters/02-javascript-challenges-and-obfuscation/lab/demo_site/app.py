@@ -294,4 +294,4 @@ if __name__ == "__main__":
     if POOL:
         print(f" * Variant pool: {len(POOL)} obfuscated variants")
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050
-    app.run(port=int(os.environ.get("PORT", "5000")), threaded=True)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), threaded=True)

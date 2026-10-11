@@ -4,7 +4,12 @@
 
 You play both sides. The attacker drives a real browser at the demo store. The defender adds a layer to the bot sensor that runs inside the page, then measures two things: what the layer catches, and what it costs real users. Then the attacker works out what to try next.
 
-> ⚠️ Run these scripts only against the local demo store. `attacks/_common.py` refuses any host other than `localhost`/`127.0.0.1`. Don't route lab traffic through proxies or anyone else's infrastructure. All users, carts and credentials here are synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Lab traffic never goes through a proxy or anyone else's infrastructure. All users, carts and credentials here are synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -12,7 +17,7 @@ lab/
   demo_site/           Flask store · static/sensor.js (the in-page sensor) · templates/
   defenses/            automation_artifacts · consistency · lie_detection · interaction · scoring
     edge/              Workshop 1's header rules, always on
-    solutions/         reference versions of the four files you edit
+  solutions/roundN/    reference versions of the four files you edit (installed by --catch-up)
   attacks/             round0_* … round5_forged_sensor · bonus_* · _common (localhost guard)
   tools/               checkpoint.py · scoreboard.py · legit_traffic.py · profiles/*.json
 ```

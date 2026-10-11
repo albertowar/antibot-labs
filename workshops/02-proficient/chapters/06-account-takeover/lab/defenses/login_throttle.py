@@ -9,7 +9,7 @@ Helpers are ready for you in ``defenses/ratelimit.py``:
     ratelimit.hit(rds, key, window_s, now)         -> count in the sliding window
     ratelimit.incr_window(rds, key, window_s, now)  -> fixed-window counter value
 
-Reference solution: defenses/solutions/login_throttle.py
+Reference solution: solutions/round1/defenses/login_throttle.py
 Run ``python tools/checkpoint.py --round 1 --catch-up`` to use the reference.
 """
 

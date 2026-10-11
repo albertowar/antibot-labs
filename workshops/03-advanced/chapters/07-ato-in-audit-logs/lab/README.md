@@ -4,7 +4,9 @@
 
 This chapter's attacker is not a script you run. It already ran: eight account-takeover campaigns are buried in 90 days of a store's account audit log, next to every legitimate behaviour that looks like one. Each round is still a 🔵 defense (a detection family you build in a notebook), a 🔴 attack (the tier of campaigns built to evade the previous round's family), a checkpoint and a number. The answer key stays sealed until the reveal; the scorer tells you how you are doing without telling you why.
 
-> ⚠️ Nothing in this lab touches a network. Every address is non-routable (198.18.0.0/15 benchmark space for residential, mobile and datacenter pools; 100.64.0.0/10 for carrier NAT; the RFC 5737 /24s for VPN, Tor and hosting; 2001:db8::/32 for IPv6), every ASN is private (RFC 6996), and every account, agent, device and city centroid is invented. The companies named in the data do not exist.
+## Rules of engagement
+
+Nothing in this lab touches a network. Every address is non-routable (198.18.0.0/15 benchmark space for residential, mobile and datacenter pools; 100.64.0.0/10 for carrier NAT; the RFC 5737 /24s for VPN, Tor and hosting; 2001:db8::/32 for IPv6), every ASN is private (RFC 6996), and every account, agent, device and city centroid is invented. The companies named in the data do not exist.
 
 ```
 lab/

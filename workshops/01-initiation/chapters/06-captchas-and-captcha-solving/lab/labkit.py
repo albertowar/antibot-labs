@@ -19,23 +19,21 @@ import os
 import random
 import secrets
 import ssl
-import sys
 import time
-from urllib.parse import urlparse
 
 import httpx
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-PROVIDER_URL = os.environ.get("PROVIDER_URL", "http://localhost:5001")
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+import labnet
+
+BASE_URL = labnet.target("DEMO_URL", "http://localhost:5000")
+PROVIDER_URL = labnet.target("PROVIDER_URL", "http://localhost:5001")
+REDIS_URL = labnet.require_local(os.environ.get("REDIS_URL", "redis://localhost:6379/0"), what="REDIS_URL")
 TIME_SCALE = float(os.environ.get("LAB_TIME_SCALE", "5"))
 
 # The mock provider's key pair. Site keys are public by design: they ship in
 # your HTML. The secret only ever lives on your server.
 SITEKEY = "lab-sitekey-0000"
 SECRET = os.environ.get("CAPTCHA_SECRET", "lab-secret-0000")
-
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 # Building an SSL context costs ~80 ms; share one across every client.
 _SSL = ssl.create_default_context()
@@ -47,12 +45,9 @@ FARM_NET = ipaddress.ip_network("192.0.2.0/24")       # TEST-NET-1
 
 
 def require_local(*urls):
-    """Ethics guardrail: refuse to send lab traffic anywhere but this machine."""
+    """Ethics guardrail: refuse to send lab traffic anywhere but this machine (see labnet.py)."""
     for url in urls or (BASE_URL, PROVIDER_URL):
-        host = urlparse(url).hostname
-        if host not in LOCAL_HOSTS:
-            sys.exit(f"Refusing to run against {url}: this lab only targets "
-                     f"localhost. Attack only systems you own.")
+        labnet.require_local(url)
 
 
 def sim_sleep(sim_seconds):

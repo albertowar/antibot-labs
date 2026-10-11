@@ -6,7 +6,12 @@ A limited sneaker drop — **50 pairs of the "Lab Runner 9", one per account**. 
 
 Everything you built across W2 is here as one stack: automation flags (Ch1), JS challenges (Ch2), behavior (Ch3), fingerprinting (Ch4), TLS/JA4 (Ch5), account takeover (Ch6), an ML model (Ch7) and the layered risk engine (Ch8).
 
-> ⚠️ **Rules of engagement.** Every script here targets your own local store and refuses any other host. The accounts, credentials and "breach list" are synthetic. "Residential" egress IPs are a header claimed from a documentation range (RFC 5737) — the lab never routes through a real proxy, a proxy list, or anyone else's infrastructure. Keep it that way.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The accounts, credentials and "breach list" are synthetic. "Residential" egress IPs are a header claimed from a documentation range (RFC 5737); the lab never routes through a real proxy or a proxy list.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -99,7 +104,7 @@ Defender cost: scoring median 10.3 ms, p95 19.6 ms per action
 
 A round **passes** when the attack is stopped at the level that should stop it **and** no legitimate customer is blocked. Challenged customers are friction, reported but not a failure. The 40 customers (`tools/personas.py`) are the people antibot defenses hurt in production — phone users, a screen-reader user, privacy browsers, a VDI session, 7 laptops behind one office IP, a brand-new customer — so watch that column as closely as the bot column.
 
-**Fell behind?** Each round's fix is one `TODO (Round N)` in one defense file. `--catch-up` copies the reference solution over your edit (saving a `.bak`); re-run without it to return to your work. Then restart the store.
+**Fell behind?** Each round's fix is one `TODO (Round N)` in one defense file. `--catch-up` installs the reference solutions for rounds 1..N (keeping each of yours once as `.bak`); `python tools/checkpoint.py --restore` puts your files back. Then restart the store.
 
 ---
 

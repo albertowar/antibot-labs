@@ -7,8 +7,12 @@ The demo store gives every new account a €10 welcome credit, so a bot wants hu
 - The attacker runs a sign-up farm. It uses a fresh browser context and a new simulated IP for every account.
 - The defender turns on the next fingerprinting layer. They measure what it stops and what it costs: real users refused, and milliseconds spent.
 
-> ⚠️ Run these scripts only against the local demo site. Each attack script refuses any target other than `localhost`.
-> The "rotating IPs" are RFC 5737 documentation addresses sent in a lab-only header. No proxy is involved, and every account and e-mail address is synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The "rotating IPs" are RFC 5737 documentation addresses sent in `X-Lab-Client-IP`, a lab-only header the store trusts only from loopback. No proxy is involved, and every account and e-mail address is synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

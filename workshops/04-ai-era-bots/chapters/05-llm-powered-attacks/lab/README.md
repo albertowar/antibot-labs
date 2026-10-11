@@ -17,17 +17,11 @@ rest in the attacker's own currency: tokens and latency.**
 
 ## Rules of engagement
 
-Every script targets **only** the local demo store you run yourself. The ethics
-guard in `attacks/_common.py` refuses any non-loopback target before sending a
-request. Do not remove it. Every account, review, device, IP and session in this
-lab is synthetic. The "source IPs" are RFC 5737 documentation ranges, honoured
-only from loopback — no real host is ever contacted.
-
-The LLM is a **deterministic in-process mock** by default (`tools/llm.py`), so the
-lab runs with no model download, no GPU, no network and no API key, and the
-numbers below reproduce exactly. Round 4's injection payloads target this store's
-**own** LLM features — it is how a defender checks whether their feature can be
-steered. The "secret" the exfiltration payload chases is a made-up lab code.
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `LLM_URL`. Do not remove that check.
+- Every account, review, device, IP and session in this lab is synthetic. The "source IPs" are RFC 5737 documentation ranges, honoured only from loopback.
+- The LLM is a **deterministic in-process mock** by default (`tools/llm.py`): no model download, no GPU, no network and no API key, and the numbers below reproduce exactly. Round 4's injection payloads target this store's **own** LLM features, which is how a defender checks whether a feature can be steered. The "secret" the exfiltration payload chases is a made-up lab code.
+- **Outbound network:** none. To try a real model, point `LLM_URL` at a server on this machine (for example Ollama on `http://127.0.0.1:11434/v1`). Prompts never leave the laptop.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ## Why this stack
 

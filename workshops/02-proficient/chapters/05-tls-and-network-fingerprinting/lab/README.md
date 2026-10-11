@@ -4,18 +4,24 @@
 
 The W1 Ch4 attacker copies every header from DevTools, so nothing at the HTTP layer gives it away anymore. In this lab you move the defense one layer down, to the TLS ClientHello and the HTTP/2 connection preface. Each round you write a few lines of a new layer, run the attacker that beats it, and measure two things on simulated real users: what the layer catches, and what it costs.
 
-> ⚠️ Run these scripts only against the local demo site, or other systems you own. The attack scripts refuse any target that isn't `localhost`.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- Scripts go through the local TLS edge on `https://localhost:8443`. `attacks/_lab.py` also refuses to skip the edge by targeting the Flask origin port directly.
+- **Outbound network:** one setup-time download. `tools/get_fingerproxy.py` fetches the pinned fingerproxy release from GitHub and deletes it if the SHA-256 does not match. Nothing touches the network during the rounds.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
   docker-compose.yml   PostgreSQL 16 for the request log (optional: SQLite works too)
   demo_site/app.py     Flask store behind the edge; DEFENSE_LEVEL=0..4 picks the layers
   defenses/            ja4 (parser) · edge_headers · ja4_denylist · tls_family · h2_fingerprint ·
-                       browser_proof · scoring · known_fingerprints.json · solutions/
+                       browser_proof · scoring · known_fingerprints.json
   attacks/             round0_recon · round1_naive_requests · round1_cipher_tweak ·
                        round2_impit_chrome · round3_curl_cffi_chrome · round4_playwright_chromium
   tools/               edge.py · get_fingerproxy.py · make_cert.py · clienthello_dump.py ·
                        capture_fingerprints.py · checkpoint.py · legit_traffic.py · fingerprint_report.py
+  solutions/roundN/    the reference defenses/ module for each round (installed by --catch-up)
 ```
 
 ```
@@ -129,11 +135,7 @@ What it reports:
 - **Real users:** the personas in `tools/legit_traffic.py`, which include real Chromium and Firefox through the same edge. Two personas are **documented false positives**: the checkpoint shows them with ⚠️ as the cost of the layer instead of failing. Any other 403 here fails the checkpoint.
 - **Defender cost:** scoring time per request, from the `Server-Timing` response header.
 
-**Fell behind?** Every TODO has a reference solution in `defenses/solutions/`. To catch up:
-
-```bash
-USE_SOLUTIONS=1 DEFENSE_LEVEL=<N> python demo_site/app.py
-```
+**Fell behind?** `python tools/checkpoint.py --round N --catch-up` installs the reference solutions for rounds 1..N from `solutions/` over your files and keeps each of yours once as `.bak`. Restart the store at `DEFENSE_LEVEL=N`, then run the checkpoint again. `python tools/checkpoint.py --restore` puts your own files back.
 
 ---
 
@@ -263,7 +265,7 @@ Real Chromium, curl_cffi and the Playwright bot all land in the first cluster. Y
 
 ## Instructor: expected results
 
-Verified 2026-10-10 on Linux x86_64 (WSL2), Python 3.10.12 with OpenSSL 3.0.2, fingerproxy v1.2.3, Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0), curl_cffi 0.16.3, impit 0.14.1, SQLite fallback. Every level was run with `USE_SOLUTIONS=1`. Two things were not verified: PostgreSQL (no Docker on the test machine; the same SQLAlchemy model as W1 Ch4) and the WebKit persona (missing system libraries).
+Verified 2026-10-10 on Linux x86_64 (WSL2), Python 3.10.12 with OpenSSL 3.0.2, fingerproxy v1.2.3, Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0), curl_cffi 0.16.3, impit 0.14.1, SQLite fallback. Every level was run with the reference solutions installed (`--catch-up`). Two things were not verified: PostgreSQL (no Docker on the test machine; the same SQLAlchemy model as W1 Ch4) and the WebKit persona (missing system libraries).
 
 | Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
 |---|---|---|---|---|---|---|

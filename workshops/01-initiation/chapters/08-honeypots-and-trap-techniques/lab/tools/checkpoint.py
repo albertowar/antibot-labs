@@ -51,6 +51,10 @@ CATALOG_SIZE = 12
 SOLUTIONS = {2: ["form_traps.py"], 3: ["crawl_traps.py"]}
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def get(path):
     with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=5) as r:
         return json.loads(r.read())
@@ -70,19 +74,13 @@ def load_attack(name):
 
 
 def catch_up(round_no):
-    changed = False
-    for r in range(round_no + 1):
-        for filename in SOLUTIONS.get(r, []):
-            src = os.path.join(LAB, "solutions", f"round{r}", filename)
-            dst = os.path.join(LAB, "defenses", filename)
-            with open(src) as a, open(dst) as b:
-                if a.read() == b.read():
-                    continue
-            shutil.copy(dst, dst + ".bak")
-            shutil.copy(src, dst)
-            changed = True
-            print(f"  caught up: defenses/{filename} (your version saved as {filename}.bak)")
-    if changed:
+    """Install the reference solutions for rounds 1..round_no (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB, round_no)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
+    if installed:
         time.sleep(3)                                # let Flask's reloader restart the app
         for _ in range(20):
             try:
@@ -121,11 +119,16 @@ def judge_attack(name, first_trapped, level, result, counters):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 5))
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
     parser.add_argument("--skip-browser", action="store_true", help="skip the Playwright scripts")
     parser.add_argument("--catch-up", action="store_true",
                         help="apply the reference fixes for rounds <= N first")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
     require_local()
 
     if args.catch_up:

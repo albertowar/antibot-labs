@@ -6,7 +6,12 @@ In W1 and the earlier W2 chapters you built one defense at a time. This lab puts
 
 You play the defender. Each round you switch the decision engine (`DEFENSE_LEVEL`), send the store's 200 simulated customers through the login, and read the bill: customers blocked, customers challenged, and the signals they paid for. Then you look at what the round's attacker shows the defender, score that profile against the engine you just deployed, and see why the previous engine missed it.
 
-> ⚠️ Run this only against the local demo site. The lab ships **no attack scripts**: attackers are described by the signals they show, and `tools/sweep.py --signals` scores those profiles against your policy. Every address, name and password here is synthetic.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- The lab ships **no attack scripts**: attackers are described by the signals they show, and `tools/sweep.py --signals` scores those profiles against your policy. Every address, name and password here is synthetic.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/

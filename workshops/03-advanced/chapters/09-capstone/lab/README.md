@@ -26,19 +26,20 @@ score ≥ 60    block
 A layer above the current `DEFENSE_LEVEL` runs in **shadow mode**: its points are
 logged (`decisions.shadow`, visible in `tools/scoreboard.py`) but don't act.
 
-## Scenario and rules of engagement
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
+- "Egress IPs" are *claimed* with an `X-Lab-Egress` header drawn from RFC 5737 documentation ranges; no real proxy or proxy list is ever used.
+- Accounts, addresses and the "stolen" PII are synthetic (`@mail.example`, `@customers.example`). The skimmer and its collector origin are local and fictional.
+- Every container in `docker-compose.yml`, including the optional `prod` profile, publishes its ports on 127.0.0.1 only.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
+
+## Scenario
 
 The store drops 50 pairs of the Lab Runner 9, one per account. You play both
 sides, round by round: the attacker reaches for the next technique, you turn on
 the next layer and measure what it catches **and who it hurts**.
-
-> **Rules of engagement.** Every attack script refuses any target that is not
-> `localhost` / `127.0.0.1`. "Egress IPs" are *claimed* with an `X-Lab-Egress`
-> header drawn from RFC 5737 documentation ranges — no real proxy, no proxy
-> list, no third-party infrastructure is ever used. Accounts, addresses and the
-> "stolen" PII are synthetic (`@mail.example`, `@customers.example`). The
-> skimmer and its collector origin are local and fictional. Run this only
-> against your own copy of the store.
 
 ## Layout
 
@@ -96,7 +97,7 @@ this and is what the rounds below assume.
 
 ```bash
 python tools/checkpoint.py --round N        # runs the attack + the 40 customers + 3 API clients
-python tools/checkpoint.py --round N --catch-up   # apply this round's reference solution
+python tools/checkpoint.py --round N --catch-up   # install the reference solutions up to round N
 python tools/scoreboard.py                  # outcomes per action, incl. shadow-mode scores
 python tools/signalhealth.py                # per-layer trigger rates (the Grafana stand-in)
 ```

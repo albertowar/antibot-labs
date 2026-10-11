@@ -16,13 +16,17 @@ Then run:
 
 import json
 import os
+import sys
 import shutil
 import subprocess
 import urllib.request
 
 import requests
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 CHECK_URL = f"{BASE_URL}/header-check"
 
 

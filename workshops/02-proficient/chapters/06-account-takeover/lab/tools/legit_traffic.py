@@ -29,7 +29,9 @@ import pyotp
 sys.path.insert(0, os.path.dirname(__file__))
 from _paths import DATA  # noqa: E402
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
 
 
 def _login(client, user, password):

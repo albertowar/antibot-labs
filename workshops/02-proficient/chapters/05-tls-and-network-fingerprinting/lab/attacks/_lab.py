@@ -9,14 +9,16 @@ Shared plumbing for the Chapter 5 attack scripts and tools.
   where the client library supports it.
 """
 
-import ipaddress
 import os
 import sys
 from urllib.parse import urlparse
 
 LAB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, LAB)  # lab root: labnet.py
+import labnet  # noqa: E402
+
 CA_FILE = os.path.join(LAB, "certs", "tls.crt")
-BASE_URL = os.environ.get("DEMO_URL", "https://localhost:8443").rstrip("/")
+BASE_URL = labnet.target("DEMO_URL", "https://localhost:8443")
 ORIGIN_PORT = int(os.environ.get("PORT", "5000"))
 
 # What a W1 Ch4 graduate sends: every header copied from Chrome DevTools.
@@ -39,16 +41,9 @@ CHROME_HEADERS = {
 
 
 def require_local(url: str) -> str:
-    """Exit unless `url` points at this machine's TLS edge."""
-    parsed = urlparse(url)
-    host = parsed.hostname or ""
-    try:
-        local = host == "localhost" or ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        local = False
-    if not local:
-        sys.exit(f"Refusing to run against {host!r}: lab scripts only target localhost.")
-    if parsed.port == ORIGIN_PORT:
+    """Exit unless `url` points at this machine's TLS edge (labnet does the loopback check)."""
+    labnet.require_local(url)
+    if urlparse(url).port == ORIGIN_PORT:
         sys.exit(f"Refusing to target the origin on :{ORIGIN_PORT} directly. Go through the edge (:8443).")
     return url
 

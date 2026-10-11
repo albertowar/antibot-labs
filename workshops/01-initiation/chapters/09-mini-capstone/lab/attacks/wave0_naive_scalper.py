@@ -22,7 +22,7 @@ from collections import Counter
 import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
-from labnet import LabClient, form_fields, world_pool  # noqa: E402
+from labclient import LabClient, form_fields, world_pool  # noqa: E402
 
 MAX_ATTEMPTS = 60
 

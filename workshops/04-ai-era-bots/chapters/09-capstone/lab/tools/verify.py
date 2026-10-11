@@ -22,14 +22,12 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
+sys.path.insert(0, LAB_DIR)  # lab root: labnet.py
+import labnet  # noqa: E402
 PORT = int(os.environ.get("PORT", "8412"))
 BASE = f"http://127.0.0.1:{PORT}"
-SOLUTIONS = {1: ["crawl_governance.py"], 2: ["agent_governance.py"], 3: ["deception_limits.py", "llm_guard.py"],
-             4: ["oracle_guard.py"]}
-
-
-STUDENT_FILES = [os.path.join(LAB_DIR, "defenses", n) for rnd in SOLUTIONS for n in SOLUTIONS[rnd]] + \
-    [os.path.join(LAB_DIR, "policies", "agent_policy.json")]
+# Every file a round's reference solution replaces (solutions/roundN/<path relative to lab>).
+STUDENT_FILES = sorted({dst for _src, dst in labnet.solution_files(LAB_DIR, 4)})
 _BACKUPS = {}
 
 
@@ -37,14 +35,8 @@ def apply_solutions(upto):
     for path in STUDENT_FILES:          # back up the student state so we can restore it after
         with open(path) as f:
             _BACKUPS[path] = f.read()
-    for rnd in range(1, upto + 1):
-        for name in SOLUTIONS[rnd]:
-            src = os.path.join(LAB_DIR, "solutions", f"round{rnd}", name)
-            if os.path.exists(src):
-                shutil.copy2(src, os.path.join(LAB_DIR, "defenses", name))
-    if upto >= 2:
-        shutil.copy2(os.path.join(LAB_DIR, "policies", "agent_policy_reference.json"),
-                     os.path.join(LAB_DIR, "policies", "agent_policy.json"))
+    for src, dst in labnet.solution_files(LAB_DIR, upto):
+        shutil.copy2(src, dst)
 
 
 def restore_backups():

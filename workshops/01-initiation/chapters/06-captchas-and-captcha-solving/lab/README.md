@@ -4,7 +4,13 @@
 
 You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (`TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
 
-> ⚠️ Run these scripts only against the local demo store, or other systems you own. Every attack script refuses non-`localhost` targets. Nothing in this lab contacts a real CAPTCHA provider or solving service.
+## Rules of engagement
+
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `PROVIDER_URL` or `REDIS_URL`. Do not remove that check.
+- The CAPTCHA provider is the local mock in `provider/mock_turnstile.py`. Nothing in this lab contacts a real CAPTCHA provider or solving service; the "farm" is simulated people.
+- Simulated client addresses are RFC 5737 documentation ranges sent in `X-Lab-Client-IP`, which the store trusts only from loopback.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
@@ -51,7 +57,7 @@ Then, in **three terminals** (each with the venv active):
 ```bash
 python provider/mock_turnstile.py            # terminal 1: mock CAPTCHA provider on :5001
 DEFENSE_LEVEL=0 python demo_site/app.py      # terminal 2: the store on :5000 (restart per round)
-python tools/checkpoint.py 0                 # terminal 3: attacks + measurements
+python tools/checkpoint.py --round 0                 # terminal 3: attacks + measurements
 ```
 
 Open http://localhost:5000 in a browser: the store, the newsletter form, `/register` and `/promo` all work by hand.
@@ -91,7 +97,7 @@ The store runs with Flask's reloader: **saving a file under `defenses/` restarts
 ## How to measure a round
 
 ```bash
-python tools/checkpoint.py 3
+python tools/checkpoint.py --round 3
 ```
 
 ```
@@ -123,7 +129,7 @@ It checks the store's `DEFENSE_LEVEL`, resets Redis and the provider, and then r
 
 A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't *register* fails the checkpoint.
 
-**Fell behind?** `python tools/checkpoint.py N --catch-up` installs the reference solutions for rounds 1..N into `defenses/`, waits for the store to reload, and then runs the checkpoint. Your own files are backed up to `defenses/_backup/<timestamp>/`.
+**Fell behind?** `python tools/checkpoint.py --round N --catch-up` installs the reference solutions for rounds 1..N from `solutions/` over your files and keeps each of yours once as `.bak`. Restart the store at `DEFENSE_LEVEL=N`, then run the checkpoint again. `python tools/checkpoint.py --restore` puts your own files back.
 
 ---
 
@@ -133,7 +139,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 |---|---|---|
 | 🗡️ Attack | `python attacks/round0_mass_register.py` | `20/20` accounts in well under a second |
 | 👥 Humans | `python tools/legit_traffic.py` | `completed 40/40 · challenged 0/40` |
-| ✅ Checkpoint | `python tools/checkpoint.py 0` | passes |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 0` | passes |
 
 **Write the scoreboard row:** bots 20/20, humans 40/40, challenged 0/40. Every later round is compared with it.
 
@@ -148,7 +154,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | 🗡️ Attack | `python attacks/round1_bypass.py` | `20/20` via `missing`, `newsletter`, `laundered`, `outage` |
 | 🛡️ Defend | Fix the five `TODO (Round 1)` in `defenses/siteverify.py`. Test with `python defenses/siteverify.py` | 1 accept, 3 rejects |
 | 🗡️ Re-run | `python attacks/round1_bypass.py` | `0/20`, with a distinct reason per technique |
-| ✅ Checkpoint | `python tools/checkpoint.py 1` | 0/20 · 40/40 shoppers · siteverify ~20 ms median |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | 0/20 · 40/40 shoppers · siteverify ~20 ms median |
 
 **Rules of engagement:**
 - A bot may mint tokens for non-interactive actions (`newsletter`), and for other hostnames (laundering through visitors to the attacker's page).
@@ -166,7 +172,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | 🗡️ Attack | `python attacks/round2_cookie_replay.py` | prints the cookie payload with the answer · `20/20` vouchers from one challenge |
 | 🛡️ Defend | Fix the `TODO (Round 2)` in `defenses/challenge_store.py`. Test with `python defenses/challenge_store.py` | correct / used / other session |
 | 🗡️ Re-run | `python attacks/round2_cookie_replay.py` | `0/20`: "no answer in any cookie" |
-| ✅ Checkpoint | `python tools/checkpoint.py 2` | 0/20 · **38/40** shoppers |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | 0/20 · **38/40** shoppers |
 
 **False-positive check:** the two screen-reader users (15 and 33) are lost the moment every redemption needs an image CAPTCHA. This lab has no audio or alternative path. Leave it for now; Round 4 comes back to it.
 
@@ -184,7 +190,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | 🔍 Read | `attacks/ocr_solver.py`: binarize → segment → classify | list the assumptions |
 | 🛡️ Defend | Restart with `DEFENSE_LEVEL=3`. Implement `generate_hardened()` and `text_length()`. Look at the samples: `python defenses/captcha_generator.py` | you can still read them |
 | 🗡️ Re-run | `python attacks/round3_ocr.py` | `1–3/20` (5–15%) |
-| ✅ Checkpoint | `python tools/checkpoint.py 3` | ≤25% · 38/40 shoppers, more CAPTCHAs shown |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | ≤25% · 38/40 shoppers, more CAPTCHAs shown |
 
 **Optional:** `pip install pytesseract`, install the `tesseract` binary, then `python attacks/round3_ocr.py --tesseract`. A generic engine with no knowledge of your generator is a weak baseline. Real attackers on a self-hosted CAPTCHA write a targeted solver.
 
@@ -201,7 +207,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | 📊 Look | `python tools/legit_traffic.py`, then `python tools/scoreboard.py` | humans 3–15 s, bot < 1 s, farm 10–40 s |
 | 🛡️ Defend | Restart with `DEFENSE_LEVEL=4`. Fix the `TODO (Round 4)` in `defenses/solver_signals.py` | — |
 | 🗡️ Re-run | both Round 4 attacks | `0/10` and `0/10` |
-| ✅ Checkpoint | `python tools/checkpoint.py 4` | **40/40 shoppers · 4/40 challenged** |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | **40/40 shoppers · 4/40 challenged** |
 
 **Residual:** `python attacks/round4_solver_farm.py --sticky-ip` gets `10/10` again for ~$0.01. With one proxy per voucher there is no IP mismatch, and the farm's 10–40 s band alone is too weak to block on (slow humans live there too). That is the end of what a CAPTCHA can do. It has priced a $10 voucher at a tenth of a cent plus half a minute. The fix is a business rule (one voucher per verified account) and identity signals (W2 Ch6), not a harder puzzle.
 
@@ -254,7 +260,7 @@ Measured on Python 3.10.12 (Linux, WSL2) with fakeredis 2.39 standing in for Red
 ### Instructor prep checklist
 
 - [ ] `pip install -r requirements.txt` on the lab image; `docker compose up -d --wait` (or `fake_redis.py`)
-- [ ] Run `tools/checkpoint.py 0..4 --catch-up` once end to end (about 2 minutes), then `git checkout defenses/` to restore the student files
+- [ ] Run `tools/checkpoint.py --round N --catch-up` for N = 0..4 once end to end (about 2 minutes), then `python tools/checkpoint.py --restore` to put the student files back
 - [ ] Shared scoreboard (whiteboard or doc) ready for the debrief
 - [ ] Optional: Tesseract installed on one machine for the generic-OCR comparison
 

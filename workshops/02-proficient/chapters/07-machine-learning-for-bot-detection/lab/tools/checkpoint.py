@@ -28,7 +28,7 @@ import subprocess
 import sys
 import urllib.request
 
-import labnet
+import labclient as labnet
 import scoreboard
 import shopper
 import simulate

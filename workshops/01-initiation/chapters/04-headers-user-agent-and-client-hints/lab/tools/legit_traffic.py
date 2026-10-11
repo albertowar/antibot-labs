@@ -24,9 +24,13 @@ import glob
 import http.client
 import json
 import os
+import sys
 from urllib.parse import urlparse
 
-_url = urlparse(os.environ.get("DEMO_URL", "http://localhost:5000"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target  # noqa: E402
+
+_url = urlparse(target("DEMO_URL", "http://localhost:5000"))
 HOST, PORT = _url.hostname, _url.port or 80
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "profiles")
 PATHS = ["/", "/api/products"]

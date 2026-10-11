@@ -22,28 +22,20 @@ import multiprocessing as mp
 import os
 import sys
 import time
-from urllib.parse import urlparse
 
 import httpx
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "defenses"))
 from pow_core import solve  # noqa: E402  (the puzzle is the same on both sides)
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 PAGES = 200
 BOT_IP = "203.0.113.66"
 # Rough on-demand price of one cloud vCPU-hour. Spot capacity and botnets are cheaper.
 USD_PER_VCPU_HOUR = 0.04
-
-
-def require_local(url: str) -> str:
-    """Rules of engagement: these scripts only ever talk to this machine."""
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        raise SystemExit(f"❌ Refusing to attack {url}: lab scripts only target localhost. "
-                         "Run them against your own demo site.")
-    return url
 
 
 require_local(BASE_URL)

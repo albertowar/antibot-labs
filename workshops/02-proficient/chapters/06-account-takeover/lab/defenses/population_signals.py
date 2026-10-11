@@ -7,7 +7,7 @@ unknown-account ratio over UNKNOWN_RATIO, gets latched into a challenge.
 ctx["user"] is None when the named account does not exist — that is your
 unknown-account signal. Counters live in Redis; use ``ratelimit.incr_window``.
 
-Reference solution: defenses/solutions/population_signals.py
+Reference solution: solutions/round2/defenses/population_signals.py
 """
 
 from __future__ import annotations

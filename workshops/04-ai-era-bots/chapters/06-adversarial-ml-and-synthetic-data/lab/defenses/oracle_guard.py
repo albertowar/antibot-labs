@@ -1,5 +1,5 @@
 """
-W4 Ch6 — Round 1 Defense: deny the extraction oracle (reference solution)
+W4 Ch6 — Round 1 Defense: deny the extraction oracle  [STUDENT FILE]
 
 A per-/24 query budget. A clone needs many labelled queries, and a cheap
 extractor sends them from a handful of datacenter /24s. Count scored
@@ -20,6 +20,9 @@ Cost, paid by real users and reported by the checkpoint: a CGNAT /24 with
 many real phones behind it can exceed the budget on a busy drop and get
 soft-denied. Tune BUDGET against your own mobile volume, and prefer
 challenging over blocking when you can.
+
+TODO (Round 1): decide() below. _recent_from_ip24() is given.
+Fell behind? python tools/checkpoint.py --round 1 --catch-up
 """
 
 import os
@@ -54,8 +57,11 @@ def _recent_from_ip24(conn, prefix24, since):
 
 
 def decide(conn, level, sid, ip, risk, order_id):
-    """Per-/24 query budget, then the truthful verdict."""
-    since = time.time() - WINDOW_S * LAB_TIME_SCALE
-    if _recent_from_ip24(conn, ip24(ip) if ip else "", since) > BUDGET:
-        return _block(order_id, reason="rate_limited")   # constant: zero leakage
+    """TODO (Round 1): per-/24 query budget, then the truthful verdict.
+
+    since = now - WINDOW_S * LAB_TIME_SCALE. If _recent_from_ip24(conn, ip24(ip), since)
+    is over BUDGET, return _block(order_id, reason="rate_limited") no matter what
+    risk says: a constant answer leaks nothing to the extractor. Otherwise answer
+    truthfully. Until then: the truthful oracle, which is what the extractor wants.
+    """
     return _block(order_id) if risk >= 1.0 else _allow(order_id)

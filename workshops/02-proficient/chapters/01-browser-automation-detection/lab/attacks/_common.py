@@ -11,20 +11,13 @@ import os
 import sys
 from urllib.parse import urlparse
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 # The paths every attack reports on (tools/checkpoint.py reads these)
 SCRAPE_PATH = "/api/products"
 CART_PATH = "/api/cart"
-
-
-def require_local(url=BASE_URL):
-    """Exit unless `url` points at this machine."""
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"Refusing to run against {url}: lab attacks only target localhost.")
-    return url
 
 
 def result(path, status, body=None):

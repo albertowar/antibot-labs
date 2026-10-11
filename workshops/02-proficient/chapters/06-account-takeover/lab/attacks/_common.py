@@ -9,30 +9,16 @@ every credential, IP and session here is synthetic.
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import os
-from urllib.parse import urlparse
+import sys
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+require_local_target = require_local
+
 DATA = os.path.join(os.path.dirname(__file__), "..", "data")
-
-
-def require_local_target(url: str) -> str:
-    """Refuse any target that is not loopback. This is a safety control, not a check
-    you should remove to 'test against something real' — don't."""
-    host = urlparse(url).hostname or ""
-    if host in {"localhost"}:
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(
-        f"Refusing to run against non-local target {host!r}. "
-        f"This lab only ever targets the local demo store (127.0.0.1)."
-    )
 
 
 def load_combos() -> list[tuple[str, str]]:

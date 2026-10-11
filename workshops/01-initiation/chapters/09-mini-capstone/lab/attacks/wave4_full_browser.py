@@ -39,7 +39,7 @@ from playwright.async_api import async_playwright
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 from browser_kit import new_page  # noqa: E402
-from labnet import BASE_URL, world_pool  # noqa: E402
+from labclient import BASE_URL, world_pool  # noqa: E402
 
 BROWSERS = 3         # sessions in flight at once
 MAX_SESSIONS = 30

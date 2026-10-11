@@ -12,7 +12,7 @@ and the two never contend for the same stock. It then prints:
 
 Fell behind, or want to see the finished defense?
     python tools/checkpoint.py --round 2 --catch-up   # install the reference solution
-    python tools/checkpoint.py --round 2              # restores your work, tests it
+    python tools/checkpoint.py --restore                # put your own files back (.bak)
 
 Run with the demo store already running (python demo_site/app.py).
 """
@@ -46,18 +46,19 @@ ROUNDS = {
 BOT_CEILING = {1: 0, 2: 4, 3: 30, 4: 0, 5: 0}
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def manage_solution(module, catch_up):
-    student = os.path.join(LAB_DIR, "defenses", f"{module}.py")
-    solution = os.path.join(LAB_DIR, "defenses", "_solutions", f"{module}.py")
-    bak = student + ".bak"
-    if catch_up:
-        if not os.path.exists(bak):
-            shutil.copy2(student, bak)
-        shutil.copy2(solution, student)
-        print(f"[catch-up] installed reference solution for {module} (your work saved to {module}.py.bak)")
-    elif os.path.exists(bak):
-        shutil.copy2(bak, student)
-        print(f"[restore] testing your {module}.py (reference backup kept at {module}.py.bak)")
+    """--catch-up installs the reference solutions for every round up to this module's round
+    (your files are kept as .bak). Without it the checkpoint tests whatever is in defenses/;
+    --restore puts your .bak files back."""
+    if not catch_up:
+        return
+    upto = next(r for r, spec in ROUNDS.items() if spec[0] == module)
+    for f in labnet.catch_up(LAB_DIR, upto):
+        print(f"[catch-up] installed solutions -> {f}   (your version kept as {f}.bak)")
 
 
 def reset(base):
@@ -116,9 +117,14 @@ def run(round_, catch_up=False, base=BASE_URL):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, choices=[1, 2, 3, 4, 5], required=True)
+    ap.add_argument("--round", type=int, choices=[1, 2, 3, 4, 5], required="--restore" not in sys.argv)
     ap.add_argument("--catch-up", action="store_true")
+    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     ap.add_argument("--url", default=BASE_URL)
     a = ap.parse_args()
+    if a.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        sys.exit(0)
     ok = run(a.round, catch_up=a.catch_up, base=a.url)
     sys.exit(0 if ok else 1)

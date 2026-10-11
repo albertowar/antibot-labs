@@ -37,7 +37,7 @@ import sys
 import urllib.request
 from collections import defaultdict
 
-import labnet
+import labclient  # noqa: E402,F401  (puts defenses/ on sys.path)
 import scoreboard
 import shopper
 import simulate
@@ -61,6 +61,10 @@ EXPECT = {
 HUMAN_BUDGET = {0: 1.0, 1: 0.05, 2: 0.05, 3: 0.08, 4: 0.08}
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def status():
     with urllib.request.urlopen(f"{labnet.target()}/lab/status", timeout=5) as r:
         return json.loads(r.read())
@@ -76,10 +80,8 @@ def load(name):
 
 
 def copy_solutions(rnd):
-    for r in range(1, rnd + 1):
-        for src in glob.glob(os.path.join(SOLUTIONS, f"round{r}", "*.py")):
-            shutil.copy(src, os.path.join(DEFENSES, os.path.basename(src)))
-    print(f"  copied solutions/round1..{rnd}/*.py into defenses/")
+    installed = labnet.catch_up(LAB, rnd)
+    print(f"  installed solutions/round1..{rnd} -> " + ", ".join(installed) + "   (your versions kept as .bak; --restore puts them back)")
 
 
 def n_orders():
@@ -213,9 +215,14 @@ def main():
     parser.add_argument("--round", type=int, choices=range(0, 5))
     parser.add_argument("--catch-up", action="store_true",
                         help="rebuild this round's state with the solution code, then stop")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     parser.add_argument("--reset", action="store_true", help="wipe all lab state and exit")
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
 
     if args.reset:
         reset()

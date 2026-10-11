@@ -27,8 +27,11 @@ LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "attacks"))
 sys.path.insert(0, HERE)
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
-MOCK_URL = os.environ.get("MOCK_URL", "http://127.0.0.1:5001")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+import labnet  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+MOCK_URL = target("MOCK_URL", "http://127.0.0.1:5001")
 
 ROUNDS = {
     1: {"attack": "round1_ua_spoof", "level": 1, "solution": ["rdns.py"]},
@@ -47,14 +50,13 @@ EXPECTED_REJECTED = {
 }
 
 
-def catch_up(rnd: int):
-    for name in ROUNDS[rnd]["solution"]:
-        src = os.path.join(LAB_DIR, "solutions", f"round{rnd}", name)
-        dst = os.path.join(LAB_DIR, "defenses", name)
-        if os.path.exists(dst):
-            shutil.copy(dst, dst + ".bak")
-        shutil.copy(src, dst)
-        print(f"  applied solutions/round{rnd}/{name} -> defenses/{name} (saved {name}.bak)")
+def catch_up(rnd):
+    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(LAB_DIR, rnd)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     print("Restart the demo store so it reloads the defenses.")
 
 
@@ -76,11 +78,16 @@ def attack_verdict(rnd: int, atk: dict) -> tuple[bool, str]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, required=True, choices=sorted(ROUNDS))
+    ap.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(ROUNDS))
     ap.add_argument("--base", default=BASE_URL)
     ap.add_argument("--mock", default=MOCK_URL)
     ap.add_argument("--catch-up", action="store_true")
+    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     args = ap.parse_args()
+    if args.restore:
+        restored = labnet.restore(LAB_DIR)
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
     rnd = args.round
     if args.catch_up:
         catch_up(rnd)

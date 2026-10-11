@@ -34,7 +34,6 @@ RNG = random.Random(20260310)
 
 # Start from a clean store/level so seed-time logins succeed and cookies are valid.
 os.environ["DEFENSE_LEVEL"] = "0"
-os.environ.pop("USE_SOLUTIONS", None)
 
 # A small pool of weak/breached passwords the stuffable accounts reuse.
 BREACHED_POOL = [

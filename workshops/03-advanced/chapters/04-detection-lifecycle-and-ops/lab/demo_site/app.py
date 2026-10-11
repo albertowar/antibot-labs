@@ -320,4 +320,4 @@ form.addEventListener("submit", async e => {
 if __name__ == "__main__":
     print(f" * W3 Ch4 store · store {STORE_URL} · log {LOG_PATH} · prod model {registry.load()['roles'].get('prod') or 'none'}")
     # PORT: macOS AirPlay Receiver squats on 5000; use e.g. PORT=5050
-    app.run(debug=False, port=int(os.environ.get("PORT", "5000")), threaded=True)
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")), threaded=True)

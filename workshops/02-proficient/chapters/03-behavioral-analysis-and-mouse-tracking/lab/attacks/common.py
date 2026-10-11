@@ -7,22 +7,16 @@ script supports proxies.
 """
 
 import os
+import sys
 import random
 import time
-from urllib.parse import urlparse
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 # Synthetic identities only.
 NAMES = ["Ada Quill", "Bo Reyes", "Cy Novak", "Dee Okafor", "Eli Marsh", "Fay Lindqvist"]
-
-
-def require_local(url=BASE_URL):
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        raise SystemExit(f"Refusing to attack {host!r}: lab scripts only target localhost.")
-    return url
 
 
 def identity(rng=random):

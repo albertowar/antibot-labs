@@ -27,7 +27,10 @@ import urllib.request
 
 import legit_traffic
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
+
 ATTACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "attacks")
 
 # attack script -> first DEFENSE_LEVEL that blocks it

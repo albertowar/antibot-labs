@@ -27,7 +27,10 @@ proxy — that is the whole point of Round 1's defense.
 
 import json
 import os
-from urllib.parse import urlparse
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import is_local  # noqa: E402
 
 try:
     from mitmproxy import http
@@ -35,12 +38,10 @@ except ImportError:  # importable without mitmproxy for py_compile / docs
     http = None
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "captured_calls.jsonl")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def response(flow):
-    host = urlparse(flow.request.pretty_url).hostname
-    if host not in LOCAL_HOSTS:
+    if not is_local(flow.request.pretty_url):
         return  # rules of engagement: never record third-party traffic
     if "/api/mobile/" not in flow.request.path:
         return

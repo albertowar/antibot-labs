@@ -29,7 +29,7 @@ import os
 import random
 from collections import Counter
 
-import labnet
+import labclient as labnet
 import shopper
 from shopper import (UA, Persona, browser_headers, desktop_behavior, fingerprint,
                      human_think, keyboard_behavior, mobile_behavior, pick_device,

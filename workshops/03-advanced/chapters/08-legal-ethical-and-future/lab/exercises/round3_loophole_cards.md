@@ -28,4 +28,4 @@ Keep the answers honest. The aim is a document that survives this afternoon, not
 | Card the document does not address | +2 red |
 | Blue patches a hole within the two minutes with a concrete rule | +1 blue |
 
-Target for a team's document: 10 of the 12 checklist items covered (`python tools/checkpoint.py 3 --roe`), and no card left in the "doesn't say" column.
+Target for a team's document: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --roe`), and no card left in the "doesn't say" column.

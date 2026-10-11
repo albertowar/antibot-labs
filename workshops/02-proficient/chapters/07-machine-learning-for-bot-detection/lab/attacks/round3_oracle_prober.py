@@ -44,7 +44,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling attacks, also when imported by checkpoint.py
 
-import labnet  # noqa: E402
+import labclient as labnet  # noqa: E402
 import round0_baseline  # noqa: E402
 import round2_farm  # noqa: E402
 import shopper  # noqa: E402

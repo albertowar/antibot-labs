@@ -38,11 +38,16 @@ import os
 import random
 import re
 import struct
+import sys
 import time
 import unicodedata
 import zlib
 from collections import namedtuple
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import require_local_env  # noqa: E402
+
+require_local_env("LLM_URL")                              # a model server on this machine only
 LLM_URL = os.environ.get("LLM_URL")                       # e.g. http://127.0.0.1:11434/v1
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:4b")
 LLM_VISION_MODEL = os.environ.get("LLM_VISION_MODEL", "qwen2.5vl:3b")

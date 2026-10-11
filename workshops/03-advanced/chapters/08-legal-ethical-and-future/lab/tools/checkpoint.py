@@ -1,10 +1,10 @@
 """
 Chapter 8: catch-up checkpoints for the three rounds.
 
-    python tools/checkpoint.py 1                 Round 1 answer key (the verdict table)
-    python tools/checkpoint.py 2                 Round 2 reference scoreboard, and how to adopt the reference policy
-    python tools/checkpoint.py 3                 Round 3 rules-of-engagement checklist (the 12 items)
-    python tools/checkpoint.py 3 --roe my_roe.md score a drafted RoE against the checklist
+    python tools/checkpoint.py --round 1                 Round 1 answer key (the verdict table)
+    python tools/checkpoint.py --round 2                 Round 2 reference scoreboard, and how to adopt the reference policy
+    python tools/checkpoint.py --round 3                 Round 3 rules-of-engagement checklist (the 12 items)
+    python tools/checkpoint.py --round 3 --roe my_roe.md score a drafted RoE against the checklist
 
 Round 3 scoring is keyword matching, on purpose. It checks that a topic is
 addressed, not that it is addressed well; the loophole hunt in the other
@@ -71,7 +71,7 @@ def round3(roe_path=None):
         print("Round 3: a rules-of-engagement document for the Capstone must cover these 12 items.\n")
         for i, (name, what, _) in enumerate(ROE_CHECKLIST, 1):
             print(f"  {i:>2}. {name:<28} {what}")
-        print("\nTemplate: exercises/round3_roe_template.md    Score a draft: checkpoint.py 3 --roe <file>")
+        print("\nTemplate: exercises/round3_roe_template.md    Score a draft: checkpoint.py --round 3 --roe <file>")
         return
     with open(roe_path) as f:
         text = f.read().lower()
@@ -88,7 +88,7 @@ def round3(roe_path=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("round", type=int, choices=[1, 2, 3])
+    ap.add_argument("--round", type=int, required=True, choices=[1, 2, 3])
     ap.add_argument("--roe", help="Round 3: path to a drafted rules-of-engagement markdown file")
     args = ap.parse_args()
     {1: round1, 2: round2, 3: lambda: round3(args.roe)}[args.round]()

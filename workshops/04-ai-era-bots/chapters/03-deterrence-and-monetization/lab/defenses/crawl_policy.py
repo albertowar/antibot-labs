@@ -1,4 +1,4 @@
-"""Round 1 defense (REFERENCE SOLUTION) — publish the crawl policy in machine-readable form.
+"""Round 1 defense [STUDENT FILE] — publish the crawl policy in machine-readable form.
 
 One policy, three dialects, because no single one is honoured by every crawler:
 
@@ -15,6 +15,9 @@ One policy, three dialects, because no single one is honoured by every crawler:
 
 None of these is enforcement. They are the contract that lets the *next* rounds
 tell a crawler that ignored the rules from one that never saw them.
+
+TODO (Round 1): robots_txt() and response_headers() below. signals(), rsl_xml()
+and is_disallowed() are given. Fell behind? python tools/checkpoint.py --round 1 --catch-up
 """
 
 from __future__ import annotations
@@ -42,28 +45,18 @@ def signals(rules: dict):
 
 
 def robots_txt(base_url: str, rules: dict) -> str:
-    traps = POLICY["traps"]
-    lines = []
-    for name, op in registry.OPERATORS.items():
-        rule = rules.get(op["purpose"], "deny")
-        lines.append(f"# {name}: purpose {op['purpose']} -> {rule}")
-        lines.append(f"User-agent: {op['ua_token']}")
-        if rule == "deny":
-            lines.append("Disallow: /")
-        else:
-            lines.extend(f"Disallow: {p}" for p in traps)
-            lines.append("Allow: /")
-        lines.append("")
-    lines.append("User-agent: *")
-    lines.extend(f"Disallow: {p}" for p in traps)
-    lines.append("Allow: /")
-    lines.append("")
-    cs, cu = signals(rules)
-    lines.append(f"Content-Signal: {cs}")
-    lines.append(f"Content-Usage: {cu}")
-    lines.append(f"License: {base_url}{POLICY['license_path']}")
-    lines.append(f"Sitemap: {base_url}/sitemap.xml")
-    return "\n".join(lines) + "\n"
+    """TODO (Round 1): one robots.txt group per declared crawler in registry.OPERATORS.
+
+    For each operator look up rules[op["purpose"]] ("allow" | "deny" | "licensed"):
+    a "deny" purpose gets `Disallow: /`; anything else gets `Disallow:` for every
+    path in POLICY["traps"] and then `Allow: /`. Finish with a `User-agent: *`
+    group that disallows the traps, then the Content-Signal, Content-Usage,
+    License (POLICY["license_path"]) and Sitemap lines (see signals()).
+
+    Until then: a robots.txt that lets everyone crawl everything, which is what
+    most stores ship. Round 1's checkpoint shows what that costs.
+    """
+    return "User-agent: *\nAllow: /\n"
 
 
 def rsl_xml(base_url: str, rules: dict, price_usd: float = 0.0) -> str:
@@ -98,12 +91,10 @@ def rsl_xml(base_url: str, rules: dict, price_usd: float = 0.0) -> str:
 
 
 def response_headers(base_url: str, path: str, rules: dict) -> dict:
-    """Per-response preference signals, for clients that never read robots.txt."""
-    _cs, cu = signals(rules)
-    return {
-        "Content-Usage": cu,
-        "Link": f'<{base_url}{POLICY["license_path"]}>; rel="license"; type="application/rsl+xml"',
-    }
+    """TODO (Round 1): per-response preference signals, for clients that never read
+    robots.txt: a `Content-Usage` header (signals()[1]) and a `Link` header to the
+    RSL document, rel="license", type="application/rsl+xml". Until then: nothing."""
+    return {}
 
 
 def is_disallowed(rule, path: str) -> bool:

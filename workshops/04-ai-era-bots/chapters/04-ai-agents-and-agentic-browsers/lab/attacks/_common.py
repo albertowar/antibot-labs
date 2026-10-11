@@ -35,7 +35,16 @@ sys.path.insert(0, os.path.join(LAB_DIR, "tools"))
 sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
 import personas  # noqa: E402
 
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target as _target, require_local, require_local_env  # noqa: E402
+BASE_URL = _target("DEMO_URL", "http://127.0.0.1:8404")
+
+
+def target():
+    """The guarded demo-store URL (see labnet.py)."""
+    return BASE_URL
+
+
 DROP_SKU = "lab-runner-9"
 DROP_NAME = "Lab Runner 9 (limited drop)"
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -43,14 +52,6 @@ CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 LAB_AGENT_UA = CHROME_UA + " LabAgent/1.0 (+https://agents.lab-provider.test)"
 FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn", "avery", "rowan"]
 LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright", "scott", "green"]
-
-
-def target():
-    url = os.environ.get("DEMO_URL", "http://127.0.0.1:8404").rstrip("/")
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"🛑 Refusing to run against {host!r}. Lab attacks only run against your own local demo store.")
-    return url
 
 
 def authority(base):

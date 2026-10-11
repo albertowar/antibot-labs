@@ -40,21 +40,22 @@ from crawl import (BASE_URL, BROWSER_HEADERS, CHROME_UA, DATACENTER, RESIDENTIAL
                    SEARCHBOT_UA, TRAINBOT_RANGE, TRAINBOT_UA, Crawler, extract_links, print_report,
                    require_local, searchbot_signer, trainbot_signer)
 
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target as _target, require_local, require_local_env  # noqa: E402
+BASE_URL = _target("DEMO_URL", BASE_URL)
+
+
+def target():
+    """The guarded demo-store URL (see labnet.py)."""
+    return BASE_URL
+
+
 DROP_SKU = "lab-runner-9"
 LAB_AGENT_UA = CHROME_UA + " LabAgent/1.0 (+https://agents.lab-provider.test)"
 FARM_RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 120)]
 CLOUD = [f"192.0.2.{i}" for i in range(100, 199)]
 FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn", "avery", "rowan"]
 LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright", "scott", "green"]
-
-
-def target():
-    url = os.environ.get("DEMO_URL", BASE_URL).rstrip("/")
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"🛑 Refusing to run against {host!r}. Lab attacks only run against your own local demo store.")
-    return url
 
 
 def authority(base):

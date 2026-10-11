@@ -13,17 +13,19 @@ app, not to build a scraper.
 
 from __future__ import annotations
 
-import ipaddress
 import json
 import os
+import sys
 import re
 import time
 from urllib import robotparser
-from urllib.parse import urlparse
 
 import requests
 
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+
 LAB_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(LAB_DIR, "data")
 
@@ -58,20 +60,6 @@ UA = {
 _LINK = re.compile(r'href="(/products/p\d{3})"')
 _ASSET = re.compile(r'(?:href|src)="(/static/[^"]+)"')
 _LOC = re.compile(r"<loc>[^<]*(/products/p\d{3})</loc>")
-
-
-def require_local(url: str) -> str:
-    host = urlparse(url).hostname or ""
-    if host == "localhost":
-        return url
-    try:
-        if ipaddress.ip_address(host).is_loopback:
-            return url
-    except ValueError:
-        pass
-    raise SystemExit(
-        f"Refusing to run against non-local target {host!r}. This lab only ever targets the "
-        f"local demo store (127.0.0.1). Do not remove this check to 'try it on something real'.")
 
 
 def headers(actor: str, ip: str, ua: str, extra: dict | None = None) -> dict:

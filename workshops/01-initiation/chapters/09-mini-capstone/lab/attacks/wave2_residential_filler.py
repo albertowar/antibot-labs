@@ -28,7 +28,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 from browsers import chrome  # noqa: E402
-from labnet import BASE_URL, LabClient, form_fields, world_pool  # noqa: E402
+from labclient import BASE_URL, LabClient, form_fields, world_pool  # noqa: E402
 
 ATTEMPTS = 60
 THREADS = 10

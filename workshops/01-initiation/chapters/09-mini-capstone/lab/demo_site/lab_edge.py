@@ -3,7 +3,7 @@ W1 Ch9 — The lab edge: a pretend CDN in front of the store (W1 Ch3).
 
 On a laptop every request comes from 127.0.0.1, which makes IP reputation,
 rate limiting and shared IPs impossible to practise. Every lab actor
-(tools/labnet.py) therefore says which source IP it "rents" from a pool in
+(tools/labclient.py) therefore says which source IP it "rents" from a pool in
 data/world.json, and this middleware treats that address as the TCP peer.
 
 Rules of the game, enforced here:

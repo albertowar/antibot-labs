@@ -43,6 +43,10 @@ MOBILE_UA = ("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36")
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+import labnet  # noqa: E402
+
+
 def geometry(outer_w, outer_h, inner_w, inner_h):
     return {"outer_w": outer_w, "outer_h": outer_h, "inner_w": inner_w, "inner_h": inner_h}
 
@@ -84,18 +88,12 @@ UNIT_CHECKS = {
 
 
 def catch_up(round_number):
-    """Install reference solutions for every round up to round_number."""
-    for rnd, module in ROUND_MODULES.items():
-        if rnd > round_number:
-            continue
-        mine = os.path.join(DEFENSES, f"{module}.py")
-        ref = os.path.join(DEFENSES, "solutions", f"{module}.py")
-        if filecmp.cmp(mine, ref, shallow=False):
-            print(f"  = {module}.py already matches the reference")
-            continue
-        shutil.copy(mine, mine + ".bak")
-        shutil.copy(ref, mine)
-        print(f"  ✔ {module}.py ← solutions/{module}.py (yours saved as {module}.py.bak)")
+    """Install the reference solutions for rounds 1..round_number (each of your files is kept once as .bak)."""
+    installed = labnet.catch_up(os.path.join(HERE, '..'), round_number)
+    for f in installed:
+        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
+    if not installed:
+        print("  nothing to install up to this round")
     level = min(round_number, 4)
     print(f"\nRestart the demo site:  cd demo_site && DEFENSE_LEVEL={level} python app.py")
 
@@ -124,10 +122,15 @@ def check_student_code(round_number):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 6))
+    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 6))
     parser.add_argument("--skip-browser", action="store_true", help="skip browser-based attacks")
     parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
+    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
     args = parser.parse_args()
+    if args.restore:
+        restored = labnet.restore(os.path.join(HERE, '..'))
+        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
+        return 0
 
     if args.catch_up:
         catch_up(args.round)

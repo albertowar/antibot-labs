@@ -16,15 +16,10 @@ import requests
 
 LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 INSTANCE = os.path.join(LAB_DIR, "instance")
-BASE_URL = os.environ.get("DEMO_URL", "http://127.0.0.1:8404").rstrip("/")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-
-
-def ensure_local(url=BASE_URL):
-    host = urlparse(url).hostname
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"Refusing to run against {host!r}: lab tools only target this machine.")
-    return url
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:8404")
+ensure_local = require_local
 
 
 def authority(url=BASE_URL):

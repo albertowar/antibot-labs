@@ -23,8 +23,12 @@ hands and the headers, not the planner.
 
 import json
 import os
+import sys
 
 import requests
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))  # lab root: labnet.py
+from labnet import require_local  # noqa: E402
 
 from . import observe
 
@@ -80,7 +84,8 @@ class OllamaPolicy:
 
     def __init__(self, sku, url=None, model=None):
         self.sku = sku
-        self.url = (url or os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
+        # The model server must be on this machine too: no prompts leave the laptop.
+        self.url = require_local((url or os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/"), what="OLLAMA_URL")
         self.model = model or os.environ.get("OLLAMA_MODEL", "llama3")
 
     def decide(self, goal, snap, memory):

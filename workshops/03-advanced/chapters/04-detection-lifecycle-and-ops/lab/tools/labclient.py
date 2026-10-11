@@ -26,7 +26,6 @@ import random
 import string
 import sys
 import time
-from urllib.parse import urlparse
 
 import requests
 
@@ -38,9 +37,9 @@ sys.path.insert(0, os.path.join(LAB, "defenses"))
 import users  # noqa: E402  (the store's seed, so simulated humans know their passwords)
 from ladder import leading_zero_bits  # noqa: E402
 
-BASE_URL = os.environ.get("DEMO_URL", "http://localhost:5000")
-if urlparse(BASE_URL).hostname not in ("localhost", "127.0.0.1", "::1"):
-    raise SystemExit(f"Refusing to run against {BASE_URL}: this lab only targets localhost.")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
+from labnet import target, require_local, require_local_env  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 with open(os.path.join(LAB, "world.json")) as f:
     WORLD = json.load(f)
@@ -156,7 +155,6 @@ def browser_headers(name, accept_language="en-US,en;q=0.9", week=1):
             ("User-Agent", b["ua"]), ("Referer", referer), ("Sec-Fetch-Dest", "empty")]
 
 
-
 # --------------------------------------------------------------------------
 # Telemetry: fingerprints and behaviour traces
 # --------------------------------------------------------------------------
@@ -194,7 +192,6 @@ def human_path(rng):
         t += max(4, rng.gauss(16, 6))
         points.append([round(t), round(x + rng.gauss(0, 1.5)), round(y + rng.gauss(0, 1.5))])
     return points
-
 
 
 def taps(rng):
