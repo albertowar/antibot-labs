@@ -1,5 +1,5 @@
 """
-W3 Ch1 — Mobile attestation & signing core (infrastructure, not a student TODO)
+W3 Ch1 — Mobile attestation & signing core (infrastructure, not a TODO for you)
 
 This module is the shared machinery the genuine app AND the attacker's
 reverse-engineered SDK both use. In real life:

@@ -1,6 +1,6 @@
 # Chapter 8 Lab: Reservation, Agent Policy, Governance Record
 
-**Format:** 3 rounds, 45 min, plus a 10 min debrief. See `../chapter_08_content.md`, §8.4.
+**Format:** 3 rounds, plus a debrief. See `../chapter_08_content.md`, §8.4.
 
 This chapter's attacker is three different things. In Round 1 it is a fleet of AI crawlers, honest and otherwise, reading the signals you publish. In Round 2 it is a scalping farm that has learned that, since *Amazon v. Perplexity* (9th Cir., August 2026), a shopper's own agent is legally the shopper, and hides behind that. In Round 3 it is the other team, reading your AI governance record the way an auditor would. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 
@@ -14,18 +14,18 @@ lab/
   data/world.json             the simulated internet from W2 Ch8 (documentation ranges, ASNs)
   data/agent_sessions.jsonl   3,000 sessions: 2,000 real people in six cohorts, 4 bot campaigns of 250
   defenses/reservation/       your Round 1 stack: robots.txt · headers.json · terms.json · logging.json
-  defenses/reservation_naive/ the day-one stack · reservation_reference/ the instructor's
+  defenses/reservation_naive/ the day-one stack · reservation_reference/ the reference
   policies/                   agent_policy_blunt (day one) · agent_policy_naive (the first fix) · agent_policy (yours) · agent_policy_reference
   attacks/                    round1_crawler_fleet · round2_agent_farm
   exercises/                  round1 fleet key · round3 governance record template + audit cards · AI ethics checklist
   tools/                      make_log · reservation_audit · agent_audit · checkpoint
 ```
 
-**Why Python and no server:** the chapter is about the policy and the paperwork *over* the stack you built in W4 Ch1–7, not the stack. Shipped, deterministic inputs let everyone audit the same six crawlers and 3,000 sessions in seconds, and make the numbers below reproducible. `tools/make_log.py` regenerates the session log byte-for-byte from seed 2026.
+**Why Python and no server:** the chapter is about the policy and the paperwork *over* the stack you built in W4 Ch1–7, not the stack. Shipped, deterministic inputs let you audit the same six crawlers and 3,000 sessions in seconds, and make the numbers below reproducible. `tools/make_log.py` regenerates the session log byte-for-byte from seed 2026.
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd workshops/04-ai-era-bots/chapters/08-ai-policy-law-and-ethics/lab
@@ -47,7 +47,7 @@ If both commands print a scoreboard, you are ready. Print or open `exercises/rou
 
 ## How to measure a round
 
-Every round reports three things, and the instructor table at the bottom is in the same shape.
+Every round reports three things, and the expected-results table at the bottom is in the same shape.
 
 - **Attacker success.** Round 1: crawlers that *ingested* your catalogue. Round 2: farm sessions that reached the shop. Round 3: audit cards the record does not answer.
 - **Real users hurt.** Round 1: search visibility lost, and the lawful research crawler you turned away. Round 2: blocked and challenged rate **per cohort** against a 2 % blocked budget, with agent shoppers and assistive agents as separate rows. Round 3: the cohort the record forgets to measure.
@@ -57,7 +57,7 @@ Every round reports three things, and the instructor table at the bottom is in t
 
 ---
 
-## Round 1: A reservation that holds ⚔️ the crawler fleet (15 min)
+## Round 1: A reservation that holds ⚔️ the crawler fleet
 
 You inherit `defenses/reservation_naive/`, already copied into `defenses/reservation/`: a `robots.txt` that disallows one vendor's token, no usage signals, a browsewrap clause saying "no bots", and 7 days of user-agent logs. Three declared crawlers visit by default; the full fleet adds the ones that do not announce themselves.
 
@@ -93,11 +93,11 @@ Exposure notes: none.
 
 **The lesson in the numbers:** signals stop the honest, logs convict the rest, and nothing you emit reaches the mirror. Five of six still ingest under the reference stack: the search crawler for answers under a signal it does not act on, the research crawler lawfully, two with your evidence against them, one out of reach.
 
-**Exercise (if time):** delete the `ScrapeFeed-Bot` group from the reference `robots.txt` and re-run with `--fleet all`. The intermediary's row changes from "saw reservation: yes, honoured: NO" to "no". Which version is the better evidence?
+**Optional exercise:** delete the `ScrapeFeed-Bot` group from the reference `robots.txt` and re-run with `--fleet all`. The intermediary's row changes from "saw reservation: yes, honoured: NO" to "no". Which version is the better evidence?
 
 ---
 
-## Round 2: An agent policy ⚔️ the shopper's own agent (17 min)
+## Round 2: An agent policy ⚔️ the shopper's own agent
 
 You inherit `policies/agent_policy_blunt.json`, copied into `agent_policy.json`: hard blocks on every agent signal, "no bots" in browsewrap terms, an image CAPTCHA, no appeal path, a year of logs. It stopped last month's scalping wave. Run it and read who else it stopped.
 
@@ -137,26 +137,26 @@ Exposure notes: none.
 
 **False-positive check:** the reference policy blocks nobody, but it challenges 71 % of undeclared cloud agents and 53 % of assistive agents, and hands a confirmation back to a quarter of all shoppers at checkout. That is where the cost went. The challenge is a proof of work (non-visual); the confirmation is the thing a shopper's agent exists to hand back. Is it acceptable? Write down, for Round 3, who gets to decide that and which number they watch.
 
-**Exercise (if time):** set `checkout_step_up` back to `none` and run `--campaigns all`. Everything is still "caught", but the a11y mimic is now 250 proof-of-work challenges and no blocks: the screen-reader exemption caps velocity at a challenge, and a proof of work is a cost a farm can pay. Which number would you report to the board? Then set `undeclared_agent_action` to `block` and read the `agent_shopper` and `cloud_undeclared` rows.
+**Optional exercise:** set `checkout_step_up` back to `none` and run `--campaigns all`. Everything is still "caught", but the a11y mimic is now 250 proof-of-work challenges and no blocks: the screen-reader exemption caps velocity at a challenge, and a proof of work is a cost a farm can pay. Which number would you report to the board? Then set `undeclared_agent_action` to `block` and read the `agent_shopper` and `cloud_undeclared` rows.
 
 ---
 
-## Round 3: The AI governance record ⚔️ the auditor's cards (13 min)
+## Round 3: The AI governance record ⚔️ the auditor's cards
 
 The detection stack now contains an adversarially trained classifier (W4 Ch6) and an LLM in the triage and appeal path (W4 Ch7). Nothing yet says who is its provider, what it was trained on, whether the appeal assistant admits it is a machine, or who switches it off. You write that now. It is also the charter the Capstone runs under.
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔵 Defend | 5 min: fill `exercises/round3_governance_record_template.md` for your team, with names and numbers in the blanks | `python3 tools/checkpoint.py --round 3 --record <file>` ≥ 10/12 (the blank template scores 11: retention needs a number) |
-| 🔴 Attack | 5 min: swap records; the other team answers `exercises/round3_audit_cards.md` against yours: answered / vague / **doesn't say** | Typical first drafts have no lawful basis for *training* on session logs, no Art 50 wording for the appeal assistant, and nothing about who the labyrinth may be served to |
-| 🔵 Re-run | 3 min: patch every "doesn't say" with a concrete rule | 0 unanswered cards |
+| 🔵 Defend | Fill `exercises/round3_governance_record_template.md` for the store, with names and numbers in the blanks | `python3 tools/checkpoint.py --round 3 --record <file>` ≥ 10/12 (the blank template scores 11: retention needs a number) |
+| 🔴 Attack | Switch sides and audit your own record cold: answer `exercises/round3_audit_cards.md` against it: answered / vague / **doesn't say** | Typical first drafts have no lawful basis for *training* on session logs, no Art 50 wording for the appeal assistant, and nothing about who the labyrinth may be served to |
+| 🔵 Re-run | Patch every "doesn't say" with a concrete rule | 0 unanswered cards |
 | ✅ Checkpoint | `python3 tools/checkpoint.py --round 3` | the 12-item checklist |
 
-**Discuss:** which of the twelve items would you have skipped if the other team had not been reading? That one is the paragraph that gets written after the regulator's letter.
+**Discuss:** which of the twelve items would you have skipped if no auditor were going to read the record? That one is the paragraph that gets written after the regulator's letter.
 
 ---
 
-## Debrief (10 min)
+## Debrief
 
 Fill in the scoreboard on the slide: Round 1 honoured / ingested / evidence on your final stack, Round 2 bots caught and cohorts over budget on your final policy, Round 3 cards unanswered. Then the two questions that carry into the Capstone:
 
@@ -165,7 +165,7 @@ Fill in the scoreboard on the slide: Round 1 honoured / ingested / evidence on y
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15 on Linux (standard library only; all three checkpoints run clean); the fleet is deterministic and the session log is seeded (2026), so these numbers do not drift.
 
@@ -194,11 +194,11 @@ Verified on 2026-10-11 with Python 3.12.15 on Linux (standard library only; all 
 
 Things to watch for:
 
-- Round 1 teams that "fix" the stack by adding more vendor tokens to `robots.txt`: the signatory in the fleet uses a token they have not listed, and the `robots.txt names ...` note stays. Reserve by usage.
-- Round 1 teams that set `retention_days` to 365 to be safe: the retention note flips from "too short" to "write down why". Both are findings.
-- Round 2 teams that set `undeclared_agent_action` to `block`: 52 % of agent shoppers and 100 % of undeclared cloud agents are blocked, two cohorts over budget. Assistive agents survive only because the `screen_reader_api` exemption caps the action at a challenge.
-- Round 2 teams that rely on the step-up alone (naive weights plus `human_confirm`): about 89 % caught, because 10–25 % of farm sessions are routed to a human operator who answers the confirmation. Velocity per account is what blocks the farm.
-- Round 3 records that say "we comply with the AI Act" under every heading score well with the grep and lose every card. Say so out loud before the swap.
+- Round 1: if you "fix" the stack by adding more vendor tokens to `robots.txt`: the signatory in the fleet uses a token they have not listed, and the `robots.txt names ...` note stays. Reserve by usage.
+- Round 1: if you set `retention_days` to 365 to be safe: the retention note flips from "too short" to "write down why". Both are findings.
+- Round 2: if you set `undeclared_agent_action` to `block`: 52 % of agent shoppers and 100 % of undeclared cloud agents are blocked, two cohorts over budget. Assistive agents survive only because the `screen_reader_api` exemption caps the action at a challenge.
+- Round 2: if you rely on the step-up alone (naive weights plus `human_confirm`): about 89 % caught, because 10–25 % of farm sessions are routed to a human operator who answers the confirmation. Velocity per account is what blocks the farm.
+- Round 3: a record that says "we comply with the AI Act" under every heading scores well with the grep and loses every card. Watch for it in your own draft before you audit it.
 - Case law is current to October 2026. *Amazon v. Perplexity* was a Ninth Circuit panel opinion (rehearing denied September 2026) with the CFAA claims back in the district court; *NYT v. OpenAI* was at summary judgment; the Third Circuit's *Thomson Reuters v. Ross* outcome and the Official Journal publication of the Digital Omnibus were unconfirmed at build time. Check all four before teaching and say which way they went.
 
 ---

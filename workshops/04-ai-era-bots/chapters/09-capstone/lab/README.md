@@ -2,7 +2,7 @@
 
 The last lab of the series. One store, the whole Workshop 4 stack, five rounds
 of 🔴 attack ⚔️ 🔵 defend, run under the AI governance record you wrote in
-Chapter 8. ~125 minutes.
+W4 Ch8.
 
 You do not build the store; it is here at its end-of-Workshop-4 shape. Each round
 you switch on one more layer (`DEFENSE_LEVEL`) and complete the one module that
@@ -59,7 +59,7 @@ python tools/checkpoint.py --round N --catch-up   # fell behind? drop in the ref
 A round passes when its attack targets are met **and** no legitimate user is
 **blocked or mazed**. A challenge is friction, counted and weighted, not a failure.
 
-## Round 0 — baseline · 🔵 15 min
+## Round 0 — baseline · 🔵
 
 ```bash
 DEFENSE_LEVEL=0 PORT=8409 python demo_site/app.py
@@ -74,7 +74,7 @@ python tools/checkpoint.py --round 0
 
 **Discuss:** the whole W4 stack is running in shadow right now. What does it *say* about the agent that just bought, and why is none of it blocking yet?
 
-## Round 1 — 🔴 the crawler fleet / 🔵 crawl governance · 25 min
+## Round 1 — 🔴 the crawler fleet / 🔵 crawl governance
 
 ```bash
 python attacks/round1_crawler_fleet.py          # at L1 with the stub: everything served
@@ -92,7 +92,7 @@ python tools/checkpoint.py --round 1
 
 **Discuss:** the paying crawler is the only one that gets the catalogue, and it is the only one you can send an invoice. Which is the defense — the 402 or the block?
 
-## Round 2 — 🔴 the agent farm / 🔵 agent governance · 25 min
+## Round 2 — 🔴 the agent farm / 🔵 agent governance
 
 ```bash
 python attacks/round2_agent_farm.py             # at L2 with the blunt policy: read who it refuses
@@ -110,9 +110,7 @@ python tools/checkpoint.py --round 2
 
 **Discuss:** the shared fingerprint, not the "agent" label, is what caps the farm. Which legitimate cohort shares a fingerprint, and why is it spared?
 
-## ☕ Break (10 min)
-
-## Round 3 — 🔴 extractor + injection / 🔵 deception limits + LLM guard · 22 min
+## Round 3 — 🔴 extractor + injection / 🔵 deception limits + LLM guard
 
 ```bash
 python attacks/round3_llm_extract.py ; python attacks/round3_injector.py
@@ -130,7 +128,7 @@ python tools/checkpoint.py --round 3
 
 **Discuss:** the canary you stamp on the extractor is prompt injection you perform; Round 3's other attack is prompt injection performed on you. What makes one defensible?
 
-## Round 4 — 🔴 integrated + adaptation / 🔵 operate & audit · 23 min
+## Round 4 — 🔴 integrated + adaptation / 🔵 operate & audit
 
 ```bash
 python attacks/round4_integrated.py             # all of it + a score prober + a new vendor
@@ -153,14 +151,14 @@ python tools/checkpoint.py --round 4 --record exercises/<your-record>.md
 
 **Discuss:** the oracle guard turns a 200-request probe into a 2,000-account one. It did not stop the attacker. What did it buy you, and what finishes the job?
 
-## Wrap-up: the scoreboard (part of the 15-min debrief)
+## Wrap-up: the scoreboard
 
 `python tools/scoreboard.py` at L4, next to the L0 baseline. Read the three
 columns aloud: bots through, legitimate users blocked (target 0), legitimate
 users challenged (weighted). Name the cohort in column three with the highest
 weighted friction and decide whether it is worth it.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
 SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, cryptography 50.0.2, requests 2.34.2
@@ -186,7 +184,7 @@ is ~60–90 s. Defender cost: checkout scoring median a few ms; the maze costs b
 - **Round passes before you edit anything** — you are already at that level with the reference in place; `git`-reset the module or re-read the stub.
 - **`409 account exists` / stale drop caps** — `checkpoint.py` resets for you; to reset by hand, `POST /admin/reset?decisions=1&fresh_accounts=1` with the admin key, or re-run `tools/seed.py`.
 - **Port in use** — `PORT=9409 python demo_site/app.py` and `export DEMO_URL=http://127.0.0.1:9409`.
-- **`database is locked` under load (SQLite)** — rare; re-run the checkpoint, or use the Docker PostgreSQL path for a classroom.
+- **`database is locked` under load (SQLite)** — rare; re-run the checkpoint, or use the Docker PostgreSQL path.
 
 ## Bonus challenges
 

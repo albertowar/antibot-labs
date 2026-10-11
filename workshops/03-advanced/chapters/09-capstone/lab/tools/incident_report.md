@@ -1,6 +1,6 @@
 # Post-Incident Report — Capstone Drop
 
-*Template for the final debrief (Section 9.8). Fill one in as a team. It is the
+*Template for the final debrief (Section 9.8). Fill one in (alone or as a team). It is the
 same shape W3 Ch4 (Detection Signal Lifecycle & Ops) uses, because writing the
 kill chain down is how a stack actually improves between drops.*
 

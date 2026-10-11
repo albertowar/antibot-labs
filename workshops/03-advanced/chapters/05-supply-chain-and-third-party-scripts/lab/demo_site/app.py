@@ -9,7 +9,7 @@ Docker and no database — violation logs live in memory and clear on restart.
 
 The scenario each round is a vendor/supply-chain compromise that is ALREADY in
 place: the page loads a third-party include (`/static/vendor/analytics-helper.js`)
-that, besides real analytics, carries a lab skimmer. Students do not write the
+that, besides real analytics, carries a lab skimmer. You do not write the
 skimmer; they add the DEFENSE each round and watch the exfil stop.
 
 Everything is driven by environment variables so the checkpoint can set a round
@@ -88,7 +88,7 @@ def _sri_for(filename: str) -> str:
 
 
 # ── CSP policy strings ─────────────────────────────────────────────────────────
-# Kept in one place so students can read exactly what each round changes. The
+# Kept in one place so you can read exactly what each round changes. The
 # standalone copy in defenses/csp_policies.py is the studied version.
 
 def csp_policy(nonce: str) -> str:

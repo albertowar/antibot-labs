@@ -1,6 +1,6 @@
-# Round 4: Audit Cards (🔴 the other team), against the LIVE store
+# Round 4: Audit Cards (🔴 the auditor), against the LIVE store
 
-Swap governance records with the other team, then run them against the running store. You are now the auditor: a data-protection authority, the AI Office, an accessibility inspector, or the opposing counsel in an agentic-commerce dispute. Pick cards, read the draft, and answer each one with **"answered"**, **"vague"** or **"the record doesn't say"**, citing the section number. Every "doesn't say" is a hole they take into the Capstone. Five minutes; the blue team then has three minutes to patch.
+Take your governance record and run it against the running store. Switch sides: you are now the auditor reading it cold: a data-protection authority, the AI Office, an accessibility inspector, or the opposing counsel in an agentic-commerce dispute. Pick cards, read the draft, and answer each one with **"answered"**, **"vague"** or **"the record doesn't say"**, citing the section number. Every "doesn't say" is a hole in your record. Then switch back to the blue team and patch each one.
 
 Keep it honest. The aim is a record that survives an audit, not a trick.
 
@@ -29,6 +29,6 @@ Keep it honest. The aim is a record that survives an audit, not a trick.
 | Card answered by a specific section with a name, a number or a place | +1 blue |
 | Card answered only by a vague phrase ("we comply with applicable law", "as appropriate") | +1 red |
 | Card the record does not address | +2 red |
-| Blue patches a hole within the three minutes with a concrete rule | +1 blue |
+| Blue patches a hole with a concrete rule | +1 blue |
 
-Target for a team's record: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --record`), and no card left in the "doesn't say" column.
+Target for your record: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --record`), and no card left in the "doesn't say" column.

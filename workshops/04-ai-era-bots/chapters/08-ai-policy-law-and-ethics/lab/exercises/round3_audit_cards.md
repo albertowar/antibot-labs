@@ -1,6 +1,6 @@
 # Round 3: Audit Cards (🔴 red team)
 
-Swap governance records with the other team. You are now the auditor: a data-protection authority, the AI Office, an accessibility inspector, or the opposing counsel in an agentic-commerce dispute. Pick cards, read the draft, and answer each one with **"answered"**, **"vague"** or **"the record doesn't say"**, citing the section number. Every "doesn't say" is a hole they take into the Capstone. Five minutes; the blue team then has three minutes to patch.
+Switch sides: you wrote the governance record, and now you are the auditor reading it cold: a data-protection authority, the AI Office, an accessibility inspector, or the opposing counsel in an agentic-commerce dispute. Pick cards, read the draft, and answer each one with **"answered"**, **"vague"** or **"the record doesn't say"**, citing the section number. Every "doesn't say" is a hole you take into the Capstone. Then switch back to the blue team and patch each one.
 
 Keep it honest. The aim is a record that survives an audit, not a trick.
 
@@ -28,4 +28,4 @@ Keep it honest. The aim is a record that survives an audit, not a trick.
 | Card the record does not address | +2 red |
 | Blue patches a hole within the three minutes with a concrete rule | +1 blue |
 
-Target for a team's record: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --record`), and no card left in the "doesn't say" column.
+Target for your record: 10 of the 12 checklist items covered (`python tools/checkpoint.py --round 3 --record`), and no card left in the "doesn't say" column.

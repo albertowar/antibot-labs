@@ -390,7 +390,7 @@ def run(seed=None):
 
 
 def export(n, seed=7):
-    """Write a fixed 'instructor corpus' of mouse sessions for Round 0 and Round 4."""
+    """Write a fixed 'reference corpus' of mouse sessions for Round 0 and Round 4."""
     from_layout = {"origin": [360, 200], "boxes": {
         "name": [360, 320, 320, 36], "email": [360, 390, 320, 36],
         "size": [360, 460, 120, 36], "reserve": [360, 530, 160, 44]}}

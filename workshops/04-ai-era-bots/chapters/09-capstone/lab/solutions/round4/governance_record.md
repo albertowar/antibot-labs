@@ -1,6 +1,6 @@
 # AI Governance Record: the Lab Store detection stack (capstone reference)
 
-> A worked reference, not the only good answer. It is what the Capstone runs under, and what the other team audits. Score it with `python tools/checkpoint.py --round 4 --record <file>` or `python tools/audit.py --record <file>`.
+> A worked reference, not the only good answer. It is what the Capstone runs under, and what Round 4 audits. Score it with `python tools/checkpoint.py --round 4 --record <file>` or `python tools/audit.py --record <file>`.
 
 **Team:** capstone reference  **System:** Lab Store bot defense (W2 Ch8 scoring, W3 streaming, W4 Ch6 adversarially-hardened classifier, W4 Ch7 LLM triage, this capstone's crawl + agent governance)  **Date:** 2026-10-11
 

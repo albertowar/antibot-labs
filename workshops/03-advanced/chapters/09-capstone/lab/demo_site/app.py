@@ -222,7 +222,7 @@ def finish(response):
         response.set_cookie("did", g.did, max_age=365 * 86400, secure=True, httponly=True, samesite="Lax")
     if "risk_ms" in g:
         response.headers["Server-Timing"] = f"risk;dur={g.risk_ms:.3f}"
-    # L7: send a CSP (report-only until the student turns on enforcement) on every HTML page.
+    # L7: send a CSP (report-only until you turn on enforcement) on every HTML page.
     if DEFENSE_LEVEL >= 7 and request.path in HTML_PAGES and "csp_nonce" in g:
         name, value = supply_chain.csp_header(g.csp_nonce)
         response.headers[name] = value

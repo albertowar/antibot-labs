@@ -5,7 +5,7 @@ Every attack drives a real browser (Playwright) to the local checkout page,
 submits synthetic card data, and then asks the local collector whether anything
 got out. The attack itself is identical each round — a victim simply checks
 out. What changes is the skimmer technique (set on the server via
-SKIMMER_VARIANT) and the defence the student has added.
+SKIMMER_VARIANT) and the defence you have added.
 
 Ethics guardrail: these refuse any target that is not loopback.
 """

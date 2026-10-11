@@ -1,6 +1,6 @@
 """Seed the demo store: products, users, orders, and the persisted-query allowlist.
 
-Run once before the session (and again any time you want a clean catalogue):
+Run once before you start (and again any time you want a clean catalogue):
 
     python tools/seed.py
 

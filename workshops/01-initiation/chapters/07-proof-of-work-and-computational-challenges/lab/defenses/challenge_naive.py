@@ -16,7 +16,7 @@ and FFmpeg, shipped this bug (CVE-2025-24369, fixed in January 2025).
 
 What else is wrong here (you fix these in Round 2):
   - no signature: nonce and difficulty can be invented by the client
-  - no expiry: a solution found today is still valid next year
+  - no expiry: a solution found now is still valid next year
   - no binding: a solution found on one machine works on any other
   - no spend tracking: one solution can be redeemed again and again
 """

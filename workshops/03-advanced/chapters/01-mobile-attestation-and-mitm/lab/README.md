@@ -1,6 +1,6 @@
 # Chapter 1 Lab: Mobile Apps, Attestation & MitM
 
-**Format:** 4 rounds of attack ⚔️ defend, ~130 min. See `../chapter_01_content.md`, §1.9.
+**Format:** 4 rounds of attack ⚔️ defend. See `../chapter_01_content.md`, §1.9.
 
 You play both sides. First you are the reverse engineer: you intercept a mobile
 app's API, replay it, beat certificate pinning, forge and then steal attestation
@@ -37,7 +37,7 @@ lab/
     risk_engine.py     the 0–100 score, three outcomes, shadow mode
   attacks/
     mobile_client.py   the app SDK (genuine app AND attacker use it)
-    mitm_capture.py    live mitmproxy addon (instructor demo)
+    mitm_capture.py    live mitmproxy addon (live demo)
     round1_intercept.py … round4_farm.py
     data/egress_pool.txt
   tools/
@@ -46,7 +46,7 @@ lab/
   solutions/round1..4/ reference answers (applied by `checkpoint --catch-up`)
 ```
 
-## Setup (before the session)
+## Setup
 
 ```bash
 python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
@@ -187,8 +187,6 @@ the farm. Is that trade acceptable? What would you measure before shipping it?
 
 ---
 
-## ☕ Break (10 min)
-
 ## Wrap-up: false positives and cost
 
 ```bash
@@ -202,7 +200,7 @@ carrier IP and the per-egress farm signal starts flagging them. The lesson of th
 chapter: attestation raises the attacker's cost a lot, but it is a tax on a real,
 named set of your users — budget for it.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Run from a clean `python tools/seed.py`, store at the round's level, store
 `REDIS_URL=memory://`. Numbers are deterministic.
@@ -217,10 +215,10 @@ Run from a clean `python tools/seed.py`, store at the round's level, store
 Defender scoring cost: ~4–7 ms median per buy on the SQLite + memory path.
 
 **Things to watch for:**
-- Before students implement a round's TODO, the attack gets through — that is the
-  point. `--catch-up` unblocks anyone who falls behind.
+- Until you implement a round's TODO, the attack gets through — that is the
+  point. `--catch-up` unblocks you if you fall behind.
 - Round 4 blocks zero legitimate users but **challenges the two GrapheneOS
-  customers**. If a student's tuning blocks them, that is a real (over-strict)
+  customers**. If your tuning blocks them, that is a real (over-strict)
   policy, worth discussing, not a bug.
 - The attacker's `device="emulator"` is not a cheat: `mobile_core.mint()` only
   stamps the honest verdict of the device profile passed in. Nobody holds the

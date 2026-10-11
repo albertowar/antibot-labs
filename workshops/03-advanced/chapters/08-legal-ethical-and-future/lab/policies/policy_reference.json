@@ -1,7 +1,7 @@
 {
   "name": "reference",
   "_comment": [
-    "Instructor solution for Round 2. Not the only good answer.",
+    "Reference solution for Round 2. Not the only good answer.",
     "No hard rules on where someone connects from: Tor and datacenter ASNs are",
     "points, not verdicts. The signals that real minorities trip by themselves",
     "(fp_randomized, no_pointer, ip_elevated, outdated_browser, no_keystrokes)",

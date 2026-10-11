@@ -1,6 +1,6 @@
 # W3 Ch7 Lab — Investigating Account Takeover in Audit Logs
 
-**Format:** Round 0 explore + three detection rounds + reveal, 110 min, plus a 15 min debrief. See `../chapter_07_content.md`, §7.4.
+**Format:** Round 0 explore + three detection rounds + reveal. See `../chapter_07_content.md`, §7.4.
 
 This chapter's attacker is not a script you run. It already ran: eight account-takeover campaigns are buried in 90 days of a store's account audit log, next to every legitimate behaviour that looks like one. Each round is still a 🔵 defense (a detection family you build in a notebook), a 🔴 attack (the tier of campaigns built to evade the previous round's family), a checkpoint and a number. The answer key stays sealed until the reveal; the scorer tells you how you are doing without telling you why.
 
@@ -23,7 +23,7 @@ lab/
 
 ---
 
-## Setup (before the session, 5 minutes plus a 1-minute generation)
+## Setup (5 minutes plus a 1-minute generation)
 
 ```bash
 cd workshops/03-advanced/chapters/07-ato-in-audit-logs/lab
@@ -79,11 +79,11 @@ Names, misses and the red herrings' stories appear with `--reveal`. **Fell behin
 
 ---
 
-## Round 0: Explore (25 min) · `notebooks/00_explore.ipynb`
+## Round 0: Explore · `notebooks/00_explore.ipynb`
 
 Load the log, look at the event mix, the share of `session_resume` logins, a few account timelines. Find the four data-quality traps before anyone names them: duplicate lines, retries, late arrivals and clock skew, and one address block that changes country for three days. Write three hypotheses with numbers in them. Nothing to submit.
 
-## Round 1: Rules ⚔️ tier A (30 min) · `01_rules.ipynb`
+## Round 1: Rules ⚔️ tier A · `01_rules.ipynb`
 
 | Step | Do | Expected |
 |---|---|---|
@@ -94,9 +94,7 @@ Load the log, look at the event mix, the share of `session_resume` logins, a few
 
 **Discuss:** the only rule that found access-only takeovers is "failure from datacenter space, then a password login from datacenter space". What in the login pipeline (W2 Ch6) would have made the log unnecessary for them?
 
-## ☕ Break (10 min)
-
-## Round 2: Graph ⚔️ tier B (30 min) · `02_graph.ipynb`
+## Round 2: Graph ⚔️ tier B · `02_graph.ipynb`
 
 | Step | Do | Expected |
 |---|---|---|
@@ -107,7 +105,7 @@ Load the log, look at the event mix, the share of `session_resume` logins, a few
 
 **Discuss:** one tier is still at zero and its victims share nothing with each other. What is left to compare them against?
 
-## Round 3: Models ⚔️ tier C (25 min) · `03_ml.ipynb`
+## Round 3: Models ⚔️ tier C · `03_ml.ipynb`
 
 | Step | Do | Expected |
 |---|---|---|
@@ -116,13 +114,13 @@ Load the log, look at the event mix, the share of `session_resume` logins, a few
 | 🔵 Contrast | Train the supervised model on Rounds 1+2 and submit its queue instead. | More tier A and B, almost no tier C: a model trained on your detections finds your detections |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 3 --catch-up` | the reference `suspects_r3.csv` |
 
-## Reveal (15 min) · `04_reveal.ipynb`
+## Reveal · `04_reveal.ipynb`
 
 `python tools/checkpoint.py --reveal` (or `score.py suspects_r3.csv --reveal`), then `solutions/walkthrough.md`: each campaign's log signature, which method found it, which red herring it hid behind, and the six-victim bonus campaign (pre-hijack) that is a sequence invariant, not an anomaly.
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Produced by `python tests/test_make_log.py --tiers` (which runs the three reference detectors and asserts the bounds below). The log is deterministic (seed 2026, same digest on Python 3.10 and 3.12), so these numbers do not drift.
 

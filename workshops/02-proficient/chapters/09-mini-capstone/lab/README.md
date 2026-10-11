@@ -1,6 +1,6 @@
 # Chapter 9 Mini-Capstone Lab: Stealth Browsers vs. the Stack
 
-**Format:** 5 rounds of attack ⚔️ defend, ~110 min. See `../chapter_09_content.md`, §9.7.
+**Format:** 5 rounds of attack ⚔️ defend. See `../chapter_09_content.md`, §9.7.
 
 A limited sneaker drop — **50 pairs of the "Lab Runner 9", one per account**. You are the scalper and the defender, round by round. Each round the attacker gets a better tool; you turn on the next layer of the Workshop 2 stack and measure two things: what it catches, and who it hurts.
 
@@ -27,7 +27,7 @@ Why this stack: **Python** for the store, defenses and HTTP attackers; plain **J
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -108,7 +108,7 @@ A round **passes** when the attack is stopped at the level that should stop it *
 
 ---
 
-## Round 0: the naive fleet ⚔️ the end-of-Ch8 stack (15 min)
+## Round 0: the naive fleet ⚔️ the end-of-Ch8 stack
 
 | Step | Do | Expected |
 |---|---|---|
@@ -120,7 +120,7 @@ A round **passes** when the attack is stopped at the level that should stop it *
 
 **Discuss:** which layer caught each bot, and why `curl_cffi` — with a perfect Chrome JA4 — is still blocked (it never ran the page, so there's no telemetry).
 
-## Round 1: headless Patchright ⚔️ fingerprint coherence (25 min)
+## Round 1: headless Patchright ⚔️ fingerprint coherence
 
 Patchright removes the Ch1 automation tells (no `webdriver`, no `Runtime.enable` leak), so L0 lets it in. It is still a headless browser on a server.
 
@@ -133,7 +133,7 @@ Patchright removes the Ch1 automation tells (no `webdriver`, no `Runtime.enable`
 
 **Exercise:** the starter rule blocks the `vdi-citrix` user (real software rendering) outright. Tune the TODO so a software renderer *alone* only challenges, while a headless bot (software renderer **+** frameless window **+** Worker mismatch) still blocks. **Discuss:** is challenging the VDI user acceptable? Who signs off on that trade-off?
 
-## Round 2: scripted Camoufox ⚔️ behavior & flow (20 min)
+## Round 2: scripted Camoufox ⚔️ behavior & flow
 
 Camoufox spoofs the fingerprint natively, so every L1 check agrees. It still clicks Buy the instant the page loads.
 
@@ -146,9 +146,7 @@ Camoufox spoofs the fingerprint natively, so every L1 check agrees. It still cli
 
 **Exercise:** the starter behavior rule flags the keyboard (screen-reader) and touch (iPhone) customers, who never move a mouse. Fix the TODO so the pointer-path checks apply only to sessions that actually use a pointer. **Discuss:** every accessibility exemption you add is a door the next bot will try — how do you keep it from becoming a free pass?
 
-## ☕ Break (10 min)
-
-## Round 3: humanized farm ⚔️ session & account model (25 min)
+## Round 3: humanized farm ⚔️ session & account model
 
 The scalper adds `humanize`, browses first, and dwells — beating L2. But one pair per account means one account per pair, so it bulk-registers fresh accounts that all ship to one reshipper.
 
@@ -162,7 +160,7 @@ The scalper adds `humanize`, browses first, and dwells — beating L2. But one p
 
 **Exercise:** `pick_threshold` returns a flat 0.5. Make it return the lowest threshold whose false-positive rate on the validation humans is ≤ 1%. **Discuss:** the model learns *your lab's* bots. What happens the week the attacker changes tactics, and how would you notice?
 
-## Round 4: credential stuffing ⚔️ token binding & login risk (22 min)
+## Round 4: credential stuffing ⚔️ token binding & login risk
 
 Fresh accounts are caught, so the farm pivots to aged accounts it doesn't own: a `curl_cffi` stuffer with a (synthetic) breach list over rotating egress.
 
@@ -179,7 +177,7 @@ Fresh accounts are caught, so the farm pivots to aged accounts it doesn't own: a
 
 **Exercise:** run `--with-token --rotate-fp` against the finished defense. It leaks confirmations again — a new fingerprint per attempt is a new cluster. **Discuss:** what would it take to count failures across clusters without blocking the office NAT? (That's device attestation — Workshop 3.)
 
-## Wrap-up: the scoreboard (15 min)
+## Wrap-up: the scoreboard
 
 ```bash
 python tools/scoreboard.py
@@ -189,7 +187,7 @@ Review it together: which layer caught the most, where the false positives lande
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis-py 8.1.0 (served by fakeredis 2.39.0 over TCP, since no Redis server was installed), SQLite (no Docker; the `docker compose` path with Redis 8.10 and PostgreSQL 18 is verified separately), Playwright 1.62.0 / Patchright 1.63.0 (Chromium 153), Camoufox 0.5.8 (Firefox 156), curl_cffi 0.16.3, numpy 2.5.4 and scikit-learn 1.9.1. Each round ran with `--catch-up`; the model was retrained after the numpy/scikit-learn bump (threshold 0.5 at L1, 0.01 at L3). Pairs are out of 3 attacker sessions; "✅" means the round's checkpoint passes. Exact timings vary with hardware.
 

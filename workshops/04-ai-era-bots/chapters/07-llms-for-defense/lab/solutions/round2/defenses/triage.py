@@ -76,7 +76,7 @@ NAIVE_TEMPLATE = (
 
 
 def build_messages(card, hardened):
-    """The prompt the model sees. The ONLY difference students make in Round 2."""
+    """The prompt the model sees. The ONLY difference you make in Round 2."""
     if hardened:
         # Round 2 (solution): the card is data, fenced and labelled as such.
         user = ("Classify the session in the block below.\n"

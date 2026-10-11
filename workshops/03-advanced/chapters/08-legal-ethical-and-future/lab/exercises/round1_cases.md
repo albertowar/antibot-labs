@@ -1,8 +1,8 @@
-# Round 1: Three Cease-and-Desists (17 min)
+# Round 1: Three Cease-and-Desists
 
-Three fact patterns. In each one, the store you have been defending all week has sent a cease-and-desist letter and is deciding whether to sue. Half the room is **🔵 counsel for the store**, half is **🔴 counsel for the scraper**. Nobody here is a lawyer and nothing in this room is legal advice; the point is to know which claims a lawyer would take seriously, because that decides what your detection stack has to prove.
+Three fact patterns. In each one, the store you have been defending all week has sent a cease-and-desist letter and is deciding whether to sue. You play both sides, or split the roles with a peer: **🔵 counsel for the store** and **🔴 counsel for the scraper**. Nobody here is a lawyer and nothing in this lab is legal advice; the point is to know which claims a lawyer would take seriously, because that decides what your detection stack has to prove.
 
-**Format:** 2 min to read the cases, 10 min in pairs (one 🔵, one 🔴) to fill the verdict sheet, 5 min reveal against the answer key.
+**Format:** read the cases, fill the verdict sheet (alone as both counsels, or in a pair with one 🔵 and one 🔴), then reveal against the answer key.
 
 **Scoring:** for each case, list every claim you think **survives** (would get past a motion to dismiss in the stated jurisdiction). +1 for each claim that matches the key, −1 for each claim the key marks as weak. The pair with the best net score wins, and ties go to the pair that cited the most recent case.
 
@@ -55,4 +55,4 @@ Profilr, a startup in Ireland, scrapes the store's public review pages. Reviews 
 | C | GDPR against Profilr | | |
 | C | "The store has no exposure" | | |
 
-When the key is revealed, count your net score, then answer the question that matters for this afternoon: **in each case, what would the store's detection logs have needed to contain for the surviving claims to be provable?**
+When the key is revealed, count your net score, then answer the question that carries into Round 2: **in each case, what would the store's detection logs have needed to contain for the surviving claims to be provable?**

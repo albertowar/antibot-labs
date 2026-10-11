@@ -29,7 +29,7 @@ COLLECTOR = target("COLLECTOR_URL", "http://127.0.0.1:5001")
 
 PY = sys.executable
 
-# Per round: the server state the student should be running, and what "passing"
+# Per round: the server state you should be running, and what "passing"
 # means. exfil_blocked=False for Round 1 (detection only).
 ROUNDS = {
     1: dict(env=dict(VENDOR="compromised", SKIMMER_VARIANT="beacon",

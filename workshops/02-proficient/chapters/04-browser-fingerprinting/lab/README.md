@@ -1,6 +1,6 @@
 # Chapter 4 Lab: Browser Fingerprinting
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. About 150 min of hands-on time, spread across the 4-hour chapter. See `../chapter_04_content.md`, §4.8.
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_04_content.md`, §4.8.
 
 The demo store gives every new account a €10 welcome credit, so a bot wants hundreds of accounts. You play both sides:
 
@@ -33,7 +33,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -132,7 +132,7 @@ What it reports:
 
 ---
 
-## Round 0: Recon (20 min)
+## Round 0: Recon
 
 **🗡️ Attack (look):**
 
@@ -160,7 +160,7 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 ---
 
-## Round 1: Default headless ⚔️ Render-stack plausibility (25 min)
+## Round 1: Default headless ⚔️ Render-stack plausibility
 
 | Step | Do | Expected |
 |---|---|---|
@@ -177,11 +177,7 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 2: Stealth patches ⚔️ Lie detection (25 min)
+## Round 2: Stealth patches ⚔️ Lie detection
 
 | Step | Do | Expected |
 |---|---|---|
@@ -198,7 +194,7 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 ---
 
-## Round 3: Harvested fingerprint ⚔️ Linking with rarity (30 min)
+## Round 3: Harvested fingerprint ⚔️ Linking with rarity
 
 | Step | Do | Expected |
 |---|---|---|
@@ -218,11 +214,7 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 4: Noise ⚔️ Fuzzy clustering (30 min)
+## Round 4: Noise ⚔️ Fuzzy clustering
 
 | Step | Do | Expected |
 |---|---|---|
@@ -243,7 +235,7 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 ---
 
-## Wrap-up: false positives and cost (20 min)
+## Wrap-up: false positives and cost
 
 ```bash
 python tools/legit_traffic.py               # per-cohort verdicts and reasons
@@ -262,7 +254,7 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, Playwright 1.63.0 (Chromium 153) and the SQLite fallback (no Docker). The `docker compose` path is verified separately. Every checkpoint (rounds 0-4) passed, and the `LINK_MODE=naive` runs gave 2/40 (L3) and 10/40 (L4) refused. Numbers are accounts created out of 20 sign-ups (the scripts' default; the checkpoint uses 10). Each attack starts from an empty store.
 
@@ -275,7 +267,7 @@ Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
 | Real users refused (`legit_traffic.py`) | 0/40 | 0/40 | 0/40 | 0/40 | 0/40 | 2 privacy-extension users `suspicious` (25) from L2 |
 | … with `LINK_MODE=naive` | | | | 2/40 | 10/40 | Identical MacBooks, office fleet, iPhones, a privacy extension |
 
-Defender cost measured on the instructor laptop:
+Defender cost measured on the author's laptop:
 
 | Item | Cost |
 |---|---|
@@ -288,7 +280,7 @@ Things to watch for:
 - **Version drift.** When Chrome or Playwright updates, re-run every checkpoint. Then check `round0_recon.py`:
   - Does headless still report SwiftShader? (Chrome dropped the automatic SwiftShader fallback in 139. Playwright enables it explicitly.)
   - Is `MAX_TEXTURE_SIZE` still 8192?
-- **Synthesized profiles.** Every shipped real-user profile is marked `synthesized`. They are built from real Chromium and Firefox captures plus each browser's documented behaviour, *not* captured on those exact devices. Ask students on Safari, Brave and phones to add their captures in Round 0, and treat any refusal of a captured profile as a bug in the defense.
+- **Synthesized profiles.** Every shipped real-user profile is marked `synthesized`. They are built from real Chromium and Firefox captures plus each browser's documented behaviour, *not* captured on those exact devices. If you use Safari, Brave or a phone, add your capture in Round 0, and treat any refusal of a captured profile as a bug in the defense.
 - **PostgreSQL.** The no-Docker run above used the SQLite fallback. The queries are plain SQLAlchemy; the PostgreSQL path is covered by the separate `docker compose` verification.
 
 ---

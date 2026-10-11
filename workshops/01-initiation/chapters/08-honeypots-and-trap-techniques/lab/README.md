@@ -1,6 +1,6 @@
 # Chapter 8 Lab: Honeypots & Trap Techniques
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, 87 min of lab, followed by a 10 min debrief. See `../chapter_08_content.md`, §8.5.
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, followed by a debrief. See `../chapter_08_content.md`, §8.5.
 
 You play both sides. Each round, the defender turns on the next trap and the attacker runs the script that walks into it. Then the attacker runs the script that walks around it. Every checkpoint measures two things: the bots a trap catches, and the real people it catches by mistake. The second number is the one honeypot tutorials leave out.
 
@@ -25,7 +25,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -131,7 +131,7 @@ The autofill and screen-reader personas are **models**. Real autofill heuristics
 
 ---
 
-## Round 0: Recon (10 min)
+## Round 0: Recon
 
 **🗡️ Look like a bot:**
 
@@ -147,7 +147,7 @@ python attacks/round0_recon.py              # the form's inputs and robots.txt, 
 
 ---
 
-## Round 1: Naive spammer ⚔️ the textbook honeypot (18 min)
+## Round 1: Naive spammer ⚔️ the textbook honeypot
 
 | Step | Do | Expected |
 |---|---|---|
@@ -164,7 +164,7 @@ python attacks/round0_recon.py              # the form's inputs and robots.txt, 
 
 ---
 
-## Round 2: CSS-hidden honeypot + timing token ⚔️ a real browser (22 min)
+## Round 2: CSS-hidden honeypot + timing token ⚔️ a real browser
 
 | Step | Do | Expected |
 |---|---|---|
@@ -182,11 +182,7 @@ python attacks/round0_recon.py              # the form's inputs and robots.txt, 
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Crawl traps ⚔️ the polite crawler (20 min)
+## Round 3: Crawl traps ⚔️ the polite crawler
 
 | Step | Do | Expected |
 |---|---|---|
@@ -206,7 +202,7 @@ python attacks/round0_recon.py              # the form's inputs and robots.txt, 
 
 ---
 
-## Round 4: Responding to a hit ⚔️ the bot that checks its work (17 min)
+## Round 4: Responding to a hit ⚔️ the bot that checks its work
 
 Run the same experiment under four configurations. For each one, restart the store, run the bot, **then** the CGNAT customer who shares its IP, then read the scoreboard:
 
@@ -234,7 +230,7 @@ python tools/scoreboard.py
 
 ---
 
-## Debrief: false positives and cost (10 min)
+## Debrief: false positives and cost
 
 ```bash
 python tools/scoreboard.py
@@ -242,13 +238,13 @@ curl -s localhost:5000/trap-logs | python -m json.tool | head -40
 ```
 
 - Two scripts got through every trap: the Playwright form bot and the polite crawler. What do they have in common?
-- Count the false positives you caused today and the TODO that fixed each one. Which would you have noticed in production without the personas?
+- Count the false positives you caused in this lab and the TODO that fixed each one. Which would you have noticed in production without the personas?
 - What does a trap check cost per request? What does a sanction lookup add? (Compare the level 3 and level 4 medians.)
-- Next, in Chapter 9: combine today's traps with rate limits (Ch2), IP reputation (Ch3), header scoring (Ch4), sessions (Ch5), CAPTCHAs (Ch6) and proof of work (Ch7) into one layered defense.
+- Next, in Chapter 9: combine this chapter's traps with rate limits (Ch2), IP reputation (Ch3), header scoring (Ch4), sessions (Ch5), CAPTCHAs (Ch6) and proof of work (Ch7) into one layered defense.
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified with Python 3.12.15, Flask 3.1.3, redis 8.1.0, fakeredis 2.39.0 (`REDIS_URL=memory://`), httpx 0.28.1 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell). The `docker compose` path (Redis 8 container) is verified separately. Levels 2–4 assume the Round 2 and Round 3 fixes are in. Level 4 is `quarantine` / `session`.
 
@@ -267,9 +263,9 @@ A full checkpoint takes about 20 s at Round 0 and about 40 s at Round 4. Most of
 Things to watch for:
 
 - **Port 5000 taken:** see Troubleshooting. Everything reads `DEMO_URL`.
-- **Students who edit `form_traps.py` without the debug reloader** (e.g. `flask run` without `--debug`) must restart the store to pick up the fix.
-- **"too_fast" on a real person:** `MIN_FILL_SECONDS` is 1.5 s. The autofill persona takes about 2 s. If a student's own autofill-plus-generated-password signup gets trapped, that's a real finding. Discuss it; don't hide it.
-- **Docker path:** the store connects to `redis://localhost:6379/0` by default. Check one machine with `docker compose up` before the session.
+- **If you edit `form_traps.py` without the debug reloader** (e.g. `flask run` without `--debug`) you must restart the store to pick up the fix.
+- **"too_fast" on a real person:** `MIN_FILL_SECONDS` is 1.5 s. The autofill persona takes about 2 s. If your own autofill-plus-generated-password signup gets trapped, that's a real finding. Discuss it; don't hide it.
+- **Docker path:** the store connects to `redis://localhost:6379/0` by default. Check with `docker compose up` before you start.
 
 ---
 

@@ -1,6 +1,6 @@
 # Chapter 3 Lab: Real-Time Streaming Detection
 
-**Format:** 5 rounds of attack ⚔️ defend, ~132 min. See `../chapter_03_content.md`, §3.6.
+**Format:** 5 rounds of attack ⚔️ defend. See `../chapter_03_content.md`, §3.6.
 
 ## Rules of engagement
 
@@ -48,7 +48,7 @@ lab/
     lag.py             watch consumer lag grow when the consumer falls behind
 ```
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -115,7 +115,7 @@ checkpoint runs the whole pipeline in one process at the round's level, so run
 
 ---
 
-## Round 0: the latency gap (8 min)
+## Round 0: the latency gap
 
 - **Attack step:** `python tools/checkpoint.py --round 0`. The micro-burst runs with no
   streaming detector (L0).
@@ -123,14 +123,14 @@ checkpoint runs the whole pipeline in one process at the round's level, so run
   of the lab closes.
 - **Checkpoint:** `python tools/checkpoint.py --round 0`.
 
-## Round 1: micro-burst ⚔️ sliding-window detector (20 min)
+## Round 1: micro-burst ⚔️ sliding-window detector
 
 - **Attack step:** 150 failed logins from one IP in ten seconds.
 - **Defense step:** `defenses/window_rate.py` at L1 — trailing-60s count per `(IP, endpoint)`.
 - **False-positive check:** the 40 customers, each on their own IP at a human rate, stay clear.
 - **Checkpoint:** `python tools/checkpoint.py --round 1`.
 
-## Round 2: IP rotation ⚔️ heavy hitters + distinct counts (24 min)
+## Round 2: IP rotation ⚔️ heavy hitters + distinct counts
 
 - **Attack step:** the same campaign across 40 IPs, 4 failed logins each — under any per-IP window.
 - **Defense step:** `defenses/heavy_hitters.py` at L2 — Count-Min endpoint velocity, HyperLogLog
@@ -138,9 +138,7 @@ checkpoint runs the whole pipeline in one process at the round's level, so run
 - **False-positive check:** humans never fail logins and load assets, so the shape gate spares them.
 - **Checkpoint:** `python tools/checkpoint.py --round 2`.
 
-## ☕ Break (10 min)
-
-## Round 3: low-and-slow ⚔️ regularity + distinct-IP fan-out (24 min)
+## Round 3: low-and-slow ⚔️ regularity + distinct-IP fan-out
 
 - **Attack step:** five accounts attacked from ~60 distinct IPs each, 1–2 tries per IP, slow.
 - **Defense step:** `defenses/cross_key.py` (distinct IPs per username) and `defenses/regularity.py`
@@ -150,7 +148,7 @@ checkpoint runs the whole pipeline in one process at the round's level, so run
   and get through — the latency cost of distinct-counting. Flagged ≈ `208/300`.
 - **Checkpoint:** `python tools/checkpoint.py --round 3`.
 
-## Round 4: jittered browser ⚔️ composite + lag honesty (22 min)
+## Round 4: jittered browser ⚔️ composite + lag honesty
 
 - **Attack step:** browser-like sessions (own IP, assets, jittered timing, rotated usernames);
   most fail 2 logins, a patient quarter fails 1.
@@ -163,13 +161,13 @@ checkpoint runs the whole pipeline in one process at the round's level, so run
   and watch the backlog grow — a slow consumer reopens the gap.
 - **Checkpoint:** `python tools/checkpoint.py --round 4` (add `--slow` to see verdicts arrive late).
 
-## Wrap-up: the scoreboard (13 min)
+## Wrap-up: the scoreboard
 
 Every round reported humans flagged `0/40` next to the bots caught. Walk the scoreboard: which
 detector caught each shape, where the residual survived, and why the next chapter (W3 Ch4) owns
 the monitoring, drift and retraining that keep these signals honest over time.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on Python 3.12.15 with Flask 3.1.3, redis 8.1.0, fakeredis 2.39.0 (`probabilistic` extra) and httpx 0.28.1 on the `memory://` store: checkpoints for rounds 0-4 pass with the numbers below, and the `--live` replay against the app at L2 works. The real Redis 8 path (`docker compose`) runs the identical code; the `docker compose` path is verified separately. Counts are deterministic (seeded).
 

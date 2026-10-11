@@ -10,7 +10,7 @@ identity it trusts (defenses/bot_identity.py, from W4 Ch1-2):
     verify is a UA you cannot trust, bill, or complain to its operator about
   * everything else                                   -> ALLOW
 
-The paradox students should see in the numbers: the honest crawler that
+The paradox you should see in the numbers: the honest crawler that
 announces itself is the one that gets refused, while Round 2's stealth crawler
 (Chrome UA, residential egress) walks in. That is not a bug in this module; it
 is the limit of identity-based governance, and why the deterrence (Round 3) and

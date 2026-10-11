@@ -4,7 +4,7 @@ Chapter 2 — Build the polymorphic challenge pool (Round 3)
 Generates N challenge variants, each with its own random op chain and layout
 probe size, then obfuscates them with javascript-obfuscator:
 
-  demo_site/secrets/src/<id>.js        readable source (instructor reference, never served)
+  demo_site/secrets/src/<id>.js        readable source (reference copy, never served)
   demo_site/static/variants/<id>.js    obfuscated, served to clients
   demo_site/secrets/manifest.json      id -> chain + probe (the server's answer key)
 

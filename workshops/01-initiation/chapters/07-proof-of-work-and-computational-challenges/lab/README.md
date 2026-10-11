@@ -28,7 +28,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.2). Adds: a `pow` chal
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack and defense (73 min) and a 10-min debrief. See `../chapter_07_content.md`, section 7.7.
+**Format:** 6 rounds of attack and defense and a debrief. See `../chapter_07_content.md`, section 7.7.
 
 You play both sides. The scraper wants the whole catalog: all 120 product records. The defender puts a proof-of-work (PoW) gate in front of it, and each round tightens the gate.
 
@@ -66,7 +66,7 @@ starter, unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ---
 
-## Setup (before the session)
+## Setup
 
 Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
 
@@ -166,7 +166,7 @@ the `Server-Timing` header of every response: `curl -si localhost:5000/api/produ
 
 ---
 
-## Round 0: What does a hash cost? (8 min)
+## Round 0: What does a hash cost?
 
 **Attack (measure):**
 
@@ -191,7 +191,7 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 
 ---
 
-## Round 1: PoW gate vs forged difficulty (15 min)
+## Round 1: PoW gate vs forged difficulty
 
 | Step | Do | Expected |
 |---|---|---|
@@ -209,7 +209,7 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 
 ---
 
-## Round 2: signed challenge vs solve once, replay (15 min)
+## Round 2: signed challenge vs solve once, replay
 
 | Step | Do | Expected |
 |---|---|---|
@@ -223,11 +223,7 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 
 ---
 
-## Break (10 min)
-
----
-
-## Round 3: single use + pass budget vs solver pool (15 min)
+## Round 3: single use + pass budget vs solver pool
 
 | Step | Do | Expected |
 |---|---|---|
@@ -241,7 +237,7 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 
 ---
 
-## Round 4: adaptive difficulty vs many small clients (15 min)
+## Round 4: adaptive difficulty vs many small clients
 
 | Step | Do | Expected |
 |---|---|---|
@@ -261,7 +257,7 @@ price the neighbours' browsing set. An Android phone at 22 bits needs about 16 s
 
 ---
 
-## Round 5: the browser pays (5 min)
+## Round 5: the browser pays
 
 | Step | Do | Expected |
 |---|---|---|
@@ -276,7 +272,7 @@ The bot pays exactly what a human pays, and PoW has nothing left to say. PoW **p
 
 ---
 
-## Debrief: price, false positives and cost (10 min)
+## Debrief: price, false positives and cost
 
 ```bash
 python tools/personas_ch7.py                 # the shoppers alone, at the current level
@@ -289,7 +285,7 @@ python tools/scoreboard.py                   # bots stopped vs shoppers hurt
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 **Test setup**
 
@@ -313,7 +309,7 @@ python tools/scoreboard.py                   # bots stopped vs shoppers hurt
 | 4 | `round4_distributed` | 10 solves, 16 bits (L3) | 120/120, 10 solves, all **16** bits | 10.5-16 CPU-s per 1,000: back to the L3 price |
 | 5 | `round5_playwright_browser` | 60/60 (L4) | 60/60, 3 solves at 16 and 22 bits | 42-111 CPU-s per 1,000 (4 workers x wall time) |
 
-**The shoppers** (40 per run; the instructor-facing measure of harm). "Hurt" means the shopper never got the page:
+**The shoppers** (40 per run; the measure of harm). "Hurt" means the shopper never got the page:
 
 | Level | `no_js` (1) | `mobile_cgnat` (8, two shared addresses) | everyone else (31) |
 |---|---|---|---|

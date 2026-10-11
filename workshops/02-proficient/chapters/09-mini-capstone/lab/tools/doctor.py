@@ -1,7 +1,7 @@
 """
 Chapter 9 — Environment check (run this first)
 
-Confirms the pieces are in place before the session: Python version, the lab
+Confirms the pieces are in place before you start: Python version, the lab
 packages, the browser downloads, the TLS certificate, and that Redis,
 PostgreSQL and the store answer. With --tls it also prints the JA4 and TLS
 stack of each HTTP client, which is the Round 0 / Round 5 teaching aid.

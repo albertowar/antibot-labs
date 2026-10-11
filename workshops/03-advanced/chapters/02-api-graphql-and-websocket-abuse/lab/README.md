@@ -1,6 +1,6 @@
 # Chapter 2 Lab: API, GraphQL & WebSocket Abuse
 
-**Format:** 5 rounds of attack ⚔️ defend, ~130 min of rounds plus debrief. See `../chapter_02_content.md`, §2.7.
+**Format:** 5 rounds of attack ⚔️ defend, rounds plus debrief. See `../chapter_02_content.md`, §2.7.
 
 You play both sides. Bots attack the data plane of the "Lab Runner 9" store — its
 versioned REST API, its GraphQL endpoint and its WebSocket feed — and you add the
@@ -45,7 +45,7 @@ lab/
 Python client, and the defenses are server-side. No browser automation is needed, so
 the lab stays light.
 
-## Setup (before the session)
+## Setup
 
 ```bash
 python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
@@ -111,7 +111,7 @@ per endpoint, the top reasons, per-request cost, and bots-stopped vs real-users-
 
 ---
 
-## Round 1: REST scraping ⚔️ cost-aware rate limiting (28 min)
+## Round 1: REST scraping ⚔️ cost-aware rate limiting
 
 An async client walks `/api/v2/products` with oversized pages and enumerates
 `/api/v2/products/<id>` in order, draining the catalogue — and surfacing the internal
@@ -128,7 +128,7 @@ An async client walks `/api/v2/products` with oversized pages and enumerates
 pages, and block a sequential id walk. **Discuss:** which legitimate client is most at
 risk from an IP-keyed budget? (CGNAT and corporate NAT — see §2.12.)
 
-## Round 2: GraphQL introspection + alias batching ⚔️ query limits (28 min)
+## Round 2: GraphQL introspection + alias batching ⚔️ query limits
 
 One introspection query downloads the whole schema; one aliased operation packs dozens
 of `product` fetches into a single HTTP request.
@@ -144,7 +144,7 @@ of `product` fetches into a single HTTP request.
 is `__typename` left allowed? **Note:** the alias counter here does not follow fragment
 spreads — remember that for Round 3.
 
-## Round 3: fragment-spread amplification ⚔️ persisted queries (26 min)
+## Round 3: fragment-spread amplification ⚔️ persisted queries
 
 Hide the aliases inside a fragment and spread it. Round 2's alias limiter counts the
 surface aliases (zero) and waves it through — the shape of CVE-2026-47707.
@@ -159,9 +159,7 @@ surface aliases (zero) and waves it through — the shape of CVE-2026-47707.
 **Exercise:** enforce a trusted-document allowlist and count aliases *through* fragments.
 **Discuss:** why does APQ-that-registers-on-first-use give you no security here?
 
-## ☕ Break (10 min)
-
-## Round 4: WebSocket flood + cross-site hijack ⚔️ connection guard (26 min)
+## Round 4: WebSocket flood + cross-site hijack ⚔️ connection guard
 
 One WebSocket, opened from a forged origin with no token, floods bid messages — invisible
 to any HTTP rate limiter.
@@ -176,7 +174,7 @@ to any HTTP rate limiter.
 **Exercise:** check the Origin, require auth for state-changing messages, and meter
 messages per connection. **Discuss:** why does the same-origin policy not save you here?
 
-## Round 5: harvested-token replay ⚔️ request signing (21 min)
+## Round 5: harvested-token replay ⚔️ request signing
 
 The attacker replays a captured bearer token from their datacenter, unsigned, against the
 protected endpoints.
@@ -202,7 +200,7 @@ should show real users caught = 0. That is the number that justifies the defense
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified October 2026 with Python 3.12.15, Flask 3.1.3, SQLAlchemy 2.1.4, strawberry-graphql 0.333.0, flask-sock 0.7.0, websockets 17.2, PyJWT 2.15.1, redis 8.1.0, fakeredis 2.39.0, on the fakeredis + SQLite default (levels 1-5 pass `tools/checkpoint.py --catch-up` with 40/40 legitimate clients served; every attack run at level 0 reproduces the first column). The `docker compose` path is verified separately. A cell is the
 attack's outcome at that cumulative `DEFENSE_LEVEL`; **bold** marks the level that first

@@ -97,7 +97,7 @@ exact counts are not. The mock's "vision" step reads a label embedded in each
 tile PNG — a documented stand-in for a model's eyes; a real vision model sees the
 pixels.
 
-## Instructor expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
 redis 8.1.0, fakeredis 2.39.0, requests 2.34.2 and Pillow 12.3.0, on the default

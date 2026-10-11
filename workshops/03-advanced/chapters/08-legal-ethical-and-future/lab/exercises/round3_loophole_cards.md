@@ -1,8 +1,8 @@
 # Round 3: Loophole Cards (🔴 red team)
 
-Swap rules-of-engagement drafts with the other team. Pick cards, read the draft, and answer each one with **"allowed"**, **"forbidden"** or **"the document doesn't say"**, citing the section number. Every "doesn't say" is a point for you and a hole in their document. Four minutes; the blue team then has two minutes to patch.
+Take a rules-of-engagement draft that is not yours: a peer's, or, working alone, your own draft read as the opponent. Pick cards, read the draft, and answer each one with **"allowed"**, **"forbidden"** or **"the document doesn't say"**, citing the section number. Every "doesn't say" is a point for you and a hole in their document. The blue team then patches.
 
-Keep the answers honest. The aim is a document that survives this afternoon, not a trick.
+Keep the answers honest. The aim is a document that survives the Capstone, not a trick.
 
 | # | Card | Which section should answer it |
 |---|---|---|

@@ -1,8 +1,8 @@
 # Capstone brief: Govern the Agents
 
-**Scenario.** It is launch day for the *Lab Runner 9* drop on the Lab Store. For
-three days you built the AI-era stack piece by piece. Today you run all of it at
-once, against everything that shows up, under the AI governance record your team
+**Scenario.** It is launch day for the *Lab Runner 9* drop on the Lab Store. Across
+W4 you built the AI-era stack piece by piece. Now you run all of it at
+once, against everything that shows up, under the AI governance record you
 wrote in W4 Ch8.
 
 **Who must get in.**
@@ -33,5 +33,5 @@ has a non-visual path and whether the person behind an agent ever sees it). A bl
 of a real user is a failure. A challenge is a cost you count, not a failure.
 
 Bring your governance record from W4 Ch8 (or use
-`solutions/round4/governance_record.md`). The team that found the most holes in
-Chapter 8 audits in Round 4.
+`solutions/round4/governance_record.md`). In Round 4 you audit
+it against the live store.

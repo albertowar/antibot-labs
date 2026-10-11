@@ -1,6 +1,6 @@
 # Chapter 4 Lab: Detection Signal Lifecycle & Ops
 
-**Format:** Round 0 plus 4 attack ⚔️ defend rounds, ~94 min of the 2.5-hour chapter (including a 10-min break). See `../chapter_04_content.md`, §4.6.
+**Format:** Round 0 plus 4 attack ⚔️ defend rounds. See `../chapter_04_content.md`, §4.6.
 
 The W2 stack is in production. The eight sensors, the correlation layer, the risk score and the response ladder you built in **W2 Ch8** are live, and the **W2 Ch7** model joins them as one more sensor with three roles. Nothing new is *built* here. The job is to **operate** what you have as the world moves: notice a signal going quiet, measure drift before it becomes a crisis, retrain and ship a model without hurting anyone, and run the incident when an attack finally slips through.
 
@@ -34,7 +34,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -97,7 +97,7 @@ python tools/checkpoint.py --round 3
 
 ---
 
-## Round 0: Baseline — a stack that wins (10 min)
+## Round 0: Baseline — a stack that wins
 
 🔵 Replay week 1 and record what "normal" looks like. The naive stuffer and the pre-stealth headless bot are exactly what the W2 stack was built against.
 
@@ -112,7 +112,7 @@ Every bot is blocked; 7.7% of customers hit a challenge (the irreducible VPN/Tor
 
 ---
 
-## Round 1: A signal goes quiet ⚔️ burned signals (18 min)
+## Round 1: A signal goes quiet ⚔️ burned signals
 
 🔴 Week 2: the operator read a week of 403s and upgraded half the fleet to a TLS-impersonation library and a stealth browser. The library User-Agent, the non-browser JA4 and the wrong header order **stop appearing**.
 
@@ -135,7 +135,7 @@ python tools/checkpoint.py --round 1     # block rate back to ~100%, users hurt 
 
 ---
 
-## Round 2: The world moves under you ⚔️ drift (18 min)
+## Round 2: The world moves under you ⚔️ drift
 
 🔴 Week 3, two changes land at once. Chrome 146 ships (a new header order and a new JA4 the week-0 corpus has never seen), and Example Fiber buys an address range that your edge's six-month-old map still calls a datacenter on the community blocklist. The same week, the bots switch to residential exits and a humanized mouse, so on week-3 signals they are **invisible**.
 
@@ -158,11 +158,7 @@ The drift report flags the bot behavioural shift (PSI > 0.2 on the score and the
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Retrain without poisoning yourself ⚔️ the feedback loop (20 min)
+## Round 3: Retrain without poisoning yourself ⚔️ the feedback loop
 
 🔴 Week 4: the evaders now sign in with the valid pairs they found. The weak-label rule — *signed in, so it is human* — labels every one of them human. A retrain on those labels learns that evader traffic is a customer.
 
@@ -190,7 +186,7 @@ python tools/checkpoint.py --round 3
 
 ---
 
-## Round 4: When one slips through ⚔️ incident response (16 min)
+## Round 4: When one slips through ⚔️ incident response
 
 🔴 Week 5: a farm with a fresh fingerprint per session, residential exits and a real hand's mouse timing. It shows **no signal** the stack has, the model included, and it reaches 42 accounts. You cannot re-weight your way out; there is nothing to weight.
 
@@ -214,7 +210,7 @@ In the containment window the farm reaches **0** accounts, at the cost of challe
 
 ---
 
-## Debrief (12 min)
+## Debrief
 
 ```bash
 python tools/ops.py --all
@@ -228,7 +224,7 @@ python tools/label.py --audit            # how wrong "obviously fine" labels wer
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified end to end on Python 3.12.15 with the pinned `requirements.txt` (Flask 3.1.3, redis 8.1.0, numpy 2.5.4, pandas 3.0.6, scikit-learn 1.9.1, lightgbm 4.7.0, prometheus-client 0.26.0) and `REDIS_URL=memory://`; checkpoints for rounds 0-4 pass, and the five-week table below reproduces exactly. The population and the bots are seeded, so counts are exact; pipeline timings vary with the machine. Each `checkpoint.py --round N` resets and replays weeks 1..N with every fix applied, so the numbers reproduce.
 

@@ -1,6 +1,6 @@
 # Chapter 2 Lab: Verified Bot Identity
 
-**Format:** 5 checkpoints in 4 rounds of defend 🔵 ⚔️ attack 🔴, ~82 min of rounds plus two debriefs. See `../chapter_02_content.md`, §2.5.
+**Format:** 5 checkpoints in 4 rounds of defend 🔵 ⚔️ attack 🔴, plus two debriefs. See `../chapter_02_content.md`, §2.5.
 
 You run a store that wants search engines and AI crawlers to index it, and that gives
 verified crawlers a *fast lane*: 600 requests a minute instead of the 30 every anonymous
@@ -48,7 +48,7 @@ matching, Ed25519 signatures. No browser, no JavaScript. `cryptography` does the
 signing; the RFC 9421 signature base is built by hand in `httpsig.py` so you can read
 the exact bytes an agent signs.
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -60,7 +60,7 @@ python attacks/round1_ua_spoof.py                       # terminal 3: should pri
 ```
 
 Three terminals: the mock internet, the store, and one for attacks and tools. The store
-and the mock stay up all session; you restart the store at each round's `DEFENSE_LEVEL`.
+and the mock stay up for the whole lab; you restart the store at each round's `DEFENSE_LEVEL`.
 
 **Defense levels.** Each level includes every level below it.
 
@@ -97,7 +97,7 @@ python tools/scoreboard.py                  # the decision log by actor, after a
 python tools/checkpoint.py --round N --catch-up   # fell behind? apply the reference solution, restart the store
 ```
 
-## Round 1: UA spoof ⚔️ reverse DNS (10 + 8 min)
+## Round 1: UA spoof ⚔️ reverse DNS
 
 The store is at level 0. The honest scraper gets 30 pages and a wall of 429s. The same
 scraper with `User-Agent: Mozilla/5.0 (compatible; Googlebot/2.1; …)` gets all 200.
@@ -114,7 +114,7 @@ and the signed ChatGPT agent publish no reverse DNS, so this check can never pas
 That is the price of Round 1, and Round 3 pays it back. Also look at the cost line: every
 claimant request now waits for a DNS round trip.
 
-## Round 2: forged PTR ⚔️ forward confirmation (14 min)
+## Round 2: forged PTR ⚔️ forward confirmation
 
 The attacker owns 192.0.2.0/24's reverse zone (every hosting panel lets you set your
 PTR). First a substring trick, then an outright forgery.
@@ -130,12 +130,12 @@ PTR). First a substring trick, then an outright forgery.
 the substring attack. **Discuss:** the cache turned 380 lookups into 6. What TTL would you
 give a *negative* verdict, and what happens to Googlebot during a resolver outage?
 
-### 💬 Debrief (5 min)
+### 💬 Debrief
 
 `python tools/scoreboard.py`. Read the `claim` and `verified as` columns side by side:
 who said what, who could prove it, and who paid for the proof.
 
-## Round 3: shared-infrastructure squat ⚔️ range files + scoping (20 min)
+## Round 3: shared-infrastructure squat ⚔️ range files + scoping
 
 Google's user-triggered fetchers run partly on App Engine. Their reverse DNS is
 `*.gae.googleusercontent.com`, a suffix Google's own verification page lists as valid,
@@ -158,15 +158,13 @@ fetcher gets a person's budget under your own `lane_for()`. What would prove *th
 request comes from OpenAI? Anthropic's single `bots.json` covers three bots: what can and
 can't you decide from it?
 
-## ☕ Break (10 min)
-
-## Round 4: Web Bot Auth ⚔️ anyone with a key (14 + 16 min)
+## Round 4: Web Bot Auth ⚔️ anyone with a key
 
 The agent signs each request (RFC 9421, Ed25519) and points `Signature-Agent` at the
 origin that publishes its keys. Level 4 verifies the signature. Level 5 decides what a
 valid signature is worth.
 
-**Checkpoint 4: verify (14 min).**
+**Checkpoint 4: verify.**
 
 | Step | Do | Expected |
 |---|---|---|
@@ -174,7 +172,7 @@ valid signature is worth.
 | 🔵 Defend | Implement `verify()` in `defenses/web_bot_auth.py` (the docstring lists the six steps; `fetch_directory()` is given). Restart at `DEFENSE_LEVEL=4` | – |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 4` | crawlers **8/8** · humans 0 · 1 directory fetch · `ℹ L4 is naive on purpose: a self-signed agent got 200/200` |
 
-**Checkpoint 5: the attacks that beat verification, and the policy that stops them (16 min).**
+**Checkpoint 5: the attacks that beat verification, and the policy that stops them.**
 
 | Step | Do | Expected |
 |---|---|---|
@@ -190,7 +188,7 @@ a Signature-Agent URL unless it made this association.") In (b) one replay still
 through: why can no verifier distinguish the first replay from the original, and what
 could the *signer* cover to shrink the blast radius?
 
-## Wrap-up: the scoreboard (10 min)
+## Wrap-up: the scoreboard
 
 At level 5, run every attack and the cohorts, then the scoreboard:
 
@@ -205,7 +203,7 @@ level, which genuine crawler was the false positive, and which real-world check 
 this lab) would still have been missing? Then hand off to Chapter 3: now that you know
 who a crawler is, what do you charge it?
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, httpx 0.28.1, cryptography 50.0.2, redis 8.1.0 and fakeredis 2.39.0 (`REDIS_URL=memory://`), with the reference solutions applied cumulatively; checkpoints 1–5 reproduce the numbers below.
 

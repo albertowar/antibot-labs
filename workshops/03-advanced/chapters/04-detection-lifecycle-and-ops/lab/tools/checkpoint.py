@@ -3,8 +3,8 @@ Round checkpoint and catch-up
 
 Each round of this chapter is an operations task on a store that has been
 running for weeks. The checkpoint drives the whole canonical sequence for a
-round from a clean slate and checks the result, so a student who fell behind
-can catch up with one command, and an instructor can reproduce every number
+round from a clean slate and checks the result, so if you fell behind
+you can catch up with one command, and you can reproduce every number
 in the README.
 
     python tools/checkpoint.py --round 2          run rounds 0..2 and verify round 2
@@ -27,7 +27,7 @@ What each round does (the reference solution, and what you did by hand):
      snapshot.py, label.py, incident.py)
 
 The server must be running (REDIS_URL=memory:// python demo_site/app.py).
-The checkpoint talks to it over DEMO_URL, exactly as a student would.
+The checkpoint talks to it over DEMO_URL, exactly as you would.
 """
 
 import argparse
@@ -49,7 +49,7 @@ ACTED = ("block", "pow", "step_up")
 
 
 def run(*argv, quiet=True):
-    """Run a lab tool as the student would, from the lab root."""
+    """Run a lab tool as you would, from the lab root."""
     cmd = [PY] + list(argv)
     out = subprocess.run(cmd, cwd=LAB, capture_output=True, text=True)
     if not quiet or out.returncode:
@@ -209,7 +209,7 @@ def check(target):
     if fails:
         for f in fails:
             print(f"❌ {f}")
-        print("\n   Compare with the instructor table in README.md.")
+        print("\n   Compare with the Expected results table in README.md.")
         return 1
     print(f"✅ Round {target} checkpoint passed.")
     return 0

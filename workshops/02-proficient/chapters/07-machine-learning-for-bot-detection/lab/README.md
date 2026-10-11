@@ -1,6 +1,6 @@
 # Chapter 7 Lab: Machine Learning for Bot Detection
 
-**Format:** 4 rounds of attack ⚔️ defend plus a data round, ~125 min of lab (including a 10-min break) inside the 3-hour chapter. See `../chapter_07_content.md`, §7.6.
+**Format:** 4 rounds of attack ⚔️ defend plus a data round. See `../chapter_07_content.md`, §7.6.
 
 It is drop day at the demo store: a limited sneaker release. You play both sides. As the **defender**, you train a model on the store's event log and switch it on at checkout. As the **attacker**, you run the bot that beats it. Every round ends with a checkpoint that reports bots caught *and* real customers blocked.
 
@@ -48,7 +48,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -152,7 +152,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Round 0: Drop day, data and labels (15 min)
+## Round 0: Drop day, data and labels
 
 | Step | Do | Expected |
 |---|---|---|
@@ -164,7 +164,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Round 1: Model v1 ⚔️ the humanized bot (35 min)
+## Round 1: Model v1 ⚔️ the humanized bot
 
 | Step | Do | Expected |
 |---|---|---|
@@ -179,7 +179,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Round 2: Cohort features ⚔️ the fingerprint farm (30 min + break)
+## Round 2: Cohort features ⚔️ the fingerprint farm
 
 | Step | Do | Expected |
 |---|---|---|
@@ -188,7 +188,6 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 | 🔵 Defend | `python defenses/train.py --round 2`, then `--random-split` | temporal holdout AUC collapses (unseen campaign; 0.72 for LightGBM on a log with one humanized wave, about 1.0 if extra humanized waves from earlier checkpoints are in the log); random split hides it; top features now cohort |
 | 🔵 Exercise | `TODO (Round 2)` in `defenses/cohort.py`: add your own cohort feature, retrain | – |
 | 🔵 Switch on | restart with `DEFENSE_LEVEL=2`, `python attacks/round1_humanized.py` | ≈ 0–3 of 60 get through; `explain.py --model 2 --sid <sid>` shows `fp_ip24_fanout_1h` doing the work |
-| ☕ | **Break (10 min)** | |
 | 🔴 Attack | `python attacks/round2_farm.py` | ≈ all succeed: every cohort count is 1 |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 2` | humanized ≤ 20% · farm gets through · real users ≤ 3% |
 
@@ -196,7 +195,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Round 3: Anomaly detector ⚔️ the oracle prober (25 min)
+## Round 3: Anomaly detector ⚔️ the oracle prober
 
 | Step | Do | Expected |
 |---|---|---|
@@ -212,7 +211,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Round 4: Deny the oracle (10 min)
+## Round 4: Deny the oracle
 
 | Step | Do | Expected |
 |---|---|---|
@@ -224,7 +223,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Wrap-up: both sides of the ledger (10 min)
+## Wrap-up: both sides of the ledger
 
 - Compare the five scoreboards. Which defense cost the most real customers, and which cohort paid?
 - Which attack would you expect next, and which layer from Chapter 8 would you add instead of another feature?
@@ -232,7 +231,7 @@ Ground truth (who is really a bot) comes from `data/truth.jsonl`, which the simu
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Reference run on 2026-10-11: Python 3.12.15, Flask 3.1.3, SQLAlchemy 2.1.4, numpy 2.5.4, pandas 3.0.6, pyarrow 26.0.0, scikit-learn 1.9.1, LightGBM 4.7.0, httpx 0.28.1, SQLite (no Docker; the `docker compose` path is verified separately), `LAB_TIME_SCALE=0.02`, default seeds, on a shared WSL2 machine. Success = share of that attack's checkouts confirmed. Checkpoint traffic per run: 200 real users, 40 baseline, 30 humanized, 30 farm, 30 prober-exploit sessions.
 
@@ -256,7 +255,7 @@ Training: v1 in ~1 s, v2 in ~2 s (5-fold out-of-fold threshold included), anomal
 **Things to watch for**
 
 - **Concurrency changes latency, not decisions.** One checkout scores in about 1–2 ms when scored on its own. The checkpoint sends 16 concurrent sessions to a single-process Flask development server, so its p50 is mostly queueing for the GIL (the reference machine was also heavily loaded). Discuss it as a deployment lesson: in production, scoring runs in its own service. Personas are deterministic per seed, but thread scheduling changes which sessions overlap in time (and so the cohort counts), so success counts vary by a few sessions between runs.
-- **Round 2 depends on Round 1's attack traffic** being in the database. Students who skipped the attack have no cluster to label: `--catch-up` runs it for them.
+- **Round 2 depends on Round 1's attack traffic** being in the database. If you skipped the attack you have no cluster to label: `--catch-up` runs it for them.
 - **`--include-leaky` and `--random-split` never save a model**, so they are safe to run any time.
 - **Never let anyone train on `data/truth.jsonl`.** It is the scoreboard's answer key.
 

@@ -76,7 +76,7 @@ NAIVE_TEMPLATE = (
 
 
 def build_messages(card, hardened):
-    """The prompt the model sees. The ONLY difference students make in Round 2."""
+    """The prompt the model sees. The ONLY difference you make in Round 2."""
     if hardened:
         raise NotImplementedError("TODO (Round 2): hardened prompt not built yet.")
     flat = flatten(card)

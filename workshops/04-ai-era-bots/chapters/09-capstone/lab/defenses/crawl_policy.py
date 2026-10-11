@@ -1,7 +1,7 @@
 """
 W4 Ch9 Capstone — the published crawl policy: one reservation, four channels (GIVEN)
 
-The reservation stack students built in W4 Ch8 Round 1 lives in reservation/:
+The reservation stack you built in W4 Ch8 Round 1 lives in reservation/:
 
     robots.txt     access rules (RFC 9309) plus the usage lines crawlers read there:
                    Content-Signal (Cloudflare, 2025; Search / Agent / Training split 2026)

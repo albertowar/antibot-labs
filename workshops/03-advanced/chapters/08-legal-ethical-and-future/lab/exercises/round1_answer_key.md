@@ -1,6 +1,6 @@
-# Round 1 Answer Key (instructor)
+# Round 1 Answer Key
 
-Current to October 2026. These are the positions a careful practitioner would hold on the facts as written; a real case turns on the actual terms, the actual logs and the forum. Where a ruling is from one district court, or is on appeal, say so out loud: students should leave knowing which "rules" are settled and which are one judge's opinion.
+Current to October 2026. These are the positions a careful practitioner would hold on the facts as written; a real case turns on the actual terms, the actual logs and the forum. Where a ruling is from one district court, or is on appeal, say so plainly: you should leave knowing which "rules" are settled and which are one judge's opinion.
 
 | Case | Claim | Survives? | Why |
 |---|---|---|---|

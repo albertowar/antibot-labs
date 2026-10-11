@@ -7,8 +7,8 @@ Chapter 8: catch-up checkpoints for the three rounds.
     python tools/checkpoint.py --round 3 --record my.md      score a drafted governance record against the checklist
 
 Round 3 scoring is keyword matching, on purpose. It checks that a topic is
-addressed, not that it is addressed well; the audit cards in the other team's
-hands do the second part. A record that says "we comply with applicable law"
+addressed, not that it is addressed well; the audit cards
+do the second part. A record that says "we comply with applicable law"
 under every heading is the most common defect, and no grep finds it.
 """
 
@@ -89,7 +89,7 @@ def round3(record_path=None):
         print(f"  [{'x' if hit else ' '}] {i:>2}. {name:<32} {'' if hit else '<- missing: ' + what}")
     print(f"\nCovered {covered}/12. Target: 10 or more, and no audit card left unanswered.")
     if covered < 12:
-        print("Keyword matching only checks that a topic is present. The other team's audit cards check whether it holds.")
+        print("Keyword matching only checks that a topic is present. The audit cards check whether it holds.")
 
 
 def main():

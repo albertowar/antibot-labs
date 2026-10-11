@@ -22,7 +22,7 @@ lab/
   data/           synthetic combo list, breach corpus, users (seeded)
 ```
 
-## Setup (before the session)
+## Setup
 
 ```bash
 python -m venv .venv && . .venv/bin/activate      # one venv per chapter, see the root README
@@ -105,8 +105,6 @@ defense — note it on the scoreboard and carry it forward.
 `/forgot-password`, then gives each attempt its own /24. No cohort reaches the
 sample floor, so no cohort can be challenged without challenging everyone.
 
-## ☕ Break (10 min)
-
 ## Round 3: 🔵 breached-password screen + oracle hardening ⚔️ 🔴 stealer-log replay (DEFENSE_LEVEL=3)
 
 | Step | Do | Expected |
@@ -119,8 +117,6 @@ sample floor, so no cohort can be challenged without challenging everyone.
 **False-positive check:** screening breached passwords is the single best control
 against stuffing — but ~25 real users whose password is genuinely breached now hit
 a step-up. They complete it (TOTP) and get in; count it as friction, not a block.
-
-## ☕ Break (10 min)
 
 ## Round 4: 🔵 device/context risk + sensitive-action re-auth ⚔️ 🔴 session-cookie replay (DEFENSE_LEVEL=4)
 
@@ -144,7 +140,7 @@ point — no single layer wins, and the cheapest layer (per-IP throttle) has the
 bluntest false-positive profile (CGNAT), while the sharpest (breached-password
 screen, device/context) cost recoverable friction instead of hard blocks.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with the reference solutions (installed with `--catch-up`) on Python 3.12.15,
 Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, `fakeredis` 2.39.0, pyotp 2.10.0, httpx 0.28.1 and SQLite (no Docker; the `docker compose` path is verified separately), 1000-pair combo list, 145 simulated users. Small run-to-run

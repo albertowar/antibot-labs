@@ -1,6 +1,6 @@
 # Chapter 8 Lab: Multi-Layered Defense Architecture
 
-**Format:** shadow mode plus 4 rounds, ~77 min including the debrief. See `../chapter_08_content.md`, §8.5.
+**Format:** shadow mode plus 4 rounds. See `../chapter_08_content.md`, §8.5.
 
 In W1 and the earlier W2 chapters you built one defense at a time. This lab puts eight of them in front of one login form and asks the question every production team eventually faces: **how do the layers decide together, and who pays when they get it wrong?**
 
@@ -25,7 +25,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -103,7 +103,7 @@ What it reports:
 
 ---
 
-## Round 0: Shadow mode (10 min)
+## Round 0: Shadow mode
 
 **🛡️ Defend (look):** start at `DEFENSE_LEVEL=0`, then:
 
@@ -126,7 +126,7 @@ Five layers would each veto it on their own. In shadow mode it is allowed and lo
 
 ---
 
-## Round 1: The veto chain ⚔️ staying under every line (14 min)
+## Round 1: The veto chain ⚔️ staying under every line
 
 | Step | Do | Expected |
 |---|---|---|
@@ -140,7 +140,7 @@ The attacker's operator never saw your code. They saw 403s, fixed one thing at a
 
 ---
 
-## Round 2: Risk score + ladder ⚔️ the leaky verdict (15 min)
+## Round 2: Risk score + ladder ⚔️ the leaky verdict
 
 | Step | Do | Expected |
 |---|---|---|
@@ -159,11 +159,7 @@ Round 1's bot is caught: the score adds up what no layer could. Then read the 40
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Opaque responses + correlation ⚔️ the clean-looking session (14 min)
+## Round 3: Opaque responses + correlation ⚔️ the clean-looking session
 
 | Step | Do | Expected |
 |---|---|---|
@@ -179,7 +175,7 @@ Two changes. First, a block now returns the exact bytes of a wrong password: the
 
 ---
 
-## Round 4: Campaign layer ⚔️ low and slow (14 min)
+## Round 4: Campaign layer ⚔️ low and slow
 
 | Step | Do | Expected |
 |---|---|---|
@@ -199,7 +195,7 @@ A stuffing run fails most of its logins, because most of its list are not your c
 
 ---
 
-## Debrief (10 min)
+## Debrief
 
 ```bash
 python tools/checkpoint.py --round 4
@@ -212,7 +208,7 @@ python tools/sweep.py --signal no_keystrokes       # the largest minority you ne
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, requests 2.34.2 and the `memory://` store (no Docker). Rounds 2 and 4 were also run through the redis-py 8.1.0 client against fakeredis 2.39.0 served over TCP, with the same counts. The `docker compose` path (real Redis 8) is verified separately. The population is seeded, so the counts are exact; pipeline timings vary with the machine.
 
@@ -237,7 +233,7 @@ Attacker profiles, as scored by `tools/sweep.py --signals`:
 Things to watch for:
 
 - **The step-up never fires on the population.** That is correct: real customers do not fail half their logins. The hot-cluster path (202 → `/lab/mailbox` → `/login/verify`, single-use codes, identical response for unknown users) was verified separately with the Flask test client.
-- **The in-page JavaScript** (collector, WebCrypto proof-of-work, step-up prompt) is for students who want to log in from their own browser. It was not exercised by the automated verification.
+- **The in-page JavaScript** (collector, WebCrypto proof-of-work, step-up prompt) is for learners who want to log in from their own browser. It was not exercised by the automated verification.
 - **Redis vs. memory.** The counts are identical; only the `store` line in the checkpoint header changes.
 - If someone edits a weight and the checkpoint fails, `tools/sweep.py` replays the log against the shipped thresholds without restarting anything.
 

@@ -1,7 +1,7 @@
 {
   "name": "reference",
   "_comment": [
-    "Instructor solution for Round 2. Not the only good answer.",
+    "Reference solution for Round 2. Not the only good answer.",
     "Nothing is blocked for being an agent. After Amazon v. Perplexity (9th Cir. 2026) a",
     "user's local agent is the user, so the policy treats 'agent' as a client type, not a",
     "verdict, and puts the weight where the farm differs from the shopper: reused",

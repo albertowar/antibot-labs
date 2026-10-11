@@ -50,7 +50,7 @@ def account_limit(device_class, mode="rarity"):
     """
     Maximum accounts per fingerprint per day, or None for "don't link".
 
-    mode="naive" treats every fingerprint as unique: the version students
+    mode="naive" treats every fingerprint as unique: the version learners
     run first in Round 3 to see who it hurts.
     """
     if mode == "naive":

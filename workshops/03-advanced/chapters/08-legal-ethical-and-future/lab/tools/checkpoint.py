@@ -26,7 +26,7 @@ ROE_CHECKLIST = [
      r"authori[sz]|sign[- ]?off|permission|approv"),
     ("in-scope targets", "Exactly which hosts and ports may be attacked (own stack, assigned opponent)",
      r"in[- ]scope|scope:|targets?\b.*(host|port|127\.0\.0\.1|localhost|docker)"),
-    ("out of scope", "What is explicitly off limits: other teams, instructor hosts, the internet, vendor endpoints",
+    ("out of scope", "What is explicitly off limits: other teams, organiser hosts, the internet, vendor endpoints",
      r"out[- ]of[- ]scope|off[- ]limits|not in scope|forbidden targets|never target"),
     ("prohibited techniques", "No DoS or resource exhaustion, no direct attacks on data stores, no host exploitation",
      r"(denial[- ]of[- ]service|\bdos\b|volumetric|exhaust)|(redis|postgres|database|data store).*(prohibit|forbid|not|never)|(prohibit|forbid|not|never).*(redis|postgres|database|data store)"),

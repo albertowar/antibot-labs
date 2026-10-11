@@ -1,7 +1,7 @@
 """
 W3 Ch1 — Environment check (run this first)
 
-Confirms the pieces are in place before the session: Python version, the lab
+Confirms the pieces are in place before you start: Python version, the lab
 packages, the TLS certificate, and whether the store answers. mitmproxy is
 optional (only the live interception demo needs it), so it is reported but never
 fails the check.

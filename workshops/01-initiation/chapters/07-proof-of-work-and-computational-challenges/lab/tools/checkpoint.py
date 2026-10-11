@@ -3,7 +3,7 @@ Round checkpoint for Chapter 7 (The Price of a Page). Declares the rounds and ha
 
     python tools/checkpoint.py --round 3              # set the level, run the round's attacks next to the shoppers
     python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first
-    python tools/checkpoint.py --all --markdown       # every round (the instructor's table)
+    python tools/checkpoint.py --all --markdown       # every round (the expected-results table)
 
 PoW rarely *blocks* a paying bot, so every round reports price as well as success: CPU-seconds
 and dollars per 1,000 products for the bot, and for the shoppers the wait (hashes / device rate)

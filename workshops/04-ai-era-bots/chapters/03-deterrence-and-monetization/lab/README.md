@@ -1,6 +1,6 @@
 # W4 Ch3 Lab — Deterrence & Monetization for AI Crawlers
 
-**Format:** 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc, timings and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
+**Format:** 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
 
 The shop every AI crawler in this chapter wants: 300 products served the way a real shop serves them, through HTML, search, a JSON API and a sitemap. Each round climbs one rung of crawler governance: publish a policy, enforce it on crawlers you can verify, deter the ones you can't, and charge the ones who will pay. Every checkpoint measures what each rung stops **and** what it costs real users, readers, prefetchers and the verified search crawler.
 

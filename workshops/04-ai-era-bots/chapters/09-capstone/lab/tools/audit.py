@@ -1,5 +1,5 @@
 """
-W4 Ch9 Capstone — the governance audit: the other team's cards, run against the LIVE store
+W4 Ch9 Capstone — the governance audit: the audit cards, run against the LIVE store
 
 W4 Ch8 Round 3 swapped governance records on paper. Here the records describe a
 store that is actually running, so the auditor's cards are checks, not
@@ -15,7 +15,7 @@ probe that confirms it on the running store:
     6  retention                         governance.json publishes retention_days <= 90 and /admin/purge honours it
     7  human in the rule loop            every active rule has an audit line whose `by` is a named person
 
-Also scores a team's governance record against the 12-item checklist:
+Also scores a governance record against the 12-item checklist:
     python tools/audit.py --record exercises/governance_record.md
 
     python tools/audit.py                 # the 7 live cards

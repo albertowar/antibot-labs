@@ -72,7 +72,7 @@ python attacks/round4_account_farm.py --clean-emails   # dodge the disposable bl
 python attacks/round5_click_fraud.py --sivt        # sophisticated invalid traffic
 ```
 
-## Instructor expected results
+## Expected results (self-check)
 
 Measured on the default fakeredis + SQLite backend (`DROP_STOCK=50`, 1000-row combo
 list, 10 real hits). Numbers are deterministic up to small timing jitter.

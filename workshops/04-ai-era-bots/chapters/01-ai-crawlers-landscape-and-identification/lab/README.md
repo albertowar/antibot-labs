@@ -1,6 +1,6 @@
 # W4 Ch1 Lab — AI Crawlers: Landscape & Identification
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc, timings and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
 
 The demo store is the Workshop 4 starter state: an HTML catalogue of 120 products with a sitemap, an RSS feed, static assets and a `robots.txt`. AI crawlers want the catalogue. You build crawler identification in four rounds, and every checkpoint measures what each layer stops **and** what it costs the 14 legitimate personas: people, feed readers, link previewers and verified search crawlers.
 

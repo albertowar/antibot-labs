@@ -26,7 +26,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.2). Adds: five header 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack ⚔️ defend, ~105 min. See `../chapter_04_content.md`, §4.7.
+**Format:** 6 rounds of attack ⚔️ defend. See `../chapter_04_content.md`, §4.7.
 
 You play both sides. In each round, the attacker runs a script against the demo store. The defender then turns on the next defense layer and measures two things: what it catches, and what it costs. Then the attacker works out what to try next.
 
@@ -48,7 +48,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd lab
@@ -135,7 +135,7 @@ What it reports:
 
 ---
 
-## Round 0: Recon (15 min)
+## Round 0: Recon
 
 **🗡️ Attack (look):**
 
@@ -162,7 +162,7 @@ If you have a display, `python tools/capture_profiles.py` does the same for Chro
 
 ---
 
-## Round 1: Naive scraper ⚔️ User-Agent parsing (15 min)
+## Round 1: Naive scraper ⚔️ User-Agent parsing
 
 | Step | Do | Expected |
 |---|---|---|
@@ -175,7 +175,7 @@ If you have a display, `python tools/capture_profiles.py` does the same for Chro
 
 ---
 
-## Round 2: Chrome User-Agent ⚔️ presence & consistency (15 min)
+## Round 2: Chrome User-Agent ⚔️ presence & consistency
 
 | Step | Do | Expected |
 |---|---|---|
@@ -190,11 +190,7 @@ The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Copied browser headers ⚔️ Client Hints & order (20 min)
+## Round 3: Copied browser headers ⚔️ Client Hints & order
 
 | Step | Do | Expected |
 |---|---|---|
@@ -211,7 +207,7 @@ The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 ---
 
-## Round 4: Spoofed Client Hints ⚔️ Accept-CH negotiation (20 min)
+## Round 4: Spoofed Client Hints ⚔️ Accept-CH negotiation
 
 | Step | Do | Expected |
 |---|---|---|
@@ -229,7 +225,7 @@ The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 ---
 
-## Round 5: Real browser with a UA override (10 min)
+## Round 5: Real browser with a UA override
 
 | Step | Do | Expected |
 |---|---|---|
@@ -248,7 +244,7 @@ Playwright rewrites the `User-Agent` and even the `Sec-CH-UA-Platform` hint. But
 
 ---
 
-## Wrap-up: false positives and cost (10 min)
+## Wrap-up: false positives and cost
 
 ```bash
 python tools/legit_traffic.py               # per-profile verdicts and reasons
@@ -262,7 +258,7 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, psycopg 3.3.6, requests 2.34.2, user-agents 2.2.0 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell) on Linux, on the no-Docker path (`DATABASE_URL=sqlite:///...`); the shipped `tools/profiles/` come from real Chrome 145 and Firefox 155. The `docker compose` path has not been run for the migrated lab. "403" means every scraping request was blocked.
 

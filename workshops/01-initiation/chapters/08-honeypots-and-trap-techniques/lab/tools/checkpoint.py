@@ -191,7 +191,7 @@ def main():
     print()
     if failures:
         print(f"❌ {failures} check(s) differ from the expected results. "
-              "Read the notes above, or ask your instructor.")
+              "Read the notes above, or compare with the expected-results table in the README.")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

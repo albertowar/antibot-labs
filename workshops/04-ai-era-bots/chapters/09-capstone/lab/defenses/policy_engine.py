@@ -2,8 +2,8 @@
 W4 Ch9 Capstone — the W4 Ch8 agent-policy evaluator, unchanged (GIVEN)
 
 This is decide() from W4 Ch8's tools/agent_audit.py, lifted into the live
-store so the policy a team wrote on Day 3 is the policy the store runs on
-Day 4. A policy (policies/agent_policy.json) is evaluated in this order:
+store so the policy written in W4 Ch8 is the policy the capstone store runs.
+A policy (policies/agent_policy.json) is evaluated in this order:
 
   1. rules             hard decisions on one fact: {"if_signal": "agent_ua", "action": "block"}
                        or {"if_client": "cloud_agent", "action": "challenge"}

@@ -1,6 +1,6 @@
 # W2 Ch1 Lab: Browser Automation Detection
 
-**Format:** Round 0 plus 4 attack ⚔️ defend rounds and a closing attack, ~126 min of hands-on time. See `../chapter_01_content.md`, §1.6.
+**Format:** Round 0 plus 4 attack ⚔️ defend rounds and a closing attack. See `../chapter_01_content.md`, §1.6.
 
 You play both sides. The attacker drives a real browser at the demo store. The defender adds a layer to the bot sensor that runs inside the page, then measures two things: what the layer catches, and what it costs real users. Then the attacker works out what to try next.
 
@@ -26,7 +26,7 @@ lab/
 
 ---
 
-## Setup (before the session, ~10 min)
+## Setup (~10 min)
 
 You need Python 3.12 or newer. Docker is optional.
 
@@ -134,7 +134,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## Round 0: Where Workshop 1 left us (10 min)
+## Round 0: Where Workshop 1 left us
 
 | Step | Do | Expected |
 |---|---|---|
@@ -147,7 +147,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## Round 1: CDP identity override ⚔️ the sensor gate + `navigator.webdriver` (25 min)
+## Round 1: CDP identity override ⚔️ the sensor gate + `navigator.webdriver`
 
 | Step | Do | Expected |
 |---|---|---|
@@ -166,7 +166,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## Round 2: Automation flags off ⚔️ consistency (25 min)
+## Round 2: Automation flags off ⚔️ consistency
 
 | Step | Do | Expected |
 |---|---|---|
@@ -182,11 +182,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: playwright-stealth ⚔️ lie detection (25 min)
+## Round 3: playwright-stealth ⚔️ lie detection
 
 | Step | Do | Expected |
 |---|---|---|
@@ -203,11 +199,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 4: patchright ⚔️ interaction evidence (25 min)
+## Round 4: patchright ⚔️ interaction evidence
 
 | Step | Do | Expected |
 |---|---|---|
@@ -225,7 +217,7 @@ Then restart the store with `DEFENSE_LEVEL=<N>`.
 
 ---
 
-## Round 5 + debrief: Forge the sensor (16 min)
+## Round 5 + debrief: Forge the sensor
 
 | Step | Do | Expected |
 |---|---|---|
@@ -245,7 +237,7 @@ Read `round5_forged_sensor.py`: it is `tools/legit_traffic.py` with a different 
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, Playwright 1.63.0 (Chromium 153.0.8010.12), patchright 1.63.0, playwright-stealth 2.0.3 and Selenium 4.51.0, against the store running on SQLite; every round's checkpoint (with `--catch-up`) and `scoreboard.py --bonus` at Level 4 reproduced the table below. Each cell shows `/api/products` / `/api/cart`. **Bold** marks the first block, and `–` means the attack never reached the cart.
 
@@ -275,7 +267,7 @@ Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
 
 Things to watch for:
 
-- **Version drift is the whole game.** When Playwright, patchright or Chrome update, rerun `scoreboard.py --bonus` at every level before the session. Then re-capture `tools/profiles/chromium-153-linux.json` with `/capture`, and update the version strings in the synthetic profiles.
+- **Version drift is the whole game.** When Playwright, patchright or Chrome update, rerun `scoreboard.py --bonus` at every level. Then re-capture `tools/profiles/chromium-153-linux.json` with `/capture`, and update the version strings in the synthetic profiles.
 - **Synthetic profiles.** Twelve of the thirteen profiles are synthetic. Their header order and native-code strings come from the real Chromium capture, and the identity values (UA, brands, GPU, geometry) are edited per browser. The Firefox, Safari and resistFingerprinting values are representative, not captured. Ask students to add their own browsers with `/capture` in Round 0. That's the best false-positive data you will get in the room.
 - **Headed attacks.** Every attack runs headless, so no display is needed. If a student runs patchright headed on a real desktop, the SwiftShader signal disappears too.
 - **Docker.** The expected results above were verified on SQLite; the docker compose (PostgreSQL) path is verified separately. It uses the same models and the same compose file as W1 Ch4.

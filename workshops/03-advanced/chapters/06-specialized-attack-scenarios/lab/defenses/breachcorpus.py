@@ -1,4 +1,4 @@
-"""k-anonymity breach-password lookup — shared helper, not student-edited.
+"""k-anonymity breach-password lookup — shared helper, not edited by you.
 
 The credential-stuffing economy runs on *known* passwords: combo lists are breach
 dumps. So the signature a stuffer cannot hide is that its hits are, by definition,

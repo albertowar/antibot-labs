@@ -15,7 +15,7 @@ Two policies, same interface: decide(goal, snapshot, memory) -> action dict.
 Actions: {"action": "goto", "path": …} | {"click", "selector"|"index"} |
          {"fill", "selector", "text"} | {"read_code"} | {"done", "note"}.
 
-The point of a deterministic default: the DEFENCES are what students study, and
+The point of a deterministic default: the DEFENCES are what you study, and
 they must behave identically on every machine. Swapping in OllamaPolicy changes
 how the agent *thinks*, not how the store *scores* it — the tells are in the
 hands and the headers, not the planner.

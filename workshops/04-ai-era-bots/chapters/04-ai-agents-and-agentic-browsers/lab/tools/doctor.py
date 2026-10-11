@@ -1,7 +1,7 @@
 """
 W4 Ch4 — Preflight check: packages, Chromium, keys, store reachability
 
-Run before the session to catch the usual setup problems early.
+Run before you start the lab to catch the usual setup problems early.
 
     python tools/doctor.py
 """

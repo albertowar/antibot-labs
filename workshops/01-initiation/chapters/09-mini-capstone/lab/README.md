@@ -1,6 +1,6 @@
 # Chapter 9 Lab: The Drop (Mini-Capstone)
 
-**Format:** Round 0–4 plus Drop Day, 115 min of lab plus a 10 min break. See `../chapter_09_content.md`, §9.6.
+**Format:** Round 0–4 plus Drop Day. See `../chapter_09_content.md`, §9.6.
 
 Twenty limited-edition hoodies go on sale at once. Forty simulated shoppers want one each, and five waves of scalper bots want all of them. You wire the W1 defenses into one gate, round by round, and after every round you read both halves of the scoreboard: who got the hoodies, and what your defense cost the shoppers.
 
@@ -32,7 +32,7 @@ lab/
 
 ---
 
-## Setup (before the session, ~10 min)
+## Setup (~10 min)
 
 ```bash
 cd workshops/01-initiation/chapters/09-mini-capstone/lab
@@ -77,7 +77,7 @@ Gate cost      median 5.54 ms · p95 19.00 ms over 148 requests                �
 
 ---
 
-## Round 0: Baseline (10 min)
+## Round 0: Baseline
 
 | Step | Do | Expected |
 |---|---|---|
@@ -86,7 +86,7 @@ Gate cost      median 5.54 ms · p95 19.00 ms over 148 requests                �
 
 Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 
-## Round 1: Rate limits + headers ⚔️ the cloud fleet (25 min)
+## Round 1: Rate limits + headers ⚔️ the cloud fleet
 
 | Step | Do | Expected |
 |---|---|---|
@@ -97,7 +97,7 @@ Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 
 **Exercise:** set `"checkout_ip": (3, 0.05)` in `policy.py`, restart, and rerun wave 1. The carrier-NAT shoppers (6 on one IP) start getting `429`, and wave 1 doesn't notice. Put it back to `(12, 0.2)`.
 
-## Round 2: IP reputation ⚔️ residential proxies (20 min)
+## Round 2: IP reputation ⚔️ residential proxies
 
 | Step | Do | Expected |
 |---|---|---|
@@ -108,9 +108,7 @@ Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 
 **Discuss:** set `TRUST_PRIVACY_RELAYS = False`, restart, and run `python tools/drop.py --waves none`. Both Private Relay shoppers are now stopped: their egress ranges are on the community VPN list (`known_vpn` 40). Put it back.
 
-## ☕ Break (10 min)
-
-## Round 3: Session guard + traps ⚔️ session minting (25 min)
+## Round 3: Session guard + traps ⚔️ session minting
 
 | Step | Do | Expected |
 |---|---|---|
@@ -121,7 +119,7 @@ Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 
 **Exercise:** set `MIN_FORM_SECONDS = 3.0`, restart, and run `python tools/humans.py`. The autofill shopper now scores `form_too_fast`. Put it back to `1.0`.
 
-## Round 4: Proof of work + binding + one per customer ⚔️ a browser per hoodie (20 min)
+## Round 4: Proof of work + binding + one per customer ⚔️ a browser per hoodie
 
 | Step | Do | Expected |
 |---|---|---|
@@ -132,7 +130,7 @@ Read `defenses/pipeline.py` (empty `LAYERS`) and `defenses/ladder.py`.
 
 Open `/drop` in your own browser and buy a hoodie: the "Checking your browser…" message is the page solving the proof of work with WebCrypto.
 
-## Drop Day (15 min)
+## Drop Day
 
 ```bash
 python tools/drop.py --waves 0,1,2,3,4        # ~40 s per run; --skip-browser leaves out 3 and 4
@@ -140,7 +138,7 @@ python tools/drop.py --waves 0,1,2,3,4        # ~40 s per run; --skip-browser le
 
 Edit **only** `defenses/policy.py`. Goal: fewer bot hoodies than the reference run, with **≤ 1** shopper stopped and **≤ 10** of 40 slowed ≥ 1 s.
 
-## Debrief (13 min)
+## Debrief
 
 ```bash
 python tools/humans.py                         # per-shopper outcome and proof-of-work cost
@@ -152,7 +150,7 @@ tail -n 5 logs/decisions.jsonl                 # every gate decision of the late
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Measured on 2026-10-11 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis[lua] 2.39.0 with lupa 2.8, requests 2.34.2, user-agents 2.2.0, Playwright 1.63.0 / Chromium 153.0.8010.12 headless shell), with **`REDIS_URL=fakeredis://` and `DATABASE_URL=sqlite:///...`**. The Redis 8 + PostgreSQL 18 `docker compose` path is verified separately (see the notes below). Each cell shows the bot's hoodies out of 20 when it runs alone against the 40 shoppers, at the end of each round, with `tools/checkpoint.py --round N --all`.
 

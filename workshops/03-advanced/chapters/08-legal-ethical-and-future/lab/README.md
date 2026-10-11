@@ -1,8 +1,8 @@
 # Chapter 8 Lab: Counsel, Auditor, Referee
 
-**Format:** 3 rounds, 45 min, plus a 10 min debrief. See `../chapter_08_content.md`, §8.4.
+**Format:** 3 rounds plus a debrief. See `../chapter_08_content.md`, §8.4.
 
-This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the other team reading your rules of engagement for the hole they will use this afternoon. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
+This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the opposing side reading your rules of engagement for the hole they will use in the Capstone. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 
 ## Rules of engagement
 
@@ -22,7 +22,7 @@ lab/
 
 ---
 
-## Setup (before the session)
+## Setup
 
 ```bash
 cd workshops/03-advanced/chapters/07-legal-ethical-and-future/lab
@@ -42,7 +42,7 @@ If the last command prints a scoreboard, you are ready. Print or open `exercises
 
 ## How to measure a round
 
-Every round reports three things, and the instructor table at the bottom is in the same shape.
+Every round reports three things, and the expected-results table at the bottom is in the same shape.
 
 - **Attacker success.** Round 1: claims the scraper's counsel defeats. Round 2: bots *allowed* through. Round 3: loophole cards the draft does not answer.
 - **Real users hurt.** Round 1: the customers whose data was in the log. Round 2: blocked and challenged rate **per cohort**, against a 2% blocked budget (the Capstone rubric). Round 3: the cohort the rules forget to protect.
@@ -52,22 +52,22 @@ Every round reports three things, and the instructor table at the bottom is in t
 
 ---
 
-## Round 1: Three cease-and-desists ⚔️ the scraper's counsel (17 min)
+## Round 1: Three cease-and-desists ⚔️ the scraper's counsel
 
-Pairs: one 🔵 store's counsel, one 🔴 scraper's counsel. Three fact patterns in `exercises/round1_cases.md`: public listings scraped after a letter (US), logged-in GraphQL scraping by 400 fake accounts (US), and a people-search startup scraping EU customers' reviews.
+Pairs, or one learner playing both: 🔵 store's counsel, 🔴 scraper's counsel. Three fact patterns in `exercises/round1_cases.md`: public listings scraped after a letter (US), logged-in GraphQL scraping by 400 fake accounts (US), and a people-search startup scraping EU customers' reviews.
 
 | Step | Do | Expected |
 |---|---|---|
 | 🔵 Defend | Store's counsel lists the claims that survive per case (CFAA, contract, DMCA §1201, trespass, fraud, GDPR) | Most teams over-claim CFAA on public pages |
 | 🔴 Attack | Scraper's counsel answers each with the case that kills it (*Van Buren*, *hiQ*, *Meta v. Bright Data*, *Ryanair*, *Feist*) | Case A collapses to a narrow §1201 claim at best; Case C flips: the store is exposed, not just the scraper |
-| 🔵 Re-run | Fill the verdict sheet; 5 min reveal against the key | Net score out of +6 |
+| 🔵 Re-run | Fill the verdict sheet; reveal against the key | Net score out of +6 |
 | ✅ Checkpoint | `python3 tools/checkpoint.py --round 1` | prints `exercises/round1_answer_key.md` |
 
 **Discuss:** for each surviving claim, what would the detection log have needed to contain? (The key's last section.) That question is the bridge to Round 2: the evidence that convicts a scraper is a store of personal data about every customer you scored.
 
 ---
 
-## Round 2: The proportionality audit ⚔️ the campaign that hides among the protected (18 min)
+## Round 2: The proportionality audit ⚔️ the campaign that hides among the protected
 
 You inherit `policies/policy_blunt.json`: hard blocks on Tor exits, datacenter ASNs and library user agents, a score ladder, no exemptions, a third-party CAPTCHA, no appeal path, a year of logs. It stops every scraper. Run it and read who else it stops.
 
@@ -106,31 +106,31 @@ Exposure notes: none.
 
 ---
 
-## Round 3: Rules of engagement for the Capstone ⚔️ the loophole hunt (10 min)
+## Round 3: Rules of engagement for the Capstone ⚔️ the loophole hunt
 
-This afternoon each team attacks another team's deployment. Nothing in the Capstone brief says who authorised that, what is in scope, or how a blocked legitimate cohort is scored. You write it now.
+In the Capstone you attack a deployment you do not own, even if only a reference one. Nothing in the Capstone brief says who authorised that, what is in scope, or how a blocked legitimate cohort is scored. You write it now.
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔵 Defend | 4 min: fill `exercises/round3_roe_template.md` for your team, with numbers in the blanks | `python3 tools/checkpoint.py --round 3 --roe <file>` ≥ 10/12 (the blank template scores 11: traffic limits need a number) |
-| 🔴 Attack | 4 min: swap drafts; the other team answers `exercises/round3_loophole_cards.md` against yours: allowed / forbidden / **doesn't say** | Typical first drafts miss the opponent's Redis, the CAPTCHA-solving service, and what happens to captured logs after the workshop |
-| 🔵 Re-run | 2 min: patch every "doesn't say" with a concrete rule | 0 unanswered cards |
+| 🔵 Defend | Fill `exercises/round3_roe_template.md`, with numbers in the blanks | `python3 tools/checkpoint.py --round 3 --roe <file>` ≥ 10/12 (the blank template scores 11: traffic limits need a number) |
+| 🔴 Attack | Swap drafts with a peer (alone: read your own as the opponent) and answer `exercises/round3_loophole_cards.md` against that draft: allowed / forbidden / **doesn't say** | Typical first drafts miss the opponent's Redis, the CAPTCHA-solving service, and what happens to captured logs after the workshop |
+| 🔵 Re-run | Patch every "doesn't say" with a concrete rule | 0 unanswered cards |
 | ✅ Checkpoint | `python3 tools/checkpoint.py --round 3` | the 12-item checklist |
 
 **Discuss:** which of the twelve items would you have skipped if the other team had not been reading? That one is the clause that gets written after an incident in production.
 
 ---
 
-## Debrief (10 min)
+## Debrief
 
-Fill in the scoreboard on the slide: Round 1 net score, Round 2 bots caught and cohorts over budget on your final policy, Round 3 cards unanswered. Then the two questions that carry into the Capstone:
+Fill in the scoreboard: Round 1 net score, Round 2 bots caught and cohorts over budget on your final policy, Round 3 cards unanswered. Then the two questions that carry into the Capstone:
 
 1. Your Round 2 policy challenges 100% of Tor users and 61% of keyboard-only users. What does the Capstone rubric need to say about *challenged* legitimate users, not just blocked ones?
 2. Which clauses of your rules of engagement would also be the right clauses for a production bug-bounty scope?
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified with Python 3.12.15 on Linux, standard library only (no packages, no Docker; there is no store backend in this lab). `tools/make_log.py` regenerates `data/decisions.jsonl` byte-for-byte, the three policy scoreboards reproduce the table below, and `checkpoint.py 1`, `2`, `3` and `3 --roe` (blank template: 11/12) all run. The log is deterministic (seed 2026), so these numbers do not drift. The `docker compose` path does not apply to this chapter.
 
@@ -143,7 +143,7 @@ Verified with Python 3.12.15 on Linux, standard library only (no packages, no Do
 
 | Round | Metric | Target |
 |---|---|---|
-| 1 | Net verdict score (max +6) | ≥ +3; every pair marks Case C "store has no exposure" as **No** |
+| 1 | Net verdict score (max +6) | ≥ +3; every pair (or you) marks Case C "store has no exposure" as **No** |
 | 2 | Final policy with `--campaigns all` | bots ≥ 85% caught, 0 cohorts over budget, 0 exposure notes |
 | 3 | `checkpoint.py --round 3 --roe` and loophole cards | ≥ 10/12 covered, 0 cards unanswered after the patch |
 
@@ -152,7 +152,7 @@ Things to watch for:
 - Teams that "fix" Round 2 by setting `challenge_at` and `block_at` very high: bots drop below 85% caught, which the scoreboard flags as `MISSED`.
 - Teams that exempt `fp_reuse` or `timing_too_regular`: those are automation evidence that no real cohort trips alone; the hidden campaigns walk through.
 - In Round 3, a draft that says "be reasonable" for traffic limits scores a red point; the checklist wants a number.
-- Case law in the answer key is current to October 2026. *Ryanair v. Booking.com* was on appeal to the Third Circuit and *Reddit v. SerpApi* was a district-court ruling at build time; check both before teaching and say which way they went.
+- Case law in the answer key is current to October 2026. *Ryanair v. Booking.com* was on appeal to the Third Circuit and *Reddit v. SerpApi* was a district-court ruling at build time; check both and note which way they went.
 
 ---
 

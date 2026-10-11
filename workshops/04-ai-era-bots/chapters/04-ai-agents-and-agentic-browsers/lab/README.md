@@ -1,6 +1,6 @@
 # W4 Ch4 Lab — AI Agents & Agentic Browsers
 
-**Format:** 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc, timings and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
+**Format:** 4 rounds of attack ⚔️ defend. This is a minimal README: the chapter's content doc and measured expected results are still to be written (see the chapter's entry in the root `TODO.md`).
 
 The store is the end-of-Workshop-2 stack plus an agent policy, selling one limited drop ("Lab Runner 9", one per account). Shoppers now arrive through AI agents as well as browsers. Some are honest and declared, some hide, some forge an identity, and one runs a fleet. Each round you add the layer that sorts them, and the checkpoint measures what it stops **and** what happens to the 40 human customers and the legitimate agents.
 

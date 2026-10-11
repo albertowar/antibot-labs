@@ -1,6 +1,6 @@
 # Chapter 2 Lab: JavaScript Challenges & Obfuscation
 
-**Format:** 6 rounds of attack ⚔️ defend, ~112 min of hands-on time plus a 12-min debrief. See `../chapter_02_content.md`, §2.7.
+**Format:** 6 rounds of attack ⚔️ defend plus a closing debrief. See `../chapter_02_content.md`, §2.7.
 
 The demo store sits behind a JavaScript challenge that gets stronger every round. You play both sides:
 
@@ -31,7 +31,7 @@ lab/
 
 ---
 
-## Setup (before the session, ~10 min)
+## Setup (~10 min)
 
 You need **Python 3.12+** and **Node 24 LTS (24.15 or later)**. Docker is optional.
 
@@ -142,7 +142,7 @@ Cost
 
 ---
 
-## Round 0: Baseline (8 min)
+## Round 0: Baseline
 
 | Step | Do | Expected |
 |---|---|---|
@@ -150,11 +150,11 @@ Cost
 | 🔵 Look | Open `http://localhost:5000/` in your browser, click through a few pages, then open `/challenge-check` | the store, no challenge |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 0` | scraper 300/300 · 0/6 real users hurt · no-JS user 3/3 |
 
-Remember the last line: at level 0 even the no-JS user gets everything. It's the last time today that will be true.
+Remember the last line: at level 0 even the no-JS user gets everything. It's the last time in this lab that will be true.
 
 ---
 
-## Round 1: JS cookie gate ⚔️ forged cookie (18 min)
+## Round 1: JS cookie gate ⚔️ forged cookie
 
 | Step | Do | Expected |
 |---|---|---|
@@ -171,7 +171,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 ---
 
-## Round 2: Signed, bound, single-use challenge ⚔️ Python port (22 min)
+## Round 2: Signed, bound, single-use challenge ⚔️ Python port
 
 | Step | Do | Expected |
 |---|---|---|
@@ -189,11 +189,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Polymorphic obfuscated variants ⚔️ run it in jsdom (25 min)
+## Round 3: Polymorphic obfuscated variants ⚔️ run it in jsdom
 
 | Step | Do | Expected |
 |---|---|---|
@@ -212,7 +208,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 ---
 
-## Round 4: Environment-bound answer ⚔️ real browser + clearance harvesting (22 min)
+## Round 4: Environment-bound answer ⚔️ real browser + clearance harvesting
 
 | Step | Do | Expected |
 |---|---|---|
@@ -236,7 +232,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 ---
 
-## Round 5: Clearance budget ⚔️ re-solve loop (17 min)
+## Round 5: Clearance budget ⚔️ re-solve loop
 
 | Step | Do | Expected |
 |---|---|---|
@@ -256,13 +252,13 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 ---
 
-## Debrief (12 min)
+## Debrief
 
 ```bash
 python tools/scoreboard.py                  # every level, every attack, real users (~5 min)
 ```
 
-Run this before class if your machine is slow, and walk the table below. For each defense, ask three questions:
+Run it once and read the table below. For each defense, ask three questions:
 
 1. What did it stop?
 2. Who did it hurt?
@@ -270,7 +266,7 @@ Run this before class if your machine is slow, and walk the table below. For eac
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11. Stack:
 

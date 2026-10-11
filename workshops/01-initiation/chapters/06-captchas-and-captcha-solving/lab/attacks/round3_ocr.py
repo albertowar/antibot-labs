@@ -7,7 +7,7 @@ each challenge in tens of milliseconds.
 
 One attempt per challenge, one fresh session per voucher.
 
-Expected (the instructor table in the README has the measured values):
+Expected (the expected-results table in the README has the measured values):
   DEFENSE_LEVEL=2 (basic style)     most of 20 attempts succeed
   DEFENSE_LEVEL=3 (hardened style)  a few succeed
 

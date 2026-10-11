@@ -1,6 +1,6 @@
 # Chapter 3 Lab: Behavioral Analysis & Mouse Tracking
 
-**Format:** Round 0 recon plus 4 rounds of attack ⚔️ defend, 100 min of lab inside the 3-hour chapter. See `../chapter_03_content.md`, §3.7.
+**Format:** Round 0 recon plus 4 rounds of attack ⚔️ defend. See `../chapter_03_content.md`, §3.7.
 
 The demo store is running a **limited drop**: 50 pairs of a (fictional) shoe and one reservation form. Scalper bots want all 50.
 
@@ -35,7 +35,7 @@ lab/
 
 ---
 
-## Setup (before the session, ~5 min)
+## Setup (~5 min)
 
 ```bash
 cd lab
@@ -154,7 +154,7 @@ What the checkpoint reports:
 
 ---
 
-## Round 0: Instrument & recon (15 min)
+## Round 0: Instrument & recon
 
 **🛡️ Look at your own behavior:**
 
@@ -195,7 +195,7 @@ python attacks/round0_recon.py               # runs a page.fill()/page.click() b
 
 ---
 
-## Round 1: `page.fill()` + `page.click()` ⚔️ L1 presence & sanity (20 min)
+## Round 1: `page.fill()` + `page.click()` ⚔️ L1 presence & sanity
 
 | Step | Do | Expected |
 |---|---|---|
@@ -212,7 +212,7 @@ python attacks/round0_recon.py               # runs a page.fill()/page.click() b
 
 ---
 
-## Round 2: Ruler & metronome ⚔️ L2 kinematics & keystroke dynamics (20 min)
+## Round 2: Ruler & metronome ⚔️ L2 kinematics & keystroke dynamics
 
 | Step | Do | Expected |
 |---|---|---|
@@ -229,11 +229,7 @@ python attacks/round0_recon.py               # runs a page.fill()/page.click() b
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: The humanizer ⚔️ L3 motor-control realism (25 min)
+## Round 3: The humanizer ⚔️ L3 motor-control realism
 
 | Step | Do | Expected |
 |---|---|---|
@@ -252,7 +248,7 @@ python attacks/round0_recon.py               # runs a page.fill()/page.click() b
 
 ---
 
-## Round 4: Replay a real human ⚔️ L4 layout jitter & signatures (20 min)
+## Round 4: Replay a real human ⚔️ L4 layout jitter & signatures
 
 | Step | Do | Expected |
 |---|---|---|
@@ -287,7 +283,7 @@ curl -s localhost:5000/behavior/sessions | python -m json.tool | less
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, requests 2.34.2 and Playwright 1.63.0 (Chromium 153.0.8010.12, headless) on Linux, with `STORE=memory` (redis-py 8.1.0 installed but unused). Checkpoints 0 to 4 passed with the numbers below. The Redis back end and the docker compose path are verified separately.
 
@@ -314,8 +310,8 @@ Defender cost measured across these runs:
 
 Things to watch for:
 
-- **Variance.** Round 3 and Round 4 bots are randomised. The checkpoint's thresholds ("stopped ≥ 1/2" for the eased humanizer) are set below the observed rates so that a correct setup almost never fails by chance. If a student's checkpoint fails once, run it again before you debug.
-- **Synthetic humans.** Calibration came from `tools/humans.py`, not from a labelled corpus of real users. Ask students to save 2–3 traces each in Round 0, and treat any block of a real trace as a bug in the rules.
+- **Variance.** Round 3 and Round 4 bots are randomised. The checkpoint's thresholds ("stopped ≥ 1/2" for the eased humanizer) are set below the observed rates so that a correct setup almost never fails by chance. If your checkpoint fails once, run it again before you debug.
+- **Synthetic humans.** Calibration came from `tools/humans.py`, not from a labelled corpus of real users. Save 2–3 traces of your own in Round 0, and treat any block of a real trace as a bug in the rules.
 - **Version drift.** Playwright changes how input is dispatched now and then. The `(0, 0)` first sample, for example, appears in some runs and not others. Re-run all checkpoints when you bump `playwright` in `requirements.txt`.
 
 ---

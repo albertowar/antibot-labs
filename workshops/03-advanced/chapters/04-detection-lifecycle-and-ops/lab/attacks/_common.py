@@ -13,7 +13,7 @@ answer).
 
 Restraint (AGENTS.md): each week's profile is exactly strong enough to get
 past the previous round's defense, no stronger. These train defenders
-against the student's own local store; they are not general-purpose tools.
+against your own local store; they are not general-purpose tools.
 All safety rails live in tools/labclient.py (localhost only, documentation
 address ranges only, synthetic *@example.test credentials only) and every
 session goes through it.

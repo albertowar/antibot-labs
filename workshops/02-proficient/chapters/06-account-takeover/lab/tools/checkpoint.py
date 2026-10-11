@@ -1,5 +1,5 @@
 """Per-round checkpoint: run the round's attacks + the human simulator, score both,
-and compare against the expected results so students who fell behind can confirm
+and compare against the expected results so a learner who fell behind can confirm
 they are caught up.
 
 Each round runs the new attack *and* the previous round's attack, to show the old

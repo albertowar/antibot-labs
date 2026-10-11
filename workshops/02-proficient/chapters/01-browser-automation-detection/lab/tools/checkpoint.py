@@ -170,7 +170,7 @@ def main():
     print()
     if failures:
         print(f"❌ {failures} check(s) differ from the expected results. "
-              f"Ask your instructor, or run: python tools/checkpoint.py --round {args.round} --catch-up")
+              f"Compare with the expected-results table in README.md, or run: python tools/checkpoint.py --round {args.round} --catch-up")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

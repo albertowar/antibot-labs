@@ -6,7 +6,7 @@ other, on SCOREBOARD_PORT, default 5151), runs that round's checkpoint
 (attacks + real users), and prints the debrief table: what each defense
 stopped, what got through, who it hurt, and what it cost.
 
-Instructors: run this before class to fill in the expected-results table,
+Run this to regenerate the expected-results table,
 and again after any browser or Playwright upgrade.
 
 Run (from lab/, with the venv active; Redis optional):

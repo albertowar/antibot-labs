@@ -1,7 +1,7 @@
 # W3 Ch9 Capstone Lab — Build & Break a Production-Grade Defense
 
-6 rounds of 🔴 attack ⚔️ 🔵 defend (Round 0 build + Rounds 1–4), ~215 min of hands-on.
-See `../chapter_09_content.md` §9.7 for the teaching notes and the schedule.
+6 rounds of 🔴 attack ⚔️ 🔵 defend (Round 0 build + Rounds 1–4).
+See `../chapter_09_content.md` §9.7 for the chapter notes.
 
 You inherit the whole Workshop 1 + 2 stack (levels 0–4) already running. The
 capstone adds the Workshop 3 "detection at scale" layers on top of it and runs
@@ -111,7 +111,7 @@ not failed. Capture your own browser at `/lab/capture`, save it as
 
 ---
 
-## Round 0 — build & baseline (L4) · 🔵 30 min
+## Round 0 — build & baseline (L4) · 🔵
 
 ```bash
 DEFENSE_LEVEL=4 python demo_site/app.py
@@ -125,7 +125,7 @@ python tools/checkpoint.py --round 0
 | 🗡️ Attack | `python attacks/round0_naive.py` | 0 pairs: `requests`/`curl_cffi`/stock Playwright all stopped |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 0` | bots 0 · 0 customers blocked |
 
-## Round 1 — API abuse ⚔️ API hardening (L5) · 🔴🔵 43 min
+## Round 1 — API abuse ⚔️ API hardening (L5) · 🔴🔵
 
 ```bash
 python attacks/round1_api.py                       # at L4: 4/4 techniques succeed
@@ -145,7 +145,7 @@ python tools/checkpoint.py --round 1
 blocked. What makes it legitimate to the server (token bound to its JA4) that
 the scraper cannot cheaply forge?
 
-## Round 2 — streaming evasion ⚔️ real-time detectors (L6) · 🔴🔵 48 min
+## Round 2 — streaming evasion ⚔️ real-time detectors (L6) · 🔴🔵
 
 ```bash
 python attacks/round2_streaming.py                 # micro-burst caught by rate; low-and-slow evades
@@ -165,7 +165,7 @@ python tools/checkpoint.py --round 2
 that is the latency gap closing. Why does the low-and-slow client, which stays
 under every rate limit, still stand out?
 
-## Round 3 — supply-chain skimmer ⚔️ CSP + SRI (L7) · 🔴🔵 43 min
+## Round 3 — supply-chain skimmer ⚔️ CSP + SRI (L7) · 🔴🔵
 
 ```bash
 python attacks/round3_skimmer.py                   # at L<7: exfil succeeds (report-only)
@@ -185,9 +185,7 @@ python tools/checkpoint.py --round 3
 skimmer. Why is CSP `connect-src` the control that actually stops exfiltration,
 and what does the runtime monitor add?
 
-## ☕ Break (10 min)
-
-## Round 4 — integrated assault ⚔️ the whole stack + ops (L7) · 🔴🔵 54 min
+## Round 4 — integrated assault ⚔️ the whole stack + ops (L7) · 🔴🔵
 
 ```bash
 DEFENSE_LEVEL=7 python demo_site/app.py            # all layers on, all solutions applied
@@ -201,7 +199,7 @@ python tools/signalhealth.py                       # which layer caught what
 | 🩺 Operate | `python tools/signalhealth.py` | every engaged layer fires; a silent one is a finding |
 | 📝 Report | fill in `tools/incident_report.md` | the kill chain, false positives, one improvement |
 
-## Wrap-up: the scoreboard (part of the 35-min debrief)
+## Wrap-up: the scoreboard (part of the debrief)
 
 ```bash
 python tools/scoreboard.py
@@ -213,7 +211,7 @@ that is acceptable), and write the post-incident report. The one signal that
 Round 4 could not have stopped — fingerprint rotation across real devices — is
 the hand-off to W3 Ch1 (mobile attestation) and Workshop 4.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Attack ↓ / `DEFENSE_LEVEL` →, with the first blocking level in **bold**:
 

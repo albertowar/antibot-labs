@@ -119,7 +119,7 @@ def main():
     if failures:
         for f in failures:
             print(f"❌ {f}")
-        print("   Compare with the instructor table in README.md. Did you change a weight or a line?")
+        print("   Compare with the expected-results table in README.md. Did you change a weight or a line?")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

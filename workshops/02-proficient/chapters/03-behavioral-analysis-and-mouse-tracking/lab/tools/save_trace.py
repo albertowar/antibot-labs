@@ -14,7 +14,7 @@ then on:
 
 Privacy: the trace holds pointer coordinates and keystroke *timings*, never
 key values; form fields are stored as lengths only. Still, it is a
-behavioral biometric. Don't share it outside the classroom.
+behavioral biometric. Don't share it outside your own machine.
 """
 
 import argparse

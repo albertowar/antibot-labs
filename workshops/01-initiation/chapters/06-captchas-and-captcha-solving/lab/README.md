@@ -28,7 +28,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.2). Adds: the `captcha
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, 77 min, then a 10-minute debrief. See `../chapter_06_content.md`, §6.6.
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_06_content.md`, §6.6.
 
 You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (`TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
 
@@ -69,7 +69,7 @@ lab/
 
 ---
 
-## Setup (before the session, < 10 min)
+## Setup (< 10 min)
 
 ```bash
 cd workshops/01-initiation/chapters/06-captchas-and-captcha-solving/lab
@@ -161,7 +161,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## Round 0: Baseline (5 min)
+## Round 0: Baseline
 
 | Step | Do | Expected |
 |---|---|---|
@@ -173,7 +173,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## Round 1: Naive verifier ⚔️ integration bypass (20 min)
+## Round 1: Naive verifier ⚔️ integration bypass
 
 | Step | Do | Expected |
 |---|---|---|
@@ -192,7 +192,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## Round 2: Answer in a cookie ⚔️ server-side state (15 min)
+## Round 2: Answer in a cookie ⚔️ server-side state
 
 | Step | Do | Expected |
 |---|---|---|
@@ -206,11 +206,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## ☕ Break (10 min)
-
----
-
-## Round 3: Targeted solver ⚔️ hardened generator (20 min)
+## Round 3: Targeted solver ⚔️ hardened generator
 
 | Step | Do | Expected |
 |---|---|---|
@@ -226,7 +222,7 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## Round 4: Retry bot + solving farm ⚔️ solver signals (17 min)
+## Round 4: Retry bot + solving farm ⚔️ solver signals
 
 | Step | Do | Expected |
 |---|---|---|
@@ -241,9 +237,9 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 ---
 
-## Debrief: scoreboard, false positives and cost (10 min)
+## Debrief: scoreboard, false positives and cost
 
-Fill in the room's scoreboard:
+Fill in your scoreboard:
 
 | Round | Bots succeeded | Attacker cost | Shoppers completed | Shoppers challenged | Defender cost (p95) |
 |---|---|---|---|---|---|
@@ -257,7 +253,7 @@ Then use the discussion questions in the content doc (§6.6).
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, redis 8.1.0, fakeredis 2.39.0 standing in for Redis, httpx 0.28.1, Pillow 12.3.0, numpy 2.5.4 and scikit-learn 1.9.1, `LAB_TIME_SCALE=5`, and the reference solutions (`--catch-up`). The `docker compose` path has not been run for the migrated lab. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
 
@@ -279,17 +275,16 @@ Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, 
 - captcha_check: 1–7 ms median. The p95 is up to 300 ms with fakeredis and much lower with real Redis.
 
 **Things to watch for:**
-- **Run-to-run variance:** solver accuracy on the hardened style is 5–20% per attempt. If a room's hardened style is much weaker than the reference (say >25%), the Round 3 checkpoint fails. Show them the solver's assumptions again.
-- **Student thresholds:** if students set `FAST_SOLVE_SIM_S` above ~3 s, the checkpoint flags real users. That's the lesson, so let it fail once.
-- **Slow laptops:** the bot's solve time is real compute × `LAB_TIME_SCALE`. If OCR takes more than ~300 ms per image on a student machine, its "solve time" approaches the 2 s floor. Use `LAB_TIME_SCALE=3` everywhere on that machine.
+- **Run-to-run variance:** solver accuracy on the hardened style is 5–20% per attempt. If your hardened style is much weaker than the reference (say >25%), the Round 3 checkpoint fails. Re-read the solver's assumptions.
+- **Your thresholds:** if you set `FAST_SOLVE_SIM_S` above ~3 s, the checkpoint flags real users. That's the lesson, so let it fail once.
+- **Slow laptops:** the bot's solve time is real compute × `LAB_TIME_SCALE`. If OCR takes more than ~300 ms per image on your machine, its "solve time" approaches the 2 s floor. Use `LAB_TIME_SCALE=3` everywhere on that machine.
 - **Chrome version** in `attacks/common.py` and the simulator's UAs: update the major version each quarter.
-- **Cloudflare dummy keys:** re-check them in Cloudflare's Turnstile testing docs the week you teach, if you run Bonus 3.
+- **Cloudflare dummy keys:** re-check them in Cloudflare's Turnstile testing docs before you run Bonus 3.
 
-### Instructor prep checklist
+### Self-check before you start
 
 - [ ] `pip install -r requirements.txt` on the lab image; `docker compose up -d --wait` (or `fake_redis.py`)
 - [ ] Run `tools/checkpoint.py --round N --catch-up` for N = 0..4 once end to end (about 2 minutes), then `python tools/checkpoint.py --restore` to put the student files back
-- [ ] Shared scoreboard (whiteboard or doc) ready for the debrief
 - [ ] Optional: Tesseract installed on one machine for the generic-OCR comparison
 
 ---

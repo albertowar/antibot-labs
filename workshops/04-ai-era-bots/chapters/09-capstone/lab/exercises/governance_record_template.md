@@ -1,4 +1,4 @@
-# AI Governance Record: the store's detection stack (team draft)
+# AI Governance Record: the store's detection stack (draft)
 
 > Fill in every section. This record is what you hand an auditor, a data-protection authority or the AI Office when they ask what the AI in your bot defense does, and it is the charter under which the Workshop 4 Capstone ("Govern the Agents") runs. The other team will read it for the hole. Score a draft with `python tools/checkpoint.py --round 3 --record <this file>`.
 

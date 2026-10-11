@@ -1,6 +1,6 @@
 # W4 Ch7 Lab — LLMs for Defense
 
-**Format:** Round 0 plus 3 rounds. This is a minimal README: the chapter's content doc, timings, measured expected results and the checkpoint's pass/fail thresholds are still to be written (see the chapter's entry in the root `TODO.md`).
+**Format:** Round 0 plus 3 rounds. This is a minimal README: the chapter's content doc, measured expected results and the checkpoint's pass/fail thresholds are still to be written (see the chapter's entry in the root `TODO.md`).
 
 It is drop day at the store from W2 Ch7, minus the ML scoring. A rule engine at checkout enforces `rules/active.json`. An LLM analyst reads the request log **offline**, triages sessions and proposes rules. The attacker writes to that log too, through every header it sends. Each round you harden the analyst, and the scoreboard measures triage quality, injection success, real customers blocked, and what the model costs in tokens, dollars and latency.
 

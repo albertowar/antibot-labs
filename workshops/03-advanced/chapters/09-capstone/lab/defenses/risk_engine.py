@@ -25,7 +25,7 @@ it would have done to real traffic before it can hurt anyone.
     6      L6   buy/login/api   streaming.aggregator (rate, regularity, navigation, fed by the bus)      [W3 Ch3]
     7      L7   buy             supply_chain (CSP/SRI violation reports on this session)                  [W3 Ch5]
 
-Levels 0-4 are the Workshop 1+2 stack students already built; the capstone
+Levels 0-4 are the Workshop 1+2 stack you already built; the capstone
 ships them on. Levels 5-7 are the Workshop 3 "detection at scale" layers added
 in the lab's Rounds 1-3. Round 4 runs every level at once.
 

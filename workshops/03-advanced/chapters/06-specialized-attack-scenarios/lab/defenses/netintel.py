@@ -1,4 +1,4 @@
-"""Network intelligence and the generic rate limiter — shared, not student-edited.
+"""Network intelligence and the generic rate limiter — shared, not edited by you.
 
 These are the layers the store already had coming out of Workshop 2: it knows a
 datacenter IP from a residential one (W1 Ch3), and it rate-limits per IP (W1 Ch2).

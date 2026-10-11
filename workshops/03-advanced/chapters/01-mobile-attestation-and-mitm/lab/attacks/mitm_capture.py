@@ -1,7 +1,7 @@
 """
 W3 Ch1 — Live interception demo: a mitmproxy addon (Round 1/2)
 
-This is the real-tool version of Round 1, for the instructor demo. It logs every
+This is the real-tool version of Round 1, for the live demo. It logs every
 /api/mobile/ call and pulls out the attestation token and bearer, which is
 exactly what a reverse engineer does to learn an API.
 

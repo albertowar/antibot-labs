@@ -4,7 +4,7 @@ to checkpoint_core.
 
     python tools/checkpoint.py --round 3              # set the level, run every scraper next to the 40 shoppers
     python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first
-    python tools/checkpoint.py --all --markdown       # every round (the instructor's table)
+    python tools/checkpoint.py --all --markdown       # every round (the expected-results table)
 
 Every round runs the same set of scrapers against that round's level, so you see the whole attack by defense
 matrix grow one diagonal at a time. A scraper is expected to get through (`full`) until the level that is

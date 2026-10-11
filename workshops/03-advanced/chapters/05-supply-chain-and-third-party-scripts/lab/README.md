@@ -1,6 +1,6 @@
 # Chapter 5 Lab: Supply Chain & Third-Party Scripts
 
-**Format:** 4 rounds of attack ⚔️ defend, ~92 min. See `../chapter_05_content.md`, §5.6.
+**Format:** 4 rounds of attack ⚔️ defend. See `../chapter_05_content.md`, §5.6.
 
 A third-party include your store hosts has been swapped to carry a skimmer. Each
 round you add one browser-enforced control and watch what it does — and does not
@@ -38,7 +38,7 @@ lab/
     scoreboard.py        did data get out, and did we block anyone
 ```
 
-## Setup (before the session)
+## Setup
 
 No Docker, no database. You need Python 3.12+ and a Chromium for Playwright.
 
@@ -98,7 +98,7 @@ Fell behind? `python tools/checkpoint.py --round N --catch-up` prints the exact
 commands, and each `solutions/roundN/README.md` has them too. This lab is configured,
 not coded, so there are no files to install.
 
-## Round 1: Inventory & change detection (18 min)
+## Round 1: Inventory & change detection
 
 Know every script that runs, and get told when one changes. PCI DSS v4.0 req
 6.4.3 makes this mandatory on payment pages.
@@ -114,7 +114,7 @@ Know every script that runs, and get told when one changes. PCI DSS v4.0 req
 **Discuss:** you detected the swap in minutes. The card still left on the first
 checkout. What does detection buy you, and what does it not?
 
-## Round 2: CSP report-only → enforce (20 min)
+## Round 2: CSP report-only → enforce
 
 | Step | Do | Expected |
 |---|---|---|
@@ -126,9 +126,7 @@ checkout. What does detection buy you, and what does it not?
 **Discuss:** report-only changed nothing for users but told you exactly what
 enforce would break. Why always run report-only first?
 
-## ☕ Break (10 min)
-
-## Round 3: Nonce + strict-dynamic, and SRI (22 min)
+## Round 3: Nonce + strict-dynamic, and SRI
 
 The host-allowlist of Round 2 ships two routine holes: `'unsafe-inline'` and a
 permissive `img-src`. This round's skimmer uses both — an injected inline script
@@ -144,7 +142,7 @@ and an `<img>` pixel — to sidestep `connect-src 'self'`.
 **False-positive check:** `python tools/legit_traffic.py --cdn-bump`. SRI fails
 closed when a vendor legitimately updates its file — budget for re-pinning.
 
-## Round 4: Runtime monitor + dependency hygiene (20 min)
+## Round 4: Runtime monitor + dependency hygiene
 
 A poisoned build ships the skim inside your own first-party bundle. CSP nonces
 it, SRI matches your own build, and it rides the one analytics origin your
@@ -168,7 +166,7 @@ parasitic, and none of these controls touch your own checkout code. Their cost
 is operational, not user-facing: re-pinning SRI on every CDN bump, tuning the
 policy out of report-only, and keeping the monitor's allowlist current.
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on Linux with Python 3.12.15, Flask 3.1.3, httpx 0.28.1, Playwright 1.63.0
 (Chromium 153.0.8010.12), on the no-Docker path (no Redis or database in this lab).

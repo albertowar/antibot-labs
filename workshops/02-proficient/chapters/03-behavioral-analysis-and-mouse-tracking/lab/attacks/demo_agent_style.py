@@ -1,5 +1,5 @@
 """
-Chapter 3: instructor demo, an AI agent's behavior (Section 3.8).
+Chapter 3: demo of an AI agent's behavior (Section 3.8).
 
 A deterministic mock of a computer-use agent loop. No LLM, no API keys:
     screenshot -> "think" for a few seconds -> click a coordinate -> type

@@ -1,6 +1,6 @@
 # Rules of Engagement: Workshop 3 Capstone (team draft)
 
-> Fill in every section. This afternoon's red-team phase runs under this document, and the other team will try to find the gap in it. Score a draft with `python tools/checkpoint.py --round 3 --roe <this file>`.
+> Fill in every section. The Capstone's red-team phase runs under this document, and the opposing side will try to find the gap in it. Score a draft with `python tools/checkpoint.py --round 3 --roe <this file>`.
 
 **Team:** _______________ **Opponent team:** _______________ **Date:** _______________
 
@@ -13,14 +13,14 @@ Who authorises this engagement, in writing: _______________ (name and role). The
 | Target | Host / port | Owner | Notes |
 |---|---|---|---|
 | Our store stack | `127.0.0.1:____` | us | |
-| Opponent's store stack | `________:____` | opponent | assigned by the instructor |
+| Opponent's store stack | `________:____` | opponent | assigned by whoever runs the exercise (yourself, if alone) |
 | | | | |
 
 All attack traffic originates from the lab network and uses only the documentation address ranges in `data/world.json` where source addresses are simulated. Nothing leaves the lab network.
 
 ## 3. Out of scope
 
-Not targets, under any circumstances: other teams' stacks, the instructor's machines and network, the venue's infrastructure, any internet host, any third-party service (including the vendor endpoints a CAPTCHA or fingerprinting library might call).
+Not targets, under any circumstances: other teams' stacks, the organiser's machines and network, the venue's infrastructure, any internet host, any third-party service (including the vendor endpoints a CAPTCHA or fingerprinting library might call).
 
 ## 4. Prohibited techniques
 
@@ -48,11 +48,11 @@ Honeypots and decoy endpoints: allowed. Tarpits: allowed up to ______ seconds pe
 
 ## 9. Stop conditions
 
-Anyone on either team or the instructor can call **STOP** by _______________ (channel). All attack traffic halts within 60 seconds. Resume only when the person who called it says so. Automatic stop if: the opponent's stack is unreachable for more than ______ seconds; any traffic reaches an out-of-scope host; anyone suspects real personal data is involved.
+Anyone on either team or the organiser can call **STOP** by _______________ (channel). All attack traffic halts within 60 seconds. Resume only when the person who called it says so. Automatic stop if: the opponent's stack is unreachable for more than ______ seconds; any traffic reaches an out-of-scope host; anyone suspects real personal data is involved.
 
 ## 10. Disclosure
 
-Each team gives the opponent a written findings report by ______ (time) using `exercises/disclosure_template.md`. Bypasses are shown to the opponent before the plenary. No public write-up names a person without their consent. Vulnerabilities in the shared workshop code go to the instructor first.
+Each team gives the opponent a written findings report by ______ (time) using `exercises/disclosure_template.md`. Bypasses are shown to the opponent before the plenary. No public write-up names a person without their consent. Vulnerabilities in the shared workshop code go to the organiser first.
 
 ## 11. False-positive accountability
 

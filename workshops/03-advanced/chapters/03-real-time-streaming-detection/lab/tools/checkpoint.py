@@ -66,7 +66,7 @@ def main():
     failures = scoreboard.report(events, verdicts, stats, expected)
     print()
     if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. Ask your instructor.")
+        print(f"❌ {failures} check(s) differ from the expected results. Compare with the Expected results table in README.md.")
         return 1
     print(f"✅ Round {args.round} checkpoint passed.")
     return 0

@@ -1,6 +1,6 @@
-# Pre-work: get the store running before the workshop
+# Pre-work: get the store running before you start
 
-Do this before Day 1 of any workshop. It takes about 20 minutes on a laptop with a normal connection,
+Do this before your first chapter of any workshop. It takes about 20 minutes on a laptop with a normal connection,
 and it is the only setup the series needs. The Setup deck (`onboarding/setup/slides.md`) narrates the same
 steps; the Demo Store deck (`onboarding/demo-store/slides.md`) shows the shop you just started, and the Lab
 Harness deck (`onboarding/lab-harness/slides.md`) shows how the labs measure attacks and defenses against it.
@@ -94,7 +94,7 @@ python -m playwright install chromium
 
 Only labs whose README asks for it (W1 Ch9, most of W2, parts of W4) need this.
 
-## 8. Rules of engagement (you will be asked to agree on Day 1)
+## 8. Rules of engagement (you agree to these before your first lab)
 
 - Lab traffic goes to **this machine only**. `labnet.py` at the lab root refuses any other `DEMO_URL` (and any non-local
   `REDIS_URL` or `DATABASE_URL`); the store

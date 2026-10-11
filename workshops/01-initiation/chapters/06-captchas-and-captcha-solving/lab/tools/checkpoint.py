@@ -4,7 +4,7 @@ Round checkpoint for Chapter 6 (Price the Puzzle). Declares the rounds and hands
     python tools/checkpoint.py --round 3              # set the level, run the round's attacks next to the shoppers
     python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first
     python tools/checkpoint.py --round 3 --level 2    # the same attacks one level down (the "before")
-    python tools/checkpoint.py --all --markdown       # every round (the instructor's table)
+    python tools/checkpoint.py --all --markdown       # every round (the expected-results table)
 
 Each round reports BOTH sides. The bots: which attacks got through (vouchers, accounts, dollars
 spent on a farm). The shoppers (tools/population.py + tools/personas_ch06.py): 40 people who sign

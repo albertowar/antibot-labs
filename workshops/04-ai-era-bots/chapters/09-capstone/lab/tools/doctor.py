@@ -1,7 +1,7 @@
 """
 W4 Ch9 Capstone — preflight check: packages, keys, seed, store reachability
 
-Run before the session to catch the usual setup problems early. No browser is
+Run before you start the lab to catch the usual setup problems early. No browser is
 needed: the agents are HTTP-level (Playwright is an optional bonus only).
 
     python tools/doctor.py

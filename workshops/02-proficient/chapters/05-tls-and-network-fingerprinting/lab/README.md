@@ -1,6 +1,6 @@
 # Chapter 5 Lab: The ClientHello Arms Race
 
-**Format:** Round 0 recon plus 4 rounds of defend ⚔️ attack, 105 min plus a 13-min debrief. See `../chapter_05_content.md`, §5.8.
+**Format:** Round 0 recon plus 4 rounds of defend ⚔️ attack, then a closing debrief. See `../chapter_05_content.md`, §5.8.
 
 The W1 Ch4 attacker copies every header from DevTools, so nothing at the HTTP layer gives it away anymore. In this lab you move the defense one layer down, to the TLS ClientHello and the HTTP/2 connection preface. Each round you write a few lines of a new layer, run the attacker that beats it, and measure two things on simulated real users: what the layer catches, and what it costs.
 
@@ -32,7 +32,7 @@ lab/
 
 ---
 
-## Setup (before the session, about 10 min)
+## Setup (about 10 min)
 
 Requirements: Python ≥ 3.12. Docker is optional.
 
@@ -139,7 +139,7 @@ What it reports:
 
 ---
 
-## Round 0: Recon (25 min)
+## Round 0: Recon
 
 | Step | Do | Expected |
 |---|---|---|
@@ -170,7 +170,7 @@ Fill in this table from the recon output:
 
 ---
 
-## Round 1: 🛡️ JA4 denylist ⚔️ 🗡️ change one cipher string (20 min)
+## Round 1: 🛡️ JA4 denylist ⚔️ 🗡️ change one cipher string
 
 | Step | Do | Expected |
 |---|---|---|
@@ -187,7 +187,7 @@ Fill in this table from the recon output:
 
 ---
 
-## Round 2: 🛡️ UA ↔ TLS family ⚔️ 🗡️ a browser-shaped ClientHello (20 min)
+## Round 2: 🛡️ UA ↔ TLS family ⚔️ 🗡️ a browser-shaped ClientHello
 
 | Step | Do | Expected |
 |---|---|---|
@@ -203,11 +203,9 @@ Fill in this table from the recon output:
 2. Why do Chrome, Firefox and Edge on iOS all map to `webkit`?
 3. `tls_families()` can return two families for one JA4 (resumed Chrome = fresh Firefox). Why does the layer ask "is the TLS consistent with the claimed engine?" instead of "which browser is this?
 
-## ☕ Break (10 min)
-
 ---
 
-## Round 3: 🛡️ HTTP/2 fingerprint ⚔️ 🗡️ full impersonation (20 min)
+## Round 3: 🛡️ HTTP/2 fingerprint ⚔️ 🗡️ full impersonation
 
 | Step | Do | Expected |
 |---|---|---|
@@ -221,7 +219,7 @@ Fill in this table from the recon output:
 
 ---
 
-## Round 4: 🛡️ the browser claim needs browser proof ⚔️ 🗡️ a real browser (20 min)
+## Round 4: 🛡️ the browser claim needs browser proof ⚔️ 🗡️ a real browser
 
 | Step | Do | Expected |
 |---|---|---|
@@ -236,7 +234,7 @@ Fill in this table from the recon output:
 
 ---
 
-## Debrief: fingerprints as an aggregation key (13 min)
+## Debrief: fingerprints as an aggregation key
 
 ```bash
 python tools/fingerprint_report.py --minutes 120
@@ -263,7 +261,7 @@ Real Chromium, curl_cffi and the Playwright bot all land in the first cluster. Y
 
 ---
 
-## Instructor: expected results
+## Expected results (self-check)
 
 Verified on 2026-10-11 on Linux x86_64 (WSL2) with Python 3.12.15 (OpenSSL 3.5.9), Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, fingerproxy v1.2.3, Playwright 1.63.0 (Chromium 153, Firefox 155.0), curl_cffi 0.16.3, impit 0.14.1 and the SQLite fallback. Every level was run with the reference solutions installed (`--catch-up`), after `tools/capture_fingerprints.py` (Round 1 step). The `docker compose` path is verified separately. The WebKit persona was not verified (missing system libraries).
 
@@ -287,9 +285,9 @@ TLS session resumption was verified with `tools/clienthello_dump.py` (resumed Ch
 **Things to watch for:**
 
 - **Your OpenSSL ≠ ours.** On macOS or other distros, the library JA4s differ from the shipped list. That's why Round 1 starts with `tools/capture_fingerprints.py`. If `round1_naive_requests` isn't blocked at level 1, check `defenses/local_fingerprints.json`.
-- **Browser updates.** When Playwright, Chrome or Firefox update, re-run `round0_recon.py` and compare JA4 a+b and the HTTP/2 core with `defenses/known_fingerprints.json`. A Firefox release that changes its cipher list breaks `firefox-user` at level 2. That's the lesson about allowlist maintenance, but fix the file before class.
+- **Browser updates.** When Playwright, Chrome or Firefox update, re-run `round0_recon.py` and compare JA4 a+b and the HTTP/2 core with `defenses/known_fingerprints.json`. A Firefox release that changes its cipher list breaks `firefox-user` at level 2. That's the lesson about allowlist maintenance, but update the file before you publish the lab.
 - **impit and curl_cffi updates** change what they impersonate. The versions are pinned for a reason.
-- **Students' own browsers** behind a corporate TLS-inspection proxy still show their real JA4 here, because localhost traffic doesn't go through the proxy.
+- **Your own browser** behind a corporate TLS-inspection proxy still show their real JA4 here, because localhost traffic doesn't go through the proxy.
 
 ## Bonus challenges
 
