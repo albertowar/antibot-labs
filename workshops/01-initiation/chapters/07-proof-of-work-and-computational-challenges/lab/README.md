@@ -68,7 +68,7 @@ starter, unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ## Setup (before the session)
 
-Setup is covered once for the whole series in `intro/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
 
 ```bash
 cd lab
