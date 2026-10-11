@@ -1,0 +1,1 @@
+{% set r = (p.rating or 0)|round(0, 'floor')|int %}<span class="stars" aria-label="{{ '%.1f'|format(p.rating or 0) }} out of 5">{% for i in range(5) %}{% if i < r %}★{% else %}☆{% endif %}{% endfor %}</span>

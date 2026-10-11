@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block page %}products{% endblock %}
+{% block title %}{{ heading or (category|capitalize if category else 'All gear') }} · {{ store_name }}{% endblock %}
+{% block content %}
+<div class="section-head">
+  <h1>{{ heading or (category|capitalize if category else 'All gear') }} <span class="muted small">{{ total }} items</span></h1>
+  <form class="sort" method="get">
+    <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="category" value="{{ category }}">
+    <label>Sort <select name="sort" onchange="this.form.submit()">
+      {% for key, label in [('featured','Featured'),('rating','Top rated'),('price_asc','Price: low to high'),('price_desc','Price: high to low'),('newest','Newest')] %}
+      <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+  </form>
+</div>
+{% if items %}
+<div class="grid">{% for p in items %}{% include "partials/_card.html" %}{% endfor %}</div>
+{% include "partials/_pager.html" %}
+{% else %}<p class="empty">Nothing matched. Try another search or <a href="/products">browse everything</a>.</p>{% endif %}
+{% endblock %}

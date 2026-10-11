@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block page %}login{% endblock %}{% block title %}Log in · {{ store_name }}{% endblock %}
+{% block content %}
+<form id="login-form" class="card narrow" action="/login" method="post">
+  <h1>Log in</h1>
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="{{ next or '/account' }}">
+  {% with label="Email", name="email", type="email", required=True, autocomplete="email", value=email %}{% include "partials/_field.html" %}{% endwith %}
+  {% with label="Password", name="password", type="password", required=True, autocomplete="current-password" %}{% include "partials/_field.html" %}{% endwith %}
+  {{ slot("form:login") }}
+  <button class="btn big" type="submit">Log in</button>
+  <p class="muted small">No account? <a href="/register">Create one</a>. Forgot your password? Ask the store to <a href="#" data-reset>email a reset link</a>.</p>
+</form>
+{% endblock %}
