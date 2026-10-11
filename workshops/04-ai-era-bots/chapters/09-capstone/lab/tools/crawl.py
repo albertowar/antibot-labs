@@ -71,8 +71,12 @@ class Signer:
 
     def __init__(self, pem_name, keyid, signature_agent):
         from cryptography.hazmat.primitives import serialization
-        with open(os.path.join(KEYS, pem_name), "rb") as fh:
-            self.key = serialization.load_pem_private_key(fh.read(), password=None)
+        try:
+            with open(os.path.join(KEYS, pem_name), "rb") as fh:
+                self.key = serialization.load_pem_private_key(fh.read(), password=None)
+        except FileNotFoundError:
+            raise SystemExit(f"Operator key {pem_name} not found under {KEYS}: run "
+                             f"`python tools/seed.py` (it generates the lab's signing keys).")
         self.keyid, self.agent = keyid, signature_agent
 
     def headers(self, authority):

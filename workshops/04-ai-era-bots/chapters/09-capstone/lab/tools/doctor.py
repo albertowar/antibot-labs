@@ -28,6 +28,8 @@ def main():
         ok &= check(f"import {pkg}", importlib.util.find_spec(pkg) is not None, "pip install -r requirements.txt")
     keys = os.path.join(LAB_DIR, "data", "keys", "lab-provider.pem")
     ok &= check("operator keys present", os.path.exists(keys), "python tools/seed.py")
+    crawler_keys = os.path.join(LAB_DIR, "attacks", "keys", "registry.json")
+    ok &= check("crawler operator keys present (attacks/keys/)", os.path.exists(crawler_keys), "python tools/seed.py")
     db = os.path.join(LAB_DIR, "instance", "shop.db")
     check("store seeded (instance/shop.db)", os.path.exists(db), "python tools/seed.py")
     try:

@@ -45,6 +45,7 @@ from flask import Flask, Response, g, jsonify, request
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 DATA_DIR = os.path.join(LAB_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)  # data/ is not in git (only generated files live there)
 sys.path.insert(0, LAB_DIR)       # for defenses/
 sys.path.insert(0, HERE)          # for store
 

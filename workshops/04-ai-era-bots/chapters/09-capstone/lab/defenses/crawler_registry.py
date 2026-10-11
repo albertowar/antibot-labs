@@ -23,7 +23,10 @@ operator would publish.
 from __future__ import annotations
 
 import ipaddress
+import json
+import os
 import re
+import sys
 
 # purpose vocabulary used across the policy, enforcement and paywall modules.
 # It matches the IETF AIPREF categories (train-ai, ai-use, search) and the RSL
@@ -36,20 +39,42 @@ OPERATORS = {
         "purpose": "ai-train",
         "ranges": ["203.0.113.0/26"],
         "signature_agent": "https://trainbot.example",
-        "keys": {
-            "trainbot-2026-10": "Kyxtj5AETd6yOJ1PwGOPCaXr4dCWkx182WakXrn11oo",
-        },
+        "keys": {},  # keyid -> public key, filled from attacks/keys/registry.json below
     },
     "labsearch.example": {
         "ua_token": "LabSearchBot",
         "purpose": "search",
         "ranges": ["203.0.113.64/26"],
         "signature_agent": "https://labsearch.example",
-        "keys": {
-            "searchbot-2026-10": "kMT0BDo6Hd3ptXxForG9QZ99WrndD340glGglB3is3I",
-        },
+        "keys": {},
     },
 }
+
+# The operators' public keys are not hard-coded: tools/make_keys.py (run by
+# tools/seed.py) generates each operator's key pair and "publishes" the public
+# halves to attacks/keys/registry.json, exactly as a real operator would publish
+# a key directory. Nothing under attacks/keys/ is committed; a private key in
+# git, even a synthetic one, trips secret scanners and teaches the wrong habit.
+PUBLISHED_KEYS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "attacks", "keys", "registry.json")
+
+
+def load_published_keys(path: str = PUBLISHED_KEYS) -> bool:
+    """Fill OPERATORS[*]["keys"] from the generated registry. False if it is missing."""
+    try:
+        with open(path) as fh:
+            published = json.load(fh)
+    except FileNotFoundError:
+        print(f"[crawler_registry] {path} not found: no crawler signature can verify until "
+              f"you run `python tools/seed.py` (then restart the store).", file=sys.stderr)
+        return False
+    for operator, keys in published.items():
+        if operator in OPERATORS:
+            OPERATORS[operator]["keys"].update(keys)
+    return True
+
+
+load_published_keys()
 
 _BY_TOKEN = {op["ua_token"].lower(): (name, op) for name, op in OPERATORS.items()}
 _BY_AGENT = {op["signature_agent"]: (name, op) for name, op in OPERATORS.items()}

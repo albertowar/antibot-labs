@@ -4,6 +4,10 @@ Deterministic (seeded RNG) so every student has the same catalogue and the
 expected-results table holds. The descriptions double as the corpus the maze
 babbler trains on, so decoy pages read like the shop.
 
+Also generates the two crawler operators' signing keys if they are missing
+(tools/make_keys.py -> attacks/keys/, gitignored), so the signed-crawler rounds
+and tools/legit_traffic.py can run.
+
     python tools/seed.py            # SQLite in data/shop.db (default)
     DATABASE_URL=... python tools/seed.py
 """
@@ -18,6 +22,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "demo_site"))
 sys.path.insert(0, LAB_DIR)
+sys.path.insert(0, HERE)
+
+import make_keys  # noqa: E402
 
 CATEGORIES = ["sneakers", "headphones", "coffee", "camping", "stationery", "kitchen"]
 ADJ = ["retro", "quiet", "compact", "heavy-duty", "hand-poured", "insulated", "matte",
@@ -57,6 +64,7 @@ def main():
         db.session.bulk_insert_mappings(Product, make_products())
         db.session.commit()
         print(f"seeded {Product.query.count()} products into {app.config['SQLALCHEMY_DATABASE_URI']}")
+    make_keys.main()
 
 
 if __name__ == "__main__":
