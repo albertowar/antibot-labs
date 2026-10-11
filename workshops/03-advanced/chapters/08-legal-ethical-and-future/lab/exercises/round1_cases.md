@@ -55,4 +55,4 @@ Profilr, a startup in Ireland, scrapes the store's public review pages. Reviews 
 | C | GDPR against Profilr | | |
 | C | "The store has no exposure" | | |
 
-When the key is revealed, count your net score, then answer the question that matters for tomorrow: **in each case, what would the store's detection logs have needed to contain for the surviving claims to be provable?**
+When the key is revealed, count your net score, then answer the question that matters for this afternoon: **in each case, what would the store's detection logs have needed to contain for the surviving claims to be provable?**

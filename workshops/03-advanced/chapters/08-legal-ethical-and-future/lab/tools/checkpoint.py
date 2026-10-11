@@ -1,5 +1,5 @@
 """
-Chapter 7: catch-up checkpoints for the three rounds.
+Chapter 8: catch-up checkpoints for the three rounds.
 
     python tools/checkpoint.py 1                 Round 1 answer key (the verdict table)
     python tools/checkpoint.py 2                 Round 2 reference scoreboard, and how to adopt the reference policy

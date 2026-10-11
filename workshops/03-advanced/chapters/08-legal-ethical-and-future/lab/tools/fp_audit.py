@@ -1,5 +1,5 @@
 """
-Chapter 7, Round 2: the false-positive impact audit.
+Chapter 8, Round 2: the false-positive impact audit.
 
 Apply a policy file to the decision log and print the bill from both sides:
 how much bot traffic the policy stops, and which real people it stops by
@@ -20,7 +20,7 @@ A policy (policies/*.json) has four parts, evaluated in this order:
                   lever, and also the hole the Round 2 attacker crawls through.
 
 Plus three facts about the deployment that change your legal exposure but
-not the verdicts: challenge_type, appeal_path, retention_days (see §7.2).
+not the verdicts: challenge_type, appeal_path, retention_days (see §8.2).
 
 What "caught" means here: a bot that is blocked or challenged. A challenge
 is a cost, not a verdict (W2 Ch8): proof-of-work or a self-hosted CAPTCHA
@@ -153,7 +153,7 @@ def exposure_notes(policy, cohorts):
     ct = policy.get("challenge_type", "pow")
     if ct == "captcha_thirdparty":
         notes.append("challenge_type captcha_thirdparty: a third party receives device data on every challenge. "
-                     "You need a transfer basis and a consent story (ePrivacy Art 5(3); W1 Ch6, §7.2).")
+                     "You need a transfer basis and a consent story (ePrivacy Art 5(3); W1 Ch6, §8.2).")
     elif ct == "captcha_selfhosted":
         notes.append("challenge_type captcha_selfhosted: no third-party transfer, but a visual CAPTCHA still needs "
                      "an accessible alternative (WCAG 1.1.1).")
@@ -205,7 +205,7 @@ def print_report(name, policy, campaigns, cohorts, bots, per_campaign, reasons):
         print("Why real people were blocked: " + ", ".join(f"{r} {n}" for r, n in reasons.most_common()))
     notes = exposure_notes(policy, cohorts)
     print()
-    print("Exposure notes (§7.2):" if notes else "Exposure notes: none.")
+    print("Exposure notes (§8.2):" if notes else "Exposure notes: none.")
     for note in notes:
         print(f"  - {note}")
 

@@ -2,7 +2,7 @@
 
 A post-incident report is the deliverable that turns one bad night into a
 better stack. Keep it blameless and specific. This is the template the W3
-capstone (W3 Ch8) expects you to fill in. `tools/incident.py` pre-fills the
+capstone (W3 Ch9) expects you to fill in. `tools/incident.py` pre-fills the
 detection and attack sections from the decision log; you write the rest.
 
 ```

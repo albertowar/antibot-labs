@@ -1,8 +1,8 @@
-# Chapter 7 Lab: Counsel, Auditor, Referee
+# Chapter 8 Lab: Counsel, Auditor, Referee
 
-**Format:** 3 rounds, 45 min, plus a 10 min debrief. See `../chapter_07_content.md`, §7.4.
+**Format:** 3 rounds, 45 min, plus a 10 min debrief. See `../chapter_08_content.md`, §8.4.
 
-This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the other team reading your rules of engagement for the hole they will use tomorrow. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
+This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the other team reading your rules of engagement for the hole they will use this afternoon. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 
 > ⚠️ Nothing in this lab touches a network. The decision log is generated from the documentation address ranges in `data/world.json` (RFC 5737 / RFC 3849), the people in it are the W2 Ch8 synthetic population, and every name, account and case in the exercises is invented. Nothing here is legal advice.
 
@@ -106,7 +106,7 @@ Exposure notes: none.
 
 ## Round 3: Rules of engagement for the Capstone ⚔️ the loophole hunt (10 min)
 
-Tomorrow each team attacks another team's deployment. Nothing in the Capstone brief says who authorised that, what is in scope, or how a blocked legitimate cohort is scored. You write it now.
+This afternoon each team attacks another team's deployment. Nothing in the Capstone brief says who authorised that, what is in scope, or how a blocked legitimate cohort is scored. You write it now.
 
 | Step | Do | Expected |
 |---|---|---|

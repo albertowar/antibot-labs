@@ -1,6 +1,6 @@
 # AI-Era Ethics Checklist for Bot Defense
 
-Use this before shipping a defense that uses AI, blocks AI, or both. It extends the W3 Ch7 checklist (authorisation, proportionality, the dual-newspaper test), which still applies.
+Use this before shipping a defense that uses AI, blocks AI, or both. It extends the W3 Ch8 checklist (authorisation, proportionality, the dual-newspaper test), which still applies.
 
 ## Before you block an agent
 

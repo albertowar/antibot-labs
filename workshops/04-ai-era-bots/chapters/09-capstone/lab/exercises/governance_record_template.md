@@ -14,7 +14,7 @@ The system decides whether a session is allowed, challenged, stepped up or block
 
 ## 3. Lawful basis
 
-Telemetry and scoring: legitimate interest (fraud and abuse prevention, GDPR Recital 47), balancing test on file at _______________ (W3 Ch7). **Training** the classifier on last quarter's session logs is a new purpose: compatible under Art 6(4) because _______________, or we use synthetic data only (section 4). Consent is not relied on.
+Telemetry and scoring: legitimate interest (fraud and abuse prevention, GDPR Recital 47), balancing test on file at _______________ (W3 Ch8). **Training** the classifier on last quarter's session logs is a new purpose: compatible under Art 6(4) because _______________, or we use synthetic data only (section 4). Consent is not relied on.
 
 ## 4. Synthetic data provenance
 
@@ -50,7 +50,7 @@ Tarpits, labyrinths and decoys are served only to sessions the policy would othe
 
 ## 12. Incidents and complaints
 
-A complaint from a person, a vendor, an accessibility auditor or a regulator (DPA or AI Office) goes to _______________ and is acknowledged within ______ business days. A false-positive incident (a cohort over budget in production) is an incident: declared by _______________, reviewed within ______ hours, written up using the W3 Ch7 disclosure template.
+A complaint from a person, a vendor, an accessibility auditor or a regulator (DPA or AI Office) goes to _______________ and is acknowledged within ______ business days. A false-positive incident (a cohort over budget in production) is an incident: declared by _______________, reviewed within ______ hours, written up using the W3 Ch8 disclosure template.
 
 | Name | Team | Signature | Time |
 |---|---|---|---|

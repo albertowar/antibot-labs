@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+data/account_activity.*
+suspects*.csv
+notebooks/suspects*.csv

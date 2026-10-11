@@ -1,0 +1,14 @@
+# W3 Ch7 — Investigating Account Takeover in Audit Logs. Python 3.10+.
+# Exact pins, verified October 2026. One venv per chapter (see README).
+# The generator (tools/make_log.py) needs only the standard library; everything
+# below is for the notebooks, the helper module, the scorer and the reference detectors.
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.3
+scikit-learn==1.7.2
+networkx==3.4.2
+matplotlib==3.10.6
+jupyterlab==4.4.9
+ipykernel==6.30.1
+# dev only: strips outputs before committing notebooks
+nbstripout==0.8.1

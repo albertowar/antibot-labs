@@ -1,4 +1,4 @@
-# W3 Ch8 Capstone lab. Python 3.12+ recommended (built and verified on 3.10 too).
+# W3 Ch9 Capstone lab. Python 3.12+ recommended (built and verified on 3.10 too).
 # Exact pins, verified October 2026.
 
 # --- demo store ---

@@ -2,7 +2,7 @@
 
 Swap rules-of-engagement drafts with the other team. Pick cards, read the draft, and answer each one with **"allowed"**, **"forbidden"** or **"the document doesn't say"**, citing the section number. Every "doesn't say" is a point for you and a hole in their document. Four minutes; the blue team then has two minutes to patch.
 
-Keep the answers honest. The aim is a document that survives tomorrow, not a trick.
+Keep the answers honest. The aim is a document that survives this afternoon, not a trick.
 
 | # | Card | Which section should answer it |
 |---|---|---|

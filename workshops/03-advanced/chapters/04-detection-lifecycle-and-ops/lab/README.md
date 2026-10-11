@@ -48,7 +48,7 @@ python tools/ops.py --all                        # the five-week story, one row 
 python tools/checkpoint.py --round N             # run a round end to end and verify it
 ```
 
-**Docker is optional, two reasons it exists.** The shared counters use Redis in production; here `REDIS_URL=memory://` is an in-process stand-in, and `docker compose up -d --wait` gives you the real thing (`redis:8.10.2-alpine` on `127.0.0.1:6379`) if you want it. Separately, the capstone (W3 Ch8) asks for a Grafana dashboard, so `docker compose --profile monitoring up -d` brings up Prometheus (`v3.15.0`) scraping `/metrics` and Grafana (`13.2.3`) with a provisioned signal-health dashboard on `127.0.0.1:3000` (admin/admin). **The required path needs neither:** `/metrics` is readable with `curl`, and `tools/ops.py` and `tools/alerts.py` are a terminal dashboard over the same data.
+**Docker is optional, two reasons it exists.** The shared counters use Redis in production; here `REDIS_URL=memory://` is an in-process stand-in, and `docker compose up -d --wait` gives you the real thing (`redis:8.10.2-alpine` on `127.0.0.1:6379`) if you want it. Separately, the capstone (W3 Ch9) asks for a Grafana dashboard, so `docker compose --profile monitoring up -d` brings up Prometheus (`v3.15.0`) scraping `/metrics` and Grafana (`13.2.3`) with a provisioned signal-health dashboard on `127.0.0.1:3000` (admin/admin). **The required path needs neither:** `/metrics` is readable with `curl`, and `tools/ops.py` and `tools/alerts.py` are a terminal dashboard over the same data.
 
 **Troubleshooting**
 

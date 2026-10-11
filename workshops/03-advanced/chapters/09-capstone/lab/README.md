@@ -1,7 +1,7 @@
-# W3 Ch8 Capstone Lab — Build & Break a Production-Grade Defense
+# W3 Ch9 Capstone Lab — Build & Break a Production-Grade Defense
 
 6 rounds of 🔴 attack ⚔️ 🔵 defend (Round 0 build + Rounds 1–4), ~215 min of hands-on.
-See `../chapter_08_content.md` §8.7 for the teaching notes and the schedule.
+See `../chapter_09_content.md` §9.7 for the teaching notes and the schedule.
 
 You inherit the whole Workshop 1 + 2 stack (levels 0–4) already running. The
 capstone adds the Workshop 3 "detection at scale" layers on top of it and runs

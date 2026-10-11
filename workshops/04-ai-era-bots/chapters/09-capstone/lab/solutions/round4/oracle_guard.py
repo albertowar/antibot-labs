@@ -5,7 +5,7 @@ A decision is an allowlist of fields, not a redaction of the debug reply. The
 client learns the outcome and what it needs to do next; never which layer
 fired, how many points it has, or how close it sits to a threshold. Two
 things that are deliberately kept: the appeal link (a block a person cannot
-contest is an Article 22 problem, W3 Ch7) and the challenge details (a
+contest is an Article 22 problem, W3 Ch8) and the challenge details (a
 challenge you cannot answer is a block).
 
 What this does not stop: an attacker can still measure outcomes (allow /

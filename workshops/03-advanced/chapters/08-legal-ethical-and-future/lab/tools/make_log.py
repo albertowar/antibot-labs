@@ -1,5 +1,5 @@
 """
-Chapter 7, Round 2: generate the decision log the audit runs over.
+Chapter 8, Round 2: generate the decision log the audit runs over.
 
 The store's detection pipeline (W2 Ch8 and the W3 streaming chapters) writes
 one line per request: who the pipeline *thinks* it saw (the signals) and, in

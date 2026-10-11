@@ -1,4 +1,4 @@
-# W3 Ch8 Capstone — stateful services for the demo store.
+# W3 Ch9 Capstone — stateful services for the demo store.
 #
 # Default (always): Redis + PostgreSQL only, bound to 127.0.0.1.
 #   docker compose up -d --wait

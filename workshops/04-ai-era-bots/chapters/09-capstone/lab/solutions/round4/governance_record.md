@@ -50,7 +50,7 @@ Tarpits, labyrinths and decoys are served **only to sessions the policy would ot
 
 ## 12. Incidents and complaints
 
-A **complaint** from a person, a vendor, an accessibility auditor or a **regulator** (DPA or AI Office) goes to `abuse@lab-store.test` and is acknowledged **within 2 business days**. A **false-positive incident** (a cohort over budget in production) is declared by the on-call engineer, reviewed within 24 hours, and written up with the W3 Ch7 disclosure template.
+A **complaint** from a person, a vendor, an accessibility auditor or a **regulator** (DPA or AI Office) goes to `abuse@lab-store.test` and is acknowledged **within 2 business days**. A **false-positive incident** (a cohort over budget in production) is declared by the on-call engineer, reviewed within 24 hours, and written up with the W3 Ch8 disclosure template.
 
 | Name | Team | Signature | Time |
 |---|---|---|---|

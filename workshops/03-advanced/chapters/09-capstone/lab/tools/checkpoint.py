@@ -1,5 +1,5 @@
 """
-Capstone — Round checkpoint (Section 8.7)
+Capstone — Round checkpoint (Section 9.7)
 
 Run at the end of every round to see where you stand, measuring BOTH sides:
 

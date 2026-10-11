@@ -1,6 +1,6 @@
 # Rules of Engagement: Workshop 3 Capstone (team draft)
 
-> Fill in every section. Tomorrow's red-team phase runs under this document, and the other team will try to find the gap in it. Score a draft with `python tools/checkpoint.py 3 --roe <this file>`.
+> Fill in every section. This afternoon's red-team phase runs under this document, and the other team will try to find the gap in it. Score a draft with `python tools/checkpoint.py 3 --roe <this file>`.
 
 **Team:** _______________ **Opponent team:** _______________ **Date:** _______________
 
