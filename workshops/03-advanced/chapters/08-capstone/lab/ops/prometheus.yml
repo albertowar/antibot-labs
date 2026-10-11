@@ -1,0 +1,10 @@
+# Scrapes the demo store's /metrics on the host (self-signed TLS, so skip verify).
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: lab-store
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ["host.docker.internal:8443"]

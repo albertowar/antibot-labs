@@ -1,0 +1,59 @@
+{
+ "note": "The attacker's own Chrome on Windows, captured once from collector.js and replayed on every attempt. Synthetic lab data.",
+ "headers": {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "sec-ch-ua-platform": "\"Windows\""
+ },
+ "fp": {
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "platform": "Win32",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "hc": 12,
+  "mem": 8,
+  "touch_points": 0,
+  "plugins": 5,
+  "screen": [
+   1920,
+   1080,
+   1920,
+   1032
+  ],
+  "win": [
+   1920,
+   1032,
+   1920,
+   945
+  ],
+  "dpr": 1,
+  "tz": "America/New_York",
+  "webgl": {
+   "vendor": "Google Inc. (NVIDIA)",
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "canvas": "5d2a91c4",
+  "uach": {
+   "brands": [
+    "Chromium",
+    "Google Chrome",
+    "Not_A Brand"
+   ],
+   "platform": "Windows",
+   "mobile": false,
+   "platform_version": "19.0.0"
+  },
+  "webdriver": false,
+  "automation_globals": [],
+  "worker": {
+   "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+   "platform": "Win32",
+   "hc": 12,
+   "languages": [
+    "en-US",
+    "en"
+   ]
+  }
+ }
+}

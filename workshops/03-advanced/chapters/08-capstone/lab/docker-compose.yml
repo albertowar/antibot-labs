@@ -1,0 +1,83 @@
+# W3 Ch8 Capstone — stateful services for the demo store.
+#
+# Default (always): Redis + PostgreSQL only, bound to 127.0.0.1.
+#   docker compose up -d --wait
+#
+# Optional `prod` profile: a production-like stack — Redpanda (streaming),
+# Prometheus + Grafana (the signal-health board). Justification for going
+# beyond Redis/Postgres (the lab rule's one-liner): the capstone's whole point
+# is operating a real stack, and these are the OSS tools W3 Ch3/Ch4 teach,
+# running locally with no cloud account. The lab is fully functional without
+# them (STREAM_BACKEND=inproc, tools/signalhealth.py).
+#   docker compose --profile prod up -d --wait
+#   # then: STREAM_BACKEND=kafka DEFENSE_LEVEL=6 python demo_site/app.py
+#   # Grafana: http://localhost:3000  (admin / admin), Prometheus: http://localhost:9090
+#
+#   docker compose --profile prod down -v   # stop and wipe all lab data
+
+name: w3-ch08-capstone
+
+services:
+  redis:
+    image: redis:7.4.11-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_PASSWORD: workshop
+      POSTGRES_DB: shop
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # ---- optional production-like stack (profile: prod) --------------------
+  redpanda:
+    image: redpandadata/redpanda:v24.3.6
+    profiles: ["prod"]
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --kafka-addr PLAINTEXT://0.0.0.0:19092
+      - --advertise-kafka-addr PLAINTEXT://127.0.0.1:19092
+    ports: ["127.0.0.1:19092:19092"]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: ["prod"]
+    volumes: ["./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    profiles: ["prod"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: ["prometheus"]
+
+volumes:
+  pgdata:
