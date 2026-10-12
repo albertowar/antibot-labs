@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% block page %}checkout{% endblock %}{% block title %}Checkout · {{ store_name }}{% endblock %}
+{% block content %}
+<h1>Checkout</h1>
+<div class="two">
+<form id="checkout" class="card" action="/checkout" method="post">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Contact</h2>
+  {% if user %}<p>{{ user.email }} <span class="muted">(logged in)</span></p>{% else %}
+  {% with label="Email", name="email", type="email", required=True, autocomplete="email" %}{% include "partials/_field.html" %}{% endwith %}
+  <p class="muted small"><a href="/login?next=/checkout">Log in</a> for saved details.</p>{% endif %}
+  <h2>Shipping</h2>
+  {% with label="Full name", name="name", required=True, autocomplete="name", value=(user.name if user) %}{% include "partials/_field.html" %}{% endwith %}
+  {% with label="Address", name="address", required=True, autocomplete="street-address", value=(address.line1 if address) %}{% include "partials/_field.html" %}{% endwith %}
+  <div class="row">
+    {% with label="City", name="city", required=True, autocomplete="address-level2", value=(address.city if address) %}{% include "partials/_field.html" %}{% endwith %}
+    {% with label="Postcode", name="postcode", required=True, autocomplete="postal-code", value=(address.postcode if address) %}{% include "partials/_field.html" %}{% endwith %}
+  </div>
+  <h2>Payment</h2>
+  {% if user and user.saved_card_last4 %}<p>{{ user.saved_card_brand }} •••• {{ user.saved_card_last4 }} <span class="muted">(saved)</span></p>{% else %}
+  {% with label="Card number", name="card", required=True, autocomplete="cc-number", placeholder="4242 4242 4242 4242" %}{% include "partials/_field.html" %}{% endwith %}
+  <div class="row">
+    {% with label="Expiry", name="exp", required=True, autocomplete="cc-exp", placeholder="12/29" %}{% include "partials/_field.html" %}{% endwith %}
+    {% with label="CVC", name="cvc", required=True, autocomplete="cc-csc", placeholder="123" %}{% include "partials/_field.html" %}{% endwith %}
+  </div>{% endif %}
+  <p class="muted small">Test store. Any card number is accepted and nothing is charged.</p>
+  {{ slot("form:checkout") }}
+  <button class="btn big" type="submit">Pay ${{ "%.2f"|format(total_cents / 100) }}</button>
+</form>
+<aside class="card summary">
+  <h2>Order</h2>
+  <ul>{% for l in lines %}<li><span>{{ l.qty }} × {{ l.product.name }}{% if l.size %} ({{ l.size }}){% endif %}</span><span>${{ "%.2f"|format(l.line_cents / 100) }}</span></li>{% endfor %}</ul>
+  <p class="total"><span>Total</span><span>${{ "%.2f"|format(total_cents / 100) }}</span></p>
+</aside>
+</div>
+{% endblock %}

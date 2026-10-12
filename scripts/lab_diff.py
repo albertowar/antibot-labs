@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -42,7 +43,18 @@ def hashes(base):
                     continue
                 p = os.path.join(root, f)
                 out[os.path.relpath(p, base)] = hashlib.sha256(open(p, "rb").read()).hexdigest()
+    for rel in git_ignored(base, out):                  # build output (e.g. W2 Ch2's variant pool) is not the lab
+        del out[rel]
     return out
+
+
+def git_ignored(base, rels):
+    """The paths in rels that git ignores, relative to base."""
+    if not rels:
+        return []
+    r = subprocess.run(["git", "-C", base, "check-ignore", "--stdin"], input="\n".join(rels),
+                       capture_output=True, text=True)
+    return [line for line in r.stdout.splitlines() if line in rels]
 
 
 def diff(lab):

@@ -3,9 +3,10 @@ Chapter 3, Round 4 attack: replay a real human (Section 3.6).
 
 The scalper stops simulating humans and starts recording them. Two styles:
 
-  --forge   Sensor replay. Skip the browser: take a recorded telemetry
-            payload and POST it with a fresh session. Costs nothing per
-            attempt. Works as long as the page always looks the same.
+  --forge   Sensor replay. Skip the browser: load the drop page over plain
+            HTTP (for the session cookie and the CSRF token), POST a recorded
+            telemetry payload to /api/telemetry, then POST the form. Costs
+            nothing per attempt. Works as long as the page always looks the same.
 
   --jitter-keys  (with the warped replay) perturb every key's hold and gap
             by ~20 ms, to dodge a typing fingerprint. Only the path is left.
@@ -38,10 +39,11 @@ import os
 import random
 import time
 
-import requests
 from playwright.sync_api import sync_playwright
 
-from common import BASE_URL, identity, open_drop, report, require_local, sleep_ms, wait_result
+from _common import DROP, FIELDS, SELECTOR, LabClient, bot_ip, finish, identity, open_drop, outcome, report, sleep_ms
+import browsers           # noqa: E402  (tools/, on the path through _common)
+from labclient import BASE_URL, csrf_of  # noqa: E402
 
 TRACES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "traces")
 LONG_GAP_MS = 2000      # idle pauses longer than this are shortened to SHORT_GAP_MS,
@@ -65,14 +67,17 @@ def pick_trace(path=None):
 
 
 def forge(trace):
-    """POST the recorded payload unchanged, with a brand-new session."""
-    require_local()
-    http = requests.Session()
-    http.headers["X-Lab-Client"] = "round4_forge"
-    sid = http.post(f"{BASE_URL}/api/session", timeout=5).json()["sid"]
-    r = http.post(f"{BASE_URL}/api/reserve", timeout=10,
-                  json={"sid": sid, "form": identity(), "telemetry": trace["telemetry"]})
-    return r.json()
+    """Replay the recorded payload unchanged, with a brand-new session. No browser."""
+    bot = LabClient("bot:round4_forge", ip=bot_ip())
+    chrome = ("chrome", 153, "windows")
+    page = bot.get(DROP, browsers.headers_for(chrome, "typed", BASE_URL))
+    bot.post("/api/telemetry", json=dict(trace["telemetry"], kind="behavior"),
+             headers=[("User-Agent", dict(browsers.headers_for(chrome, "typed", BASE_URL))["User-Agent"]),
+                      ("Content-Type", "application/json"), ("Origin", BASE_URL)])
+    form = dict(identity(), csrf=csrf_of(page.text))
+    r = bot.post(DROP, form, browsers.headers_for(chrome, "post", BASE_URL, BASE_URL + DROP))
+    return outcome(r.status_code, r.headers.get("X-Lab-Verdict"), r.headers.get("X-Lab-Signals"),
+                   confirmed="order-confirmed" in r.text)
 
 
 def _similarity(p_from, p_to, q_from, q_to):
@@ -130,18 +135,46 @@ def build_actions(trace, new_boxes, jitter_keys=False):
     return out
 
 
+def texts_for(telemetry, rng=random):
+    """
+    Text to type, one string per field, exactly as long as what the recording left in that
+    field (character keys minus backspaces), so the replayed keystrokes produce a valid form:
+    a size the drop sells and an address with an @.
+    """
+    length = {f: 0 for f in FIELDS}
+    for field, _, _, cls in telemetry["keys"]:
+        if field in length:
+            length[field] += {"c": 1, "b": -1}.get(cls, 0)
+    n = {f: max(1, v) for f, v in length.items()}
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    name = "".join(rng.choice(letters) for _ in range(n["name"]))
+    domain = "@example.test" if n["email"] >= 15 else "@e.test"
+    local = "".join(rng.choice(letters) for _ in range(max(1, n["email"] - len(domain))))
+    size = rng.choice(["10", "11", "12"] if n["size"] >= 2 else ["7", "8", "9"])
+    return {"name": name, "email": local + domain, "size": size}
+
+
 def warped(p, trace, jitter_keys=False):
     browser, page = open_drop(p, "round4_replay")
     boxes = {}
-    for name in ("name", "email", "size", "reserve"):
-        b = page.locator(f"#{name}").bounding_box()
+    for name, sel in SELECTOR.items():
+        b = page.locator(sel).bounding_box()
         boxes[name] = [b["x"], b["y"], b["width"], b["height"]]
-    who = identity()
-    text = {f: who[f] for f in ("name", "email", "size")}
+    text = texts_for(trace["telemetry"])
     typed = {f: 0 for f in text}
     held = {}
+    with page.expect_navigation(timeout=120000) as nav:    # the replayed click on Reserve submits
+        _replay(page, build_actions(trace, boxes, jitter_keys), text, typed, held)
+    r = nav.value
+    result = outcome(r.status, r.headers.get("x-lab-verdict"), r.headers.get("x-lab-signals"),
+                     confirmed="order-confirmed" in page.content())
+    browser.close()
+    return result
+
+
+def _replay(page, actions, text, typed, held):
     start = time.perf_counter()
-    for t, kind, data in build_actions(trace, boxes, jitter_keys):
+    for t, kind, data in actions:
         now = (time.perf_counter() - start) * 1000
         if kind == "move" and now - t > 20:
             continue                       # behind schedule: drop samples like a 60 Hz device
@@ -172,9 +205,6 @@ def warped(p, trace, jitter_keys=False):
             key = held.pop(data[0], None)
             if key:
                 page.keyboard.up(key)
-    result = wait_result(page)
-    browser.close()
-    return result
 
 
 def run(forge_only=False, runs=1, trace_path=None, jitter_keys=False, verbose=False):
@@ -204,4 +234,4 @@ if __name__ == "__main__":
     ap.add_argument("--jitter-keys", action="store_true", help="perturb key timings (warped replay)")
     args = ap.parse_args()
     print(f"=== Round 4: {'sensor replay (forged payload)' if args.forge else 'warped replay in Chromium'} ===")
-    run(args.forge, args.runs, args.trace, args.jitter_keys, verbose=True)
+    finish("round4_forge" if args.forge else "round4_replay", run(args.forge, args.runs, args.trace, args.jitter_keys, verbose=True))

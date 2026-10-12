@@ -1,161 +1,131 @@
 """
-Chapter 2 — Round Checkpoint (Section 2.7)
+Round checkpoint for Chapter 2 (JavaScript Challenges & Obfuscation). Declares the rounds and hands
+over to checkpoint_core.
 
-Run at the end of every round to check you are where you should be, and to
-measure BOTH sides of the defense:
+    python tools/checkpoint.py --round 3              # set level 3, run the round's bots next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same bots against level 2 (the "before")
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 (ladder.py, policy.py) first
 
-  - bot traffic:   every attack introduced so far, vs. the expected result
-  - real users:    real browser engines browsing the store (tools/legit_traffic.py)
-  - defender cost: gate/verify time (Server-Timing) and challenge script size
-  - attacker cost: time and browser solves per 1,000 pages
+Every defense is pre-written; Round N = level N. Each round runs every bot introduced so far: the
+expectation is "full" (the whole catalogue: 5 listing pages + 120 product records), "partial"
+(stopped part-way, the harvester at level 5) or "blocked".
 
-Fell behind? Every defense is already written. Catching up means restarting
-the demo site with the round's level:
-    cd demo_site && DEFENSE_LEVEL=<round> python app.py
+Next to the bots:
+  - the store's 40 shoppers browse the catalogue (tools/population.py) and solve the challenge
+    the way their browser would (tools/personas_ch2.py). A shopper stopped by the gate fails the
+    round, except the no-JavaScript one from level 1 on: an accepted, measured cost.
+  - one real Chromium and one real Firefox (Playwright) load the catalogue through the
+    interstitial. Either one stopped fails the round: they are the ground truth for the
+    shoppers' model, and Firefox is the one NAIVE_ENGINE_CHECK=1 hurts.
+  - the defender's cost: the gate's time per request (Server-Timing), the challenge script's size.
 
-Run:
-    python tools/checkpoint.py --round 3
-    python tools/checkpoint.py --round 3 --skip-browser   # no Playwright (no FP measurement!)
+Round 3 needs the variant pool: if defenses/secrets/manifest.json is missing, this builds it
+(python tools/build_variants.py, which needs Node 24 and `npm ci`).
+
+Needs: pip install -r requirements-browser.txt && python -m playwright install chromium firefox && npm ci
 """
 
-import argparse
-import importlib.util
-import json
 import os
-import statistics
+import subprocess
 import sys
-import urllib.request
 
-import legit_traffic
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
+import labclient  # noqa: E402
+import personas_ch2  # noqa: E402,F401  (registers the shoppers' challenge hook)
+from checkpoint_core import LAB, Round, main  # noqa: E402
 
-ATTACKS_DIR = os.path.join(os.path.dirname(__file__), "..", "attacks")
-sys.path.insert(0, ATTACKS_DIR)
-
-# attack -> (round it is introduced in, first DEFENSE_LEVEL that stops it)
-ATTACKS = {
-    "round1_requests_scraper": (0, 1),
-    "round1_cookie_forge": (1, 2),
-    "round2_python_port": (2, 3),
-    "round3_jsdom_solver": (3, 4),
-    "round4_playwright_harvest": (4, 5),
-    "round5_resolve_loop": (5, None),
+# name -> (script, round introduced, first level that stops it, expectation once stopped)
+BOTS = {
+    "round1_requests_scraper": ("attacks/round1_requests_scraper.py", 0, 1, "blocked"),
+    "round1_cookie_forge": ("attacks/round1_cookie_forge.py", 1, 2, "blocked"),
+    "round2_python_port": ("attacks/round2_python_port.py", 2, 3, "blocked"),
+    "round3_jsdom_solver": ("attacks/round3_jsdom_solver.py", 3, 4, "blocked"),
+    "round4_playwright_harvest": ("attacks/round4_playwright_harvest.py", 4, 5, "partial"),
+    "round5_resolve_loop": ("attacks/round5_resolve_loop.py", 5, None, None),
 }
-BROWSER_ATTACKS = {"round4_playwright_harvest", "round5_resolve_loop"}
+MANIFEST = os.path.join(LAB, "defenses", "secrets", "manifest.json")
 
 
-def load_attack(name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(ATTACKS_DIR, f"{name}.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def ensure_pool():
+    if not os.path.exists(MANIFEST):
+        print("building the variant pool (tools/build_variants.py) ...")
+        subprocess.run([sys.executable, os.path.join(HERE, "build_variants.py")], cwd=LAB, check=True)
 
 
-def get(path, method="GET"):
-    req = urllib.request.Request(f"{BASE_URL}{path}", method=method)
-    try:
-        r = urllib.request.urlopen(req, timeout=5)
-    except urllib.error.HTTPError as e:
-        r = e
-    return r.status, r.headers, r.read()
+ensure_pool()          # at import: tools/verify.py imports this module and calls checkpoint_core itself
 
 
-def server_level():
-    return json.loads(get("/challenge-check")[2])["level"]
+def bots(n):
+    return {name: script for name, (script, introduced, _, _) in BOTS.items() if introduced <= n}
 
 
-def script_bytes(level):
-    if level < 2:
-        return None
-    status, headers, body = get("/", method="GET")
-    sid = headers.get("Set-Cookie", "").split(";")[0]
-    req = urllib.request.Request(f"{BASE_URL}/challenge/new", method="POST", headers={"Cookie": sid})
-    ch = json.loads(urllib.request.urlopen(req, timeout=5).read())
-    return len(get(ch["script"])[2])
+def expect(n):
+    out = {}
+    for name, (_, introduced, stopped_at, stopped) in BOTS.items():
+        if introduced <= n:
+            out[name] = stopped if stopped_at is not None and n >= stopped_at else "full"
+    return out
 
 
-def run_attacks(level, skip_browser):
-    """Run each attack that exists by this round. Returns (results, failures)."""
-    results, failures = [], 0
-    for name, (introduced, stopped_at) in ATTACKS.items():
-        if introduced > level:
-            continue
-        if name in BROWSER_ATTACKS and skip_browser:
-            print(f"  ⏭️  {name:<28} skipped (--skip-browser)")
-            continue
-        r = load_attack(name).run()
-        results.append(r)
-        got_all = r["pages_ok"] == r["pages_total"]
-        should_pass = stopped_at is None or level < stopped_at
-        ok = got_all == should_pass
-        failures += not ok
-        expectation = "gets through" if should_pass else "stopped"
-        cost = f", {r['solves']} solve(s)" if r["solves"] else ""
-        print(f"  {'✅' if ok else '❌'} {name:<28} {r['pages_ok']:>3}/{r['pages_total']} pages "
-              f"in {r['seconds']:.1f} s{cost}  (expected: {expectation})")
-        if r["reason"] and r["pages_ok"] < r["pages_total"]:
-            print(f"       {r['reason']}")
-    return results, failures
+def real_browsers(board, results, attacks):
+    """One real Chromium and one real Firefox load the catalogue through the interstitial."""
+    from playwright.sync_api import sync_playwright
+    bad, lines = [], []
+    with sync_playwright() as p:
+        for name, kind in (("chromium", p.chromium), ("firefox", p.firefox)):
+            try:
+                browser = kind.launch()
+            except Exception as e:                  # browser not installed
+                bad.append(f"{name}: cannot launch ({str(e).splitlines()[0][:80]}); python -m playwright install {name}")
+                continue
+            page = labclient.browser_context(browser, f"human:browser:{name}").new_page()
+            try:
+                page.goto(f"{labclient.BASE_URL}/products")
+                page.wait_for_selector(".product-card", timeout=20000)
+                status = page.evaluate("fetch('/api/products?page=2').then(r => r.status)")
+                lines.append(f"  {name:<9} through the challenge, then /api/products -> {status}")
+                if status != 200:
+                    bad.append(f"{name}: /api/products -> {status}")
+            except Exception:
+                text = page.text_content("#challenge-status") if page.query_selector("#challenge-status") else "?"
+                lines.append(f"  {name:<9} STOPPED at the interstitial: {text}")
+                bad.append(f"{name} stopped by the challenge")
+            browser.close()
+    print("\nreal browsers")
+    print("\n".join(lines))
+    return (not bad, "; ".join(bad))
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Chapter 2 round checkpoint")
-    parser.add_argument("--round", type=int, required=True, choices=range(0, 6))
-    parser.add_argument("--skip-browser", action="store_true",
-                        help="skip Playwright attacks and the real-user simulation")
-    args = parser.parse_args()
-
-    try:
-        level = server_level()
-    except OSError:
-        print(f"❌ Demo site not reachable on {BASE_URL}. Is it running?")
-        return 1
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={level}) ===\n")
-    if level != args.round:
-        print(f"❌ Expected DEFENSE_LEVEL={args.round}. Restart the demo site with:")
-        print(f"     cd demo_site && DEFENSE_LEVEL={args.round} python app.py")
-        return 1
-
-    print("Bot traffic")
-    results, failures = run_attacks(level, args.skip_browser)
-
-    print("\nReal users (real browser engines)")
-    if args.skip_browser:
-        print("  ⏭️  skipped: false positives NOT measured this run")
-    else:
-        legit = legit_traffic.run()
-        legit_traffic.print_report(legit)
-        hurt = [r for r in legit if not r["nojs"]
-                and (r["pages_ok"] < r["pages_total"] or r["challenges_failed"])]
-        failures += bool(hurt)
-        nojs = [r for r in legit if r["nojs"]]
-        if nojs and level >= 1:
-            print("  ⚠️  no-JS users are blocked by design: what do they get instead? (policy, not a bug)")
-
-    print("\nCost")
-    cleared = [r["gate_ms"] for r in results if r["gate_ms"] is not None]
-    if cleared:
-        print(f"  defender: gate {statistics.median(cleared):.3f} ms per cleared request "
-              f"(median, Server-Timing)")
-    size = script_bytes(level)
-    if size:
-        print(f"  client:   challenge script {size / 1024:.1f} KB")
-    for r in results:
-        if r["solves"] and r["pages_ok"]:
-            per_1k = r["solves"] / r["pages_ok"] * 1000
-            print(f"  attacker: {r['attack']:<28} {per_1k:5.1f} solves per 1,000 pages "
-                  f"({r['solve_seconds']:.2f} s solving)")
-
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. Compare with the expected-results table in README.md.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def costs(board, results, attacks):
+    gate = [a.get("gate_ms") for a in attacks.values() if isinstance(a, dict) and a.get("gate_ms") is not None]
+    sizes = []
+    for f in os.listdir(os.path.join(LAB, "demo_site", "static", "js", "variants")) if os.path.isdir(
+            os.path.join(LAB, "demo_site", "static", "js", "variants")) else []:
+        sizes.append(os.path.getsize(os.path.join(LAB, "demo_site", "static", "js", "variants", f)))
+    personas_ch2.print_js(results)
+    print("defender cost: gate median per request (from the bots' 200s): "
+          + (f"{sorted(gate)[len(gate) // 2]:.3f} ms" if gate else "-")
+          + (f"; obfuscated variant {sorted(sizes)[len(sizes) // 2] / 1024:.1f} KB (median of {len(sizes)})" if sizes else ""))
+    return (True, "")
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def make_round(n, description):
+    return Round(level=n, description=description, scenario="browse", attacks=bots(n), expect=expect(n),
+                 allowed_fp=("no_js",) if n >= 1 else (), bot_success_max=1.0,
+                 extra_checks=[costs, real_browsers], solutions=("defenses/ladder.py", "defenses/policy.py"))
+
+
+ROUNDS = {
+    0: make_round(0, "no challenge: the catalogue is open"),
+    1: make_round(1, "inline JS sets a fixed cookie"),
+    2: make_round(2, "signed, session-bound, single-use challenge"),
+    3: make_round(3, "polymorphic, obfuscated variant pool"),
+    4: make_round(4, "environment-bound answer"),
+    5: make_round(5, "clearance budget"),
+}
+
+if __name__ == "__main__":
+    main(ROUNDS)

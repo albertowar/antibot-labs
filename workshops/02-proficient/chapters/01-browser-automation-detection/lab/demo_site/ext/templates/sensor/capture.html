@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block page %}capture{% endblock %}
+{% block title %}Capture my browser · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card" style="max-width:46rem;margin:24px auto">
+  <h1>Capture my browser as a real-user profile</h1>
+  <p>Open this page in the browser you use every day (not a driven one). It records the headers and
+     sensor signals your browser sends, then a test click, and saves them to
+     <code>tools/profiles/captured-&lt;name&gt;.json</code>. From then on the checkpoint replays you as one
+     of the shoppers, so you see straight away if a defense blocks your own browser.</p>
+  <p class="muted">Nothing leaves your machine: the store runs on 127.0.0.1.</p>
+  <label class="field"><span>Profile name</span><input id="name" value="my-browser" pattern="[a-z0-9-]+"></label>
+  <p><button id="test-click" class="btn add-to-cart" disabled>Collecting&hellip;</button>
+     &larr; move to it and click it the way you normally would</p>
+  <p id="result"></p>
+  <pre id="signals" style="max-height:24rem;overflow:auto;font-size:.8rem"></pre>
+</section>
+<script src="/static/js/sensor.js"></script>
+<script>
+  const CID = {{ cid|tojson }};
+  const button = document.getElementById("test-click");
+  let signals = null;
+  Promise.all([ShopSensor.collect(), fetch("/lab/capture/echo?cid=" + CID)]).then(([s]) => {
+    signals = s;
+    document.getElementById("signals").textContent = JSON.stringify(s, null, 2);
+    button.disabled = false;
+    button.textContent = "Add to cart (test)";
+  });
+  button.addEventListener("click", async (event) => {
+    const interaction = ShopSensor.describeClick(event);
+    const name = document.getElementById("name").value.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const response = await fetch("/lab/capture/save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cid: CID, name, signals, interaction }),
+    });
+    const data = await response.json();
+    document.getElementById("result").textContent = response.ok
+      ? `Saved ${data.path}. Every checkpoint replays it from now on.` : `Error: ${data.error}`;
+  });
+</script>
+{% endblock %}

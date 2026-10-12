@@ -1,5 +1,5 @@
 """
-Chapter 3: score a saved trace offline, at every level (Rounds 0-3).
+Chapter 3: score a saved trace offline, at every level (Rounds 0-5).
 
     python tools/score_trace.py tools/traces/alice.json
     python tools/score_trace.py tools/traces/*.json
@@ -14,9 +14,9 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from scoring import score_offline   # noqa: E402
+from defenses.behavior import score_offline   # noqa: E402
 
 
 def main(paths):
@@ -25,7 +25,7 @@ def main(paths):
     for path in paths:
         trace = json.load(open(path))
         print(f"=== {os.path.relpath(path)} ({trace.get('source', '?')}) ===")
-        for level in (1, 2, 3):
+        for level in (1, 2, 3, 5):
             score, reasons, verdict = score_offline(trace, level)
             mark = {"allow": "✅", "challenge": "🟡", "block": "❌"}[verdict]
             print(f"  L{level}: {mark} {verdict:<9} score={score}")

@@ -1,50 +1,73 @@
 """
-W2 Ch1 — Round Checkpoint (Section 1.6)
+Round checkpoint for Chapter 1 (Browser Automation Detection). Declares the rounds and hands over to
+checkpoint_core.
 
-Run at the end of every round to check you are where you should be, and to
-measure BOTH sides of the defense:
+    python tools/checkpoint.py --round 3              # set the round's level, run every bot next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first (your files kept as .bak)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-  - your code:     the function you wrote this round, against known inputs
-  - bot traffic:   every attack introduced so far vs. the expected result
-  - real users:    replayed real-browser profiles (tools/legit_traffic.py)
-  - defender cost: sensor scoring time, collection time, script size
+One offset to remember: Round N runs at DEFENSE_LEVEL N+1 (defenses/ladder.py). Level 0 is the bare
+store; W1's header rules are level 1, Round 0's starting point.
 
-Fell behind? One command installs the reference solution for every round up
-to N (your files are kept as *.bak), then restart the demo site:
+Every round runs every bot of the chapter, so you see both what the current layers stop and what
+still gets through. Each bot reports its two API calls (`/api/products`, `/api/cart/add`); the
+expectation is "full" (both 200), "partial" (the catalogue but not the cart) or "blocked".
 
-    python tools/checkpoint.py --round 3 --catch-up
-    cd demo_site && DEFENSE_LEVEL=3 python app.py
+Next to the bots, the store's 40 shoppers each replay a real-browser profile (tools/personas_ch1.py):
+a blocked shopper fails the round, except the no-JavaScript one from Round 1 on (an accepted cost).
+The checkpoint also runs your TODO function on known inputs, and reports what the defense costs
+(gate time on the API, the sensor's collection time and script size).
 
-Run:
-    python tools/checkpoint.py --round 3
-    python tools/checkpoint.py --round 3 --skip-browser   # no browser attacks
+Needs the browsers: pip install -r requirements-browser.txt && python -m playwright install chromium &&
+python -m patchright install chromium
 """
 
-import argparse
-import filecmp
+import gzip
 import importlib
 import os
-import shutil
+import statistics
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFENSES = os.path.join(HERE, "..", "defenses")
-sys.path.insert(0, DEFENSES)
+sys.path.insert(0, HERE)
 
-import scoreboard  # noqa: E402  (also puts attacks/ on sys.path)
-import legit_traffic  # noqa: E402
+import personas_ch1  # noqa: E402,F401  (registers the "sensor_shop" scenario)
+import profile_replay  # noqa: E402
+from checkpoint_core import LAB, Round, main  # noqa: E402
 
-# Round -> the defense module you edit in that round
-ROUND_MODULES = {1: "automation_artifacts", 2: "consistency", 3: "lie_detection", 4: "interaction"}
+sys.path.insert(0, LAB)
+SENSOR_JS = os.path.join(LAB, "demo_site", "static", "js", "sensor.js")
+
+# name -> (script, first ROUND that blocks the catalogue, first ROUND that blocks the cart); None = never here
+BOTS = {
+    "round0_httpx_scraper": ("attacks/round0_httpx_scraper.py", 0, 0),
+    "round0_playwright_default": ("attacks/round0_playwright_default.py", 0, 0),
+    "round1_playwright_cdp_override": ("attacks/round1_playwright_cdp_override.py", 1, 1),
+    "round2_flags_off": ("attacks/round2_flags_off.py", 2, 2),
+    "round3_stealth_plugin": ("attacks/round3_stealth_plugin.py", 3, 3),
+    "round4_patchright": ("attacks/round4_patchright.py", None, 4),
+    "round4_patchright_vanilla": ("attacks/round4_patchright.py --vanilla", 1, 1),
+    "round5_forged_sensor": ("attacks/round5_forged_sensor.py", None, None),
+}
+LAYER_MODULES = {1: "automation_artifacts", 2: "consistency", 3: "lie_detection", 4: "interaction"}
+SOLUTIONS = {1: ("defenses/automation_artifacts.py",), 2: ("defenses/consistency.py",),
+             3: ("defenses/lie_detection.py",), 4: ("defenses/interaction.py",)}
+
+
+def expect(rnd):
+    out = {}
+    for name, (_, scrape, cart) in BOTS.items():
+        scrape_stopped = scrape is not None and rnd >= scrape
+        cart_stopped = cart is not None and rnd >= cart
+        out[name] = "blocked" if scrape_stopped else ("partial" if cart_stopped else "full")
+    return out
+
 
 DESKTOP_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 MOBILE_UA = ("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36")
-
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
 
 
 def geometry(outer_w, outer_h, inner_w, inner_h):
@@ -87,94 +110,62 @@ UNIT_CHECKS = {
 }
 
 
-def catch_up(round_number):
-    """Install the reference solutions for rounds 1..round_number (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(os.path.join(HERE, '..'), round_number)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    level = min(round_number, 4)
-    print(f"\nRestart the demo site:  cd demo_site && DEFENSE_LEVEL={level} python app.py")
 
 
-def check_student_code(round_number):
-    failures = 0
-    for rnd in range(1, min(round_number, 4) + 1):
-        module = importlib.import_module(ROUND_MODULES[rnd])
-        func_name, cases = UNIT_CHECKS[rnd]
-        func = getattr(module, func_name)
-        round_failures = 0
-        for description, data, should_fire in cases:
-            points, _ = func(data)
-            ok = (points > 0) == should_fire
-            round_failures += not ok
-            if not ok:
-                want = "points" if should_fire else "0 points"
-                print(f"  ❌ {ROUND_MODULES[rnd]}.{func_name}: {description}: expected {want}, got {points}")
-        if not round_failures:
-            print(f"  ✅ {ROUND_MODULES[rnd]}.{func_name} (Round {rnd})")
-        failures += round_failures
-    if failures:
-        print(f"     Finish the TODO (Round {min(round_number, 4)}) or run with --catch-up.")
-    return failures
+def your_code(rnd):
+    """The function you finish in each round, against known inputs (rounds 1..rnd)."""
+    def check(board, results, attacks):
+        bad = []
+        for r in range(1, min(rnd, 4) + 1):
+            module = importlib.import_module(f"defenses.{LAYER_MODULES[r]}")
+            importlib.reload(module)
+            func_name, cases = UNIT_CHECKS[r]
+            func = getattr(module, func_name)
+            for description, data, should_fire in cases:
+                points, _ = func(data)
+                if (points > 0) != should_fire:
+                    bad.append(f"{LAYER_MODULES[r]}.{func_name}: {description}: "
+                               f"expected {'points' if should_fire else '0 points'}, got {points}")
+        print("\nyour code: " + ("OK" if not bad else f"{len(bad)} case(s) wrong (finish the TODO, or --catch-up)"))
+        for line in bad:
+            print("  " + line)
+        return (not bad, "; ".join(bad[:3]))
+    return check
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 6))
-    parser.add_argument("--skip-browser", action="store_true", help="skip browser-based attacks")
-    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(os.path.join(HERE, '..'))
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-
-    if args.catch_up:
-        catch_up(args.round)
-        return 0
-
-    expected_level = min(args.round, 4)
-    try:
-        level = scoreboard.server_level()
-    except OSError:
-        print(f"❌ Demo site not reachable on {scoreboard.BASE_URL}. Is it running?")
-        return 1
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={level}) ===\n")
-    if level != expected_level:
-        print(f"❌ Expected DEFENSE_LEVEL={expected_level}. Restart the demo site with:")
-        print(f"     cd demo_site && DEFENSE_LEVEL={expected_level} python app.py")
-        return 1
-
-    failures = 0
-    if args.round >= 1:
-        print("Your code")
-        failures += check_student_code(args.round)
-        print()
-
-    print("Bot traffic")
-    attacks = [a for a in scoreboard.ATTACKS if a[3] <= args.round]
-    rows = scoreboard.measure_attacks(level, attacks, args.skip_browser)
-    scoreboard.print_attacks(rows)
-    failures += sum(1 for r in rows if not r.get("skipped") and not scoreboard.attack_ok(r))
-
-    print("\nReal users (replayed profiles)")
-    results = legit_traffic.run(scoreboard.BASE_URL)
-    failures += len(scoreboard.print_legit(results))
-
-    print("\nDefender cost")
-    scoreboard.print_cost(results)
-
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. "
-              f"Compare with the expected-results table in README.md, or run: python tools/checkpoint.py --round {args.round} --catch-up")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def shoppers(board, results, attacks):
+    """Who replayed which profile, who was suspicious (20-39), and what the defense costs."""
+    print("\nshoppers (one real-browser profile each)")
+    for r in sorted(results, key=lambda r: r.get("profile", "")):
+        if r.get("outcome") != "browsed" or (r.get("score") or 0) >= 20:
+            print(f"  {r.get('outcome', '?'):<8} {r.get('profile', '?'):<34} score {r.get('score')}  {r.get('signals', '')}")
+    gate = [r["gate_ms"] for r in results if r.get("gate_ms") is not None]
+    collect = [p["signals"].get("collect_ms") for p in profile_replay.load_profiles()
+               if p.get("signals") and p["signals"].get("collect_ms") is not None]
+    raw = open(SENSOR_JS, "rb").read()
+    print("defender cost: gate on /api/products median "
+          f"{statistics.median(gate):.2f} ms, max {max(gate):.2f} ms" if gate else "defender cost: -")
+    print(f"               sensor collection {statistics.median(collect):.0f} ms median in the browser (from the profiles); "
+          f"sensor.js {len(raw) / 1024:.1f} KB, {len(gzip.compress(raw)) / 1024:.1f} KB gzipped" if collect else "")
+    return (True, "")
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def make_round(n, description, level=None):
+    return Round(level=n + 1 if level is None else level, description=description, scenario="sensor_shop",
+                 attacks={name: script for name, (script, _, _) in BOTS.items()}, expect=expect(n),
+                 allowed_fp=("no_js",) if n >= 1 else (), bot_success_max=1.0,
+                 extra_checks=([your_code(n)] if n >= 1 else []) + [shoppers],
+                 solutions=SOLUTIONS.get(n, ()))
+
+
+ROUNDS = {
+    0: make_round(0, "W1's header rules only (level 1)"),
+    1: make_round(1, "the sensor gate + automation artifacts (level 2)"),
+    2: make_round(2, "+ consistency (level 3)"),
+    3: make_round(3, "+ lie detection (level 4)"),
+    4: make_round(4, "+ interaction evidence on the cart (level 5)"),
+    5: make_round(5, "forge the sensor: integrity is the next chapter (level 5)", level=5),
+}
+
+if __name__ == "__main__":
+    main(ROUNDS)

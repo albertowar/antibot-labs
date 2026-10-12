@@ -32,17 +32,22 @@ registration). Nothing is real: no payments are processed, every user is synthet
 ## 2. Starters and the copy model
 
 ```
-workshops/01-initiation/starter/     the bare skeleton (this contract, no defenses wired)
-workshops/02-proficient/starter/     W1 Ch9 end state: every W1 defense in the baseline
-workshops/03-advanced/starter/       W2 Ch9 end state
-workshops/04-ai-era-bots/starter/    identical to W3's (W3 and W4 depend only on W1 + W2)
+workshops/01-initiation/starter/     the skeleton (this contract, no defenses wired), written by hand
+workshops/02-proficient/starter/     the skeleton + the W2 baseline (workshops/02-proficient/starter.manifest.json)
+workshops/03-advanced/starter/       the skeleton + the W3 baseline
+workshops/04-ai-era-bots/starter/    the skeleton + the W4 baseline
 ```
 
 A chapter lab **copies** its workshop's starter (`labnet.py`, `demo_site/`, `defenses/`, `tools/`, `data/`, compose
 and requirements) and adds its rounds on top. Labs never import across chapters and never edit starter
-files; they add `defenses/<name>.py` checks and `demo_site/ext/<name>.py` modules. Starters are never
-edited by hand: change the capstone lab, rebuild (`scripts/build_starter.py --from <capstone lab>`),
+files; they add `defenses/<name>.py` checks and `demo_site/ext/<name>.py` modules. The W2-W4 starters
+are never edited by hand: change the skeleton or the manifest, rebuild (`scripts/build_starter.py --all`),
 and `scripts/starter_check.py` reports drift.
+
+Every baseline is empty today (decision in `TODO.md` §1.6). No starter is a previous workshop's end
+state: each workshop runs on its own, and a chapter that needs an earlier control at its Round 0 (W1's
+header rules, say) adds it in its own lab. A baseline that ever grows is listed in its starter's README,
+with why each control is there.
 
 Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.3). Adds: …`.
 

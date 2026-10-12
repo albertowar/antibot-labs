@@ -20,8 +20,8 @@
  *                            code outside a browser.
  *   domainLock               adds little against a scraper that runs on your own origin.
  *
- * TODO (Round 3, optional): set controlFlowFlattening and deadCodeInjection to
- * false, rebuild (python tools/build_variants.py), then compare the KB and the
+ * TODO (Round 3, optional): set controlFlowFlattening and deadCodeInjection to false,
+ * rebuild (python tools/build_variants.py), then compare the KB and the
  * webcrack output (npm run deobfuscate). What did those two options buy you?
  *
  * Note the 'ms' column: obfuscating costs tens to hundreds of milliseconds per

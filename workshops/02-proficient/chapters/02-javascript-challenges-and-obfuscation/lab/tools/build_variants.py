@@ -4,16 +4,17 @@ Chapter 2 — Build the polymorphic challenge pool (Round 3)
 Generates N challenge variants, each with its own random op chain and layout
 probe size, then obfuscates them with javascript-obfuscator:
 
-  demo_site/secrets/src/<id>.js        readable source (reference copy, never served)
-  demo_site/static/variants/<id>.js    obfuscated, served to clients
-  demo_site/secrets/manifest.json      id -> chain + probe (the server's answer key)
+  defenses/secrets/src/<id>.js           readable source (reference copy, never served)
+  demo_site/static/js/variants/<id>.js   obfuscated, served to clients
+  defenses/secrets/manifest.json         id -> chain + probe (the server's answer key)
 
 The manifest is the defender's secret. If it leaks, every variant can be
-answered without running anything. The demo site never serves anything from
-secrets/.
+answered without running anything. The store never serves anything from
+defenses/. All three are gitignored: every student builds their own pool.
 
-Rotation: re-run this while the demo site is running and restart it. Old
-challenges in flight then fail and the browser simply re-solves. Real
+Rotation: re-run this while the store is running; js_challenge.py notices the
+new manifest on the next challenge. Old challenges in flight then fail and the
+browser simply re-solves. Real
 deployments rotate on a timer (minutes to hours) and keep the previous pool
 valid for one TTL, so in-flight challenges survive the switch.
 
@@ -34,13 +35,13 @@ import sys
 import time
 
 LAB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
+sys.path.insert(0, LAB_DIR)
 
-from variants import probe_width, random_chain, random_probe, render
+from defenses.variants import probe_width, random_chain, random_probe, render  # noqa: E402
 
-SECRETS_DIR = os.path.join(LAB_DIR, "demo_site", "secrets")
+SECRETS_DIR = os.path.join(LAB_DIR, "defenses", "secrets")
 SRC_DIR = os.path.join(SECRETS_DIR, "src")
-OUT_DIR = os.path.join(LAB_DIR, "demo_site", "static", "variants")
+OUT_DIR = os.path.join(LAB_DIR, "demo_site", "static", "js", "variants")
 MANIFEST = os.path.join(SECRETS_DIR, "manifest.json")
 
 
@@ -81,7 +82,7 @@ def main():
     plain = statistics.median(v["bytes_plain"] for v in variants)
     obf = statistics.median(v["bytes_obf"] for v in variants)
     ms = statistics.median(s["ms"] for s in stats.values())
-    print(f"✅ Built {len(variants)} variants in demo_site/static/variants/")
+    print(f"✅ Built {len(variants)} variants in demo_site/static/js/variants/")
     print(f"   size: {plain / 1024:.1f} KB readable -> {obf / 1024:.1f} KB obfuscated "
           f"(median, {obf / plain:.1f}x)")
     print(f"   obfuscation cost: median {ms:.0f} ms per variant (why we never do it per request)")

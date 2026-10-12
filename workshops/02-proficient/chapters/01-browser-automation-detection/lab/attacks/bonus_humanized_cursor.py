@@ -8,14 +8,12 @@ inside the button, the way open-source "humanizer" helpers do.
 This beats the two rules this chapter wrote (teleport and dead-centre).
 It does not produce human movement: constant-ish speed, no overshoot, no
 micro-corrections, perfectly regular timing. Detecting that is the subject
-of Workshop 2, Chapter 3 (behavioural analysis).
+of Chapter 3 (behavioural analysis).
 
 Expected results (verified with patchright 1.63 / Chromium 153):
-  - DEFENSE_LEVEL=4 → 200 on /api/products and /api/cart
+  - Round 4 (level 5) → 200 on /api/products and /api/cart/add
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=4 python app.py
-Then run:
+Run the store first (python demo_site/app.py), then:
     python attacks/bonus_humanized_cursor.py
 """
 
@@ -23,7 +21,7 @@ import math
 import random
 
 import round4_patchright
-from _common import report
+from _common import finish, report
 
 
 def human_click(page, button):
@@ -52,4 +50,6 @@ def run():
 
 
 if __name__ == '__main__':
-    report("Bonus: patchright + humanized cursor", run())
+    out = run()
+    report("Bonus: patchright + humanized cursor", out)
+    finish("bonus_humanized_cursor", out)

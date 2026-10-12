@@ -1,20 +1,21 @@
 """
-Chapter 3: synthetic legitimate users (Section 3.7).
+Chapter 3: synthetic behavior for the shoppers (Section 3.8).
 
-Measures the other half of every defense: how many REAL users it stops.
-Each run builds a fresh population of 40 visitors, asks the server for a
-session (the same layout the page would draw), synthesises the telemetry
-the collector would have recorded, and posts the reservation.
+The lab's 40 shoppers (tools/population.py) are Python, not browsers, so nothing
+runs the page's collector for them. tools/personas_ch3.py gives each one a
+behavior profile and calls make_session() here to synthesise the telemetry the
+collector would have recorded on the layout the server drew for that page view.
 
-    profile          n   what makes them hard
-    mouse           24   125-1000 Hz mice, varied skill, a few slow typists
-    trackpad         3   60 Hz, smoother, "clutching" (lift and re-place the finger)
-    tremor           3   4-6 Hz tremor of 2-4 px, many corrections, slow
-    keyboard         2   Tab through the form, Enter on the button: no pointer at all
-    screen_reader    2   like keyboard, slower; activation is a keyboard click
-    touch            3   taps (no hover path), virtual keyboard (key "Unidentified")
-    password_mgr     2   name and email autofilled: text with no keystrokes
-    voice            1   voice control: cursor warps to the target centre, dictated text
+    profile          n   what makes them hard                                   shoppers
+    mouse           18   125-1000 Hz mice, varied skill, a few slow typists     home, VPN, relay, old Chrome
+    trackpad         3   60 Hz, smoother, "clutching" (lift and re-place)       home (macOS)
+    tremor           3   4-6 Hz tremor of 2-4 px, many corrections, slow        home
+    keyboard         2   Tab through the form, Enter on the button: no pointer  home
+    screen_reader    2   like keyboard, slower; activation is a keyboard click  home
+    touch            8   taps (no hover path), virtual keyboard ("Unidentified") the phones (mobile_cgnat)
+    password_mgr     2   name and email autofilled: text with no keystrokes     autofill + one home
+    voice            1   voice control: cursor warps to the target centre       home
+    (no telemetry)   1   JavaScript disabled                                    no_js
 
 How the movement is modelled (and why you should not over-trust it):
 mouse paths are built from lognormal velocity strokes, the sigma-lognormal
@@ -22,27 +23,22 @@ model of Plamondon's Kinematic Theory: a primary stroke that lands near the
 target plus one or two corrective strokes, along gently curved arcs, with
 physiological tremor, sampled at the device's polling rate. Typing uses
 log-normal hold and inter-key times with natural rollover and occasional
-typos. This is a stand-in for a labelled corpus of real traffic. Real
-deployments calibrate against their own users, and so do you: Round 0 adds
-YOUR recorded traces to every checkpoint (tools/traces/*.json).
+typos. Taps hold 40-110 ms and land off centre; every phone types like
+Android's Gboard (key "Unidentified", ~0 ms holds). iOS Safari's keyboard is
+modelled the same way, which nobody has checked against a real iPhone yet.
+This is a stand-in for a labelled corpus of real traffic. Real deployments
+calibrate against their own users, and so do you: Round 0 adds YOUR recorded
+traces to every checkpoint (tools/traces/*.json).
 
-Run the demo site first, then:
-    python tools/humans.py                 # post 40 users, print verdicts
     python tools/humans.py --export 6      # write tools/traces/corpus_NN.json (fixed seed)
+    python tools/humans.py --show touch    # one synthetic session's features
 """
 
 import argparse
 import json
 import math
 import os
-import sys
 import random
-
-import requests
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRACES_DIR = os.path.join(HERE, "traces")
@@ -50,26 +46,25 @@ TRACES_DIR = os.path.join(HERE, "traces")
 FIRST = ["Maya", "Jonas", "Priya", "Tomás", "Aiko", "Lena", "Omar", "Grace", "Nikolai", "Zara"]
 LAST = ["Holt", "Ibarra", "Kowalski", "Mensah", "Nakamura", "Olsen", "Petrov", "Quinn", "Rossi", "Silva"]
 
-POPULATION = ([("mouse", 24), ("trackpad", 3), ("tremor", 3), ("keyboard", 2),
-               ("screen_reader", 2), ("touch", 3), ("password_mgr", 2), ("voice", 1)])
+SIZES = ["7", "8", "9", "10", "11", "12"]     # the shoe drop's sizes (demo_site/seed.py)
 
 
 def identity(rng):
     first, last = rng.choice(FIRST), rng.choice(LAST)
     return {"name": f"{first} {last}",
             "email": f"{first.lower()}.{last.lower()}{rng.randint(1, 99)}@example.test",
-            "size": str(rng.randint(36, 47))}
+            "size": rng.choice(SIZES)}
 
 
 class Recorder:
     """Accumulates telemetry in exactly the collector.js format."""
 
-    def __init__(self, rng, viewport, kind="m"):
+    def __init__(self, rng, viewport, kind="m", origin=(0, 0)):
         self.rng, self.kind = rng, kind
         self.t = rng.uniform(300, 900)           # page load -> first paint
-        self.d = {"v": 1, "viewport": viewport, "dpr": 1, "doc_h": 1100, "pointer": [],
-                  "moves_dispatched": 0, "downs": [], "clicks": [], "keys": [], "inputs": [],
-                  "focus": [], "scroll": [], "t_submit": 0}
+        self.d = {"v": 1, "viewport": viewport, "dpr": 1, "doc_h": 1600, "pointer": [],
+                  "moves_dispatched": 0, "downs": [], "ups": [], "contact": [], "origin": list(origin),
+                  "clicks": [], "keys": [], "inputs": [], "focus": [], "scroll": [], "t_submit": 0}
         self.pos = None
 
     def wait(self, ms):
@@ -84,7 +79,11 @@ class Recorder:
     def click_at(self, target, x, y, kind="m", hold=None):
         hold = hold if hold is not None else self.rng.uniform(60, 140)
         self.d["downs"].append([round(self.t, 1), round(x, 1), round(y, 1), kind, 0])
+        if kind == "m":                             # a mouse reports a 1x1 contact at pressure 0.5
+            self.d["contact"].append([round(self.t, 1), 1, 1, 0.5, "m"])
         self.wait(hold)
+        self.d["ups"].append([round(self.t, 1), round(x, 1), round(y, 1), kind])
+        self.wait(self.rng.uniform(0.2, 2))
         self.d["clicks"].append([round(self.t, 1), round(x, 1), round(y, 1), 1, target, kind, True])
         if target != "reserve":
             self.d["focus"].append([round(self.t - hold, 1), target])
@@ -311,10 +310,9 @@ def keyboard_session(rec, who, person, slow=False):
 def touch_session(rec, layout, who):
     rng = rec.rng
     rec.lognormal_wait(1800, 0.4)
-    for y in (120, 260, 90):                       # scroll down and back
+    for y in (180, 420, 610, 560):                 # flick down past the photo to the form
         rec.d["scroll"].append([round(rec.t, 1), y])
         rec.wait(rng.uniform(150, 400))
-    rec.d["scroll"].append([round(rec.t, 1), 0])
     for field in ("name", "email", "size", "reserve"):
         x, y = aim_point(rng, layout["boxes"][field])
         x += rng.uniform(-0.5, 0.5)
@@ -345,13 +343,23 @@ def voice_session(rec, layout, who):
                 rec.d["inputs"].append([round(rec.t, 1), field, "insertText", False])
 
 
-def make_session(layout, profile, rng):
+def page_layout(rel, origin):
+    """The server's form-relative boxes, placed where the page drew the form."""
+    ox, oy = origin
+    return {"origin": [ox, oy], "boxes": {k: [ox + b[0], oy + b[1], b[2], b[3]] for k, b in rel["boxes"].items()}}
+
+
+def make_session(rel, profile, rng):
+    """(telemetry, identity, page layout) for one page view of the layout `rel` (the page's data-layout)."""
     who = identity(rng)
     person = person_for(profile, rng)
     viewport = rng.choice([[1280, 720], [1366, 768], [1440, 900], [1920, 1080]])
+    origin = [round(659 + (viewport[0] - 1280) / 2, 1), round(rng.uniform(300, 330), 1)]
     if profile == "touch":
-        viewport = [820, 1180]
-    rec = Recorder(rng, viewport, kind="t" if profile == "touch" else "m")
+        viewport = rng.choice([[390, 844], [412, 915]])      # iPhone 15, Pixel 7
+        origin = [21, round(rng.uniform(780, 800), 1)]
+    layout = page_layout(rel, origin)
+    rec = Recorder(rng, viewport, kind="t" if profile == "touch" else "m", origin=origin)
     if profile in ("mouse", "trackpad", "tremor", "password_mgr"):
         mouse_session(rec, layout, who, person, profile)
     elif profile in ("keyboard", "screen_reader"):
@@ -361,43 +369,18 @@ def make_session(layout, profile, rng):
     elif profile == "voice":
         voice_session(rec, layout, who)
     rec.d["moves_dispatched"] = len(rec.d["pointer"])
-    return rec.submit(), who
-
-
-def population():
-    return [name for name, n in POPULATION for _ in range(n)]
-
-
-def run(seed=None):
-    """Post one fresh population. Returns one result per synthetic user."""
-    rng = random.Random(seed)
-    http = requests.Session()
-    http.headers["X-Lab-Client"] = "humans"
-    results = []
-    for profile in population():
-        sess = http.post(f"{BASE_URL}/api/session", timeout=5).json()
-        telemetry, who = make_session(sess["layout"], profile, rng)
-        r = http.post(f"{BASE_URL}/api/reserve", timeout=10,
-                      json={"sid": sess["sid"], "form": who, "telemetry": telemetry})
-        body = r.json()
-        timing = r.headers.get("Server-Timing", "")
-        results.append({
-            "profile": profile, "status": body["status"], "score": body["score"],
-            "reasons": body.get("reasons", []), "bytes": len(r.request.body or b""),
-            "score_ms": float(timing.split("dur=")[1]) if "dur=" in timing else None,
-        })
-    return results
+    return rec.submit(), who, layout
 
 
 def export(n, seed=7):
-    """Write a fixed 'reference corpus' of mouse sessions for Round 0 and Round 4."""
-    from_layout = {"origin": [360, 200], "boxes": {
-        "name": [360, 320, 320, 36], "email": [360, 390, 320, 36],
-        "size": [360, 460, 120, 36], "reserve": [360, 530, 160, 44]}}
+    """Write a fixed 'reference corpus' of mouse sessions for Round 0 and Round 4 (un-jittered page)."""
+    import sys
+    sys.path.insert(0, os.path.join(HERE, ".."))
+    from defenses.behavior import new_layout
     rng = random.Random(seed)
     os.makedirs(TRACES_DIR, exist_ok=True)
     for i in range(1, n + 1):
-        telemetry, who = make_session(from_layout, "mouse", rng)
+        telemetry, who, from_layout = make_session(new_layout(0), "mouse", rng)
         path = os.path.join(TRACES_DIR, f"corpus_{i:02d}.json")
         with open(path, "w") as f:
             json.dump({"sid": f"corpus-{i:02d}", "label": "corpus", "source": "synthetic",
@@ -407,21 +390,23 @@ def export(n, seed=7):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Synthetic legitimate users")
-    ap.add_argument("--export", type=int, metavar="N", help="write N corpus traces instead of posting")
-    ap.add_argument("--seed", type=int)
+    ap = argparse.ArgumentParser(description="Synthetic behavior for the shoppers")
+    ap.add_argument("--export", type=int, metavar="N", help="write N corpus traces (tools/traces/corpus_NN.json)")
+    ap.add_argument("--show", metavar="PROFILE", help="print one synthetic session's features")
+    ap.add_argument("--seed", type=int, default=7)
     args = ap.parse_args()
     if args.export:
-        export(args.export)
-        raise SystemExit(0)
-    results = run(args.seed)
-    print("=== Legitimate users (synthetic population) ===")
-    for r in results:
-        mark = {"reserved": "✅", "challenge": "🟡", "blocked": "❌"}[r["status"]]
-        print(f"  {mark} {r['profile']:<14} {r['status']:<9} score={r['score']:<3} "
-              f"{r['bytes'] / 1024:5.1f} KB")
-        for reason in r["reasons"]:
-            print(f"       - {reason}")
-    blocked = sum(r["status"] == "blocked" for r in results)
-    challenged = sum(r["status"] == "challenge" for r in results)
-    print(f"\n  Blocked: {blocked}/{len(results)}   Challenged: {challenged}/{len(results)}")
+        export(args.export, args.seed)
+    elif args.show:
+        import sys
+        sys.path.insert(0, os.path.join(HERE, ".."))
+        from defenses.behavior import new_layout
+        from defenses.behavior_features import extract
+        telemetry, _, layout = make_session(new_layout(0), args.show, random.Random(args.seed))
+        feats = extract(telemetry, layout)
+        for m in feats["approaches"]:
+            m.pop("speeds")
+        feats["signature"] = {k: f"{len(v)} entries" for k, v in feats["signature"].items()}
+        print(json.dumps(feats, indent=2))
+    else:
+        ap.print_help()

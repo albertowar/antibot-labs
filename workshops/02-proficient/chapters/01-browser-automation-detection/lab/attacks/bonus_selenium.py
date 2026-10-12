@@ -14,13 +14,11 @@ injects its cdc_adoQpoasnfa76pfcZLmcfl_* helper globals into the page.
 
 Expected results (verified with Selenium 4.51 and the Chrome for Testing
 build Selenium Manager downloads; the first run downloads ~150 MB):
-  - DEFENSE_LEVEL=0  → 200
-  - DEFENSE_LEVEL>=1 → 403, "[L1] navigator.webdriver is true ..." and
-    "[L1] Automation global found (ChromeDriver (Selenium) helper variable: cdc_...)"
+  - Round 0 (level 1)   → 200
+  - Round 1+ (level 2+) → 403, automation_artifacts: "navigator.webdriver is true ..." and
+    "Automation global found (ChromeDriver (Selenium) helper variable: cdc_...)"
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=1 python app.py
-Then run:
+Run the store first (python demo_site/app.py), then:
     python attacks/bonus_selenium.py
 """
 
@@ -31,15 +29,19 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from _common import BASE_URL, CART_PATH, SCRAPE_PATH, chrome_ua, report, require_local
+from _common import BASE_URL, CART_PATH, SCRAPE_PATH, bot_ip, chrome_ua, finish, report
 
 
 def run(verbose=False):
-    require_local()
+    # BASE_URL comes from tools/labclient.py, which already refused anything that is not this machine.
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
     try:
+        # The lab's simulated edge: a rented source address and the bot label, on every request.
+        driver.execute_cdp_cmd("Network.enable", {})
+        driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {
+            "X-Lab-Client-IP": bot_ip(), "X-Lab-Actor": "bot:bonus_selenium"}})
         major = driver.capabilities["browserVersion"].split(".")[0]
         full = driver.capabilities["browserVersion"]
         driver.execute_cdp_cmd("Emulation.setUserAgentOverride", {
@@ -62,18 +64,20 @@ def run(verbose=False):
                 ".filter(k => /cdc_/.test(k))")
             print(f"  ChromeDriver variables visible to the page: {json.dumps(keys)}")
         if status.get_attribute("data-state") != "ready":
-            return [{"path": SCRAPE_PATH, "status": 403, "reasons": [status.text]},
-                    {"path": CART_PATH, "status": None, "reasons": ["never reached the cart"]}]
+            return [{"path": SCRAPE_PATH, "status": 403, "signals": [status.text]},
+                    {"path": CART_PATH, "status": None, "signals": ["never reached the cart"]}]
         driver.find_element(By.CSS_SELECTOR, ".add-to-cart").click()
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#cart-status:not([data-state="idle"])')))
         cart = driver.find_element(By.ID, "cart-status")
         cart_ok = cart.get_attribute("data-state") == "added"
-        return [{"path": SCRAPE_PATH, "status": 200, "reasons": []},
+        return [{"path": SCRAPE_PATH, "status": 200, "signals": []},
                 {"path": CART_PATH, "status": 200 if cart_ok else 403,
-                 "reasons": [] if cart_ok else [cart.text]}]
+                 "signals": [] if cart_ok else [cart.text]}]
     finally:
         driver.quit()
 
 
 if __name__ == '__main__':
-    report("Bonus: Selenium + ChromeDriver", run(verbose=True))
+    out = run(verbose=True)
+    report("Bonus: Selenium + ChromeDriver", out)
+    finish("bonus_selenium", out)

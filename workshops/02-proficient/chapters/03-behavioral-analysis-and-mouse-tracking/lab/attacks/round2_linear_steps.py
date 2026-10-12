@@ -23,11 +23,11 @@ import random
 
 from playwright.sync_api import sync_playwright
 
-from common import box, identity, open_drop, report, sleep_ms, wait_result
+from _common import FIELDS, box, finish, identity, open_drop, report, sleep_ms, submit
 
 
-def move_and_click(page, selector):
-    b = box(page, selector)
+def move_and_click(page, field):
+    b = box(page, field)
     x = b["x"] + b["width"] / 2 + random.uniform(-8, 8)
     y = b["y"] + b["height"] / 2 + random.uniform(-4, 4)
     page.mouse.move(x, y, steps=25)
@@ -40,12 +40,11 @@ def run(verbose=False):
         browser, page = open_drop(p, "round2_linear_steps")
         who = identity()
         sleep_ms(800)
-        for field in ("name", "email", "size"):
-            move_and_click(page, f"#{field}")
+        for field in FIELDS:
+            move_and_click(page, field)
             page.keyboard.type(who[field], delay=100)
             sleep_ms(300)
-        move_and_click(page, "#reserve")
-        result = wait_result(page)
+        result = submit(page, lambda: move_and_click(page, "reserve"))
         browser.close()
     if verbose:
         report("round2_linear_steps", result)
@@ -54,4 +53,4 @@ def run(verbose=False):
 
 if __name__ == "__main__":
     print("=== Round 2: mouse.move(steps=25) + keyboard.type(delay=100) ===")
-    run(verbose=True)
+    finish("round2_linear_steps", run(verbose=True))

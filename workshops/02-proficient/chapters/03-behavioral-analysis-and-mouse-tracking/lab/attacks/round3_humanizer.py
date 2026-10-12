@@ -22,7 +22,7 @@ import random
 
 from playwright.sync_api import sync_playwright
 
-from common import identity, open_drop, report, sleep_ms, wait_result
+from _common import FIELDS, SELECTOR, finish, identity, open_drop, report, sleep_ms, submit
 from humanize import Cursor, human_type
 
 
@@ -32,13 +32,12 @@ def one_run(p, ease):
     cursor = Cursor(page, ease=ease)
     who = identity()
     sleep_ms(random.uniform(600, 1200))
-    for field in ("name", "email", "size"):
-        cursor.click(f"#{field}")
+    for field in FIELDS:
+        cursor.click(SELECTOR[field])
         sleep_ms(random.uniform(150, 400))
         human_type(page, who[field])
         sleep_ms(random.uniform(200, 600))
-    cursor.click("#reserve")
-    result = wait_result(page)
+    result = submit(page, lambda: cursor.click(SELECTOR["reserve"]))
     browser.close()
     return result
 
@@ -60,4 +59,4 @@ if __name__ == "__main__":
     ap.add_argument("--runs", type=int, default=2)
     args = ap.parse_args()
     print(f"=== Round 3: Bezier humanizer ({'eased' if args.ease else 'no easing'}) ===")
-    run(args.ease, args.runs, verbose=True)
+    finish("round3_humanizer" + ("_ease" if args.ease else ""), run(args.ease, args.runs, verbose=True))

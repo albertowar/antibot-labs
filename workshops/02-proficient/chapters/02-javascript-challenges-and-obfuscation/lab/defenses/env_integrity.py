@@ -29,11 +29,11 @@ False positives to respect:
   - Engine checks keyed on the UA must know every engine: Safari and every
     iOS browser (CriOS, FxiOS) are JavaScriptCore, not V8. The naive rule
     "stack must be V8-style" blocks all Firefox and Safari users. Try it:
-        NAIVE_ENGINE_CHECK=1 DEFENSE_LEVEL=4 python demo_site/app.py
+        NAIVE_ENGINE_CHECK=1 python tools/verify.py --round 4   # or set it on python demo_site/app.py
   - Timing windows: an old phone, or a laptop on battery saver, can take 5-10x
     longer than your dev machine. Try it:
-        MAX_SOLVE_MS=300 DEFENSE_LEVEL=4 python demo_site/app.py
-    and watch the throttled user in the checkpoint.
+        MAX_SOLVE_MS=300 python tools/verify.py --round 4
+    and watch the phone shoppers in the checkpoint.
 
 What still beats it: a patched emulator that returns the right offsetWidth
 and a fake "[native code]" toString (an arms race you can keep winning for a
@@ -42,11 +42,11 @@ while), or simply a real browser (Round 4's attack).
 
 import os
 
-from variants import ENGINE_OTHER, ENGINE_V8, probe_width
+from .variants import ENGINE_OTHER, ENGINE_V8, probe_width
 
 NAIVE_ENGINE_CHECK = os.environ.get("NAIVE_ENGINE_CHECK") == "1"
-# Time from /challenge/new to /challenge/verify. The token TTL (60 s) is the
-# hard limit; this is the policy limit.
+# Time from issuing the challenge to POST /api/challenge/verify. The token TTL
+# (60 s) is the hard limit; this is the policy limit.
 MAX_SOLVE_MS = float(os.environ.get("MAX_SOLVE_MS", "30000"))
 
 
@@ -55,8 +55,8 @@ def expected_engine(user_agent):
     ua = user_agent or ""
     if NAIVE_ENGINE_CHECK:
         return ENGINE_V8            # the bug: assumes everyone runs Chrome
-    # TODO (Round 4, optional): is this complete? Think about Edge, Opera,
-    # Samsung Internet, Chrome on iOS (CriOS) and Firefox on iOS (FxiOS).
+    # TODO (Round 4, optional): is this complete? Think about Edge, Opera, Samsung
+    # Internet, Chrome on iOS (CriOS) and Firefox on iOS (FxiOS).
     is_chromium = ("Chrome/" in ua or "Chromium/" in ua) and "Firefox/" not in ua
     return ENGINE_V8 if is_chromium else ENGINE_OTHER
 

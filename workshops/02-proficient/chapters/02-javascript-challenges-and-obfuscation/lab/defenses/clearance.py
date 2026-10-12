@@ -10,8 +10,8 @@ works in practice.
 You can't stop the handoff: every byte the browser holds can be copied.
 What you can do is cap what one solve buys:
 
-  - a request budget per clearance (here 30), counted in Redis by the
-    clearance's id (jti), and
+  - a request budget per clearance (here 30), counted in Redis per clearance
+    (the session plus the moment it was granted), and
   - a short lifetime (here 10 minutes).
 
 Over budget, the request gets a fresh challenge. A real browser solves it
@@ -39,20 +39,18 @@ BUDGET = int(os.environ.get("CLEARANCE_BUDGET", "30"))
 TTL_S = 600
 
 
-def consume(store, payload):
+def consume(redis, clearance_id):
     """Count one request against this clearance. Returns (allowed, used)."""
-    key = f"budget:{payload['jti']}"
-    used = store.incr(key)
+    key = f"lab:jsc:budget:{clearance_id}"
+    used = redis.incr(key)
     if used == 1:
-        store.expire(key, TTL_S)
-    # TODO (Round 5, optional): what budget would a real user on your busiest
-    # page need?
+        redis.expire(key, TTL_S)
+    # TODO (Round 5, optional): what budget would a real user on your busiest page need?
     return used <= BUDGET, used
 
 
 if __name__ == "__main__":
     import fakeredis
-    store = fakeredis.FakeRedis()
-    payload = {"jti": "demo"}
-    results = [consume(store, payload)[0] for _ in range(BUDGET + 3)]
+    redis = fakeredis.FakeRedis()
+    results = [consume(redis, "demo")[0] for _ in range(BUDGET + 3)]
     print(f"{results.count(True)} requests allowed, then {results.count(False)} re-challenged")

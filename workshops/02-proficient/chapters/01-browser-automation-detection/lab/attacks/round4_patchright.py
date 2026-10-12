@@ -25,25 +25,23 @@ What remains: a software WebGL renderer (weak signal) and the way
 page.click() moves the mouse.
 
 Expected results (verified with patchright 1.63 / Chromium 153):
-  - DEFENSE_LEVEL<=3 → 200 on /api/products and /api/cart
-      (only "[L2] Software WebGL renderer", 10 points: clean)
-  - DEFENSE_LEVEL=4  → /api/products 200 (scraping still works!)
-                       /api/cart 403: "[L4] Pointer teleported ...",
-                       "[L4] Click landed on the exact centre of the button"
-  - --vanilla, DEFENSE_LEVEL>=1 → 403, "[L1] Automation global found
+  - Rounds 0-3 (levels 1-4) → 200 on /api/products and /api/cart/add
+      (only consistency's "Software WebGL renderer", 10 points: allowed)
+  - Round 4+ (level 5)      → /api/products 200 (scraping still works!)
+                              /api/cart/add 403, interaction: "Pointer teleported ...",
+                              "Click landed on the exact centre of the button"
+  - --vanilla, Round 1+ (level 2+) → 403, automation_artifacts: "Automation global found
       (Playwright exposed binding: __playwright__binding__)"
 
 Setup (once):
     python -m patchright install chromium
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=3 python app.py
-Then run:
+Run the store first (python demo_site/app.py), or let tools/checkpoint.py set the level; then:
     python attacks/round4_patchright.py [--vanilla]
 """
 
 import sys
 
-from _common import chrome_ua, report, shop_in_browser
+from _common import chrome_ua, finish, new_context, report, shop_in_browser
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -64,7 +62,8 @@ def run(vanilla=False, click=None):
             launch["ignore_default_args"] = ["--enable-automation"]
         browser = p.chromium.launch(**launch)
         major = browser.version.split(".")[0]
-        context = browser.new_context(user_agent=chrome_ua(major), viewport=VIEWPORT)
+        context = new_context(browser, "round4_patchright_vanilla" if vanilla else "round4_patchright",
+                              user_agent=chrome_ua(major), viewport=VIEWPORT)
         context.expose_function("reportProgress", lambda step: progress.append(step))
         page = context.new_page()
         cdp = context.new_cdp_session(page)
@@ -81,5 +80,6 @@ def run(vanilla=False, click=None):
 
 if __name__ == '__main__':
     vanilla = "--vanilla" in sys.argv
-    report(f"Round 4: {'plain Playwright' if vanilla else 'patchright'}, new headless, CDP emulation",
-           run(vanilla=vanilla))
+    out = run(vanilla=vanilla)
+    report(f"Round 4: {'plain Playwright' if vanilla else 'patchright'}, new headless, CDP emulation", out)
+    finish("round4_patchright_vanilla" if vanilla else "round4_patchright", out)

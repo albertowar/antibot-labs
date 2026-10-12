@@ -11,25 +11,24 @@ What it does NOT change: navigator.webdriver is still true, because
 Playwright launches Chromium with --enable-automation.
 
 Expected results (verified with Playwright 1.63 / Chromium 153):
-  - DEFENSE_LEVEL=0  → 200 on /api/products and /api/cart (edge rules pass)
-  - DEFENSE_LEVEL>=1 → 403, "[L1] navigator.webdriver is true ..."
+  - Round 0 (level 1)    → 200 on /api/products and /api/cart/add (W1's header rules pass)
+  - Round 1+ (level 2+)  → 403, automation_artifacts: navigator.webdriver is true
+  (Round N runs at level N+1: defenses/ladder.py.)
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=0 python app.py
-Then run:
+Run the store first (python demo_site/app.py), or let tools/checkpoint.py set the level; then:
     python attacks/round1_playwright_cdp_override.py
 """
 
 from playwright.sync_api import sync_playwright
 
-from _common import cdp_identity_override, report, shop_in_browser
+from _common import cdp_identity_override, finish, new_context, report, shop_in_browser
 
 
 def run():
     """Run the attack; return one result per API call (used by tools/checkpoint.py)."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        context = browser.new_context()
+        context = new_context(browser, "round1_playwright_cdp_override")
         page = context.new_page()
         cdp_identity_override(context, page, browser.version)
         results = shop_in_browser(page)
@@ -38,4 +37,6 @@ def run():
 
 
 if __name__ == '__main__':
-    report("Round 1: Playwright + CDP identity override", run())
+    out = run()
+    report("Round 1: Playwright + CDP identity override", out)
+    finish("round1_playwright_cdp_override", out)

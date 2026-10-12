@@ -1,30 +1,10 @@
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Checking your browser&hellip;</title>
-<style>body{font-family:system-ui;max-width:40rem;margin:6rem auto;padding:0 1rem;text-align:center}
-code{background:#eee;padding:0 .3rem}</style></head>
-<body>
-  <main id="challenge">
-    <h1>Checking your browser&hellip;</h1>
-    {# role=status + aria-live: screen readers announce progress without the page stealing focus #}
-    <p id="challenge-status" role="status" aria-live="polite">This takes less than a second.</p>
-    <noscript><p>This store needs JavaScript to check your browser. Please enable it and reload.</p></noscript>
-    <p><small>Level <code>{{ level }}</code> &middot; teaching aid, never shown in production: <code>{{ reason }}</code></small></p>
-  </main>
-{% if level == 1 %}
-  <script>{{ inline_script|safe }}</script>
-{% else %}
-  <script>
-    // Loader: ask for a fresh, signed challenge, then load the script that solves it.
-    fetch("/challenge/new", { method: "POST" })
-      .then(function (r) { return r.json(); })
-      .then(function (ch) {
-        window.__ch = ch;
-        var s = document.createElement("script");
-        s.src = ch.script;
-        document.head.appendChild(s);
-      });
-  </script>
-{% endif %}
-</body>
-</html>
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Just making sure you're not a bot</h1>
+  <p class="muted">This page serves the <code>{{ challenge }}</code> challenge. A chapter's extension replaces it with a real interstitial.</p>
+  <pre class="payload">{{ payload|tojson(indent=1) }}</pre>
+  {{ slot("challenge", challenge=challenge, payload=payload) }}
+</section>
+{% endblock %}

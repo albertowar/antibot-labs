@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block page %}gift-cards{% endblock %}{% block title %}Gift cards · {{ store_name }}{% endblock %}
+{% block content %}
+<div class="two">
+<form class="card" action="/gift-cards" method="post">
+  <h1>Check a gift card</h1>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% with label="Card code", name="code", required=True, placeholder="GC-XXXX-XXXX", value=code %}{% include "partials/_field.html" %}{% endwith %}
+  <button class="btn" type="submit">Check balance</button>
+  {% if code is defined and code %}
+    {% if card %}<p class="flash ok">Balance: <strong>${{ "%.2f"|format(card.balance) }}</strong>. {% if user %}<a href="#" data-redeem="{{ card.code }}">Redeem into your account</a>{% else %}<a href="/login?next=/gift-cards">Log in</a> to redeem.{% endif %}</p>
+    {% else %}<p class="flash warn">We could not find that code.</p>{% endif %}
+  {% endif %}
+</form>
+<aside class="card"><h2>Give the trail</h2><p class="muted">Gift cards never expire and can be redeemed into loyalty points on any account.</p><img src="/img/gift.svg?w=240" alt="" width="240" height="240"></aside>
+</div>
+{% endblock %}

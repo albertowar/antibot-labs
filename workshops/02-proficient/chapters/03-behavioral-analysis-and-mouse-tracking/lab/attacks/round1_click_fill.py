@@ -11,24 +11,25 @@ Expected (verified with Playwright 1.63 / Chromium):
     DEFENSE_LEVEL 0     reserved
     DEFENSE_LEVEL >= 1  blocked: too fast + teleport + centre + text without keys + (0, 0)
 
+The store's answer comes back in X-Lab-Verdict / X-Lab-Signals: teaching only.
+In production, never tell a client which rule caught it.
+
 Run the demo site first, then:
     python attacks/round1_click_fill.py
 """
 
 from playwright.sync_api import sync_playwright
 
-from common import identity, open_drop, report, wait_result
+from _common import FIELDS, SELECTOR, finish, identity, open_drop, report, submit
 
 
 def run(verbose=False):
     with sync_playwright() as p:
         browser, page = open_drop(p, "round1_click_fill")
         who = identity()
-        page.fill("#name", who["name"])
-        page.fill("#email", who["email"])
-        page.fill("#size", who["size"])
-        page.click("#reserve")
-        result = wait_result(page)
+        for field in FIELDS:
+            page.fill(SELECTOR[field], who[field])
+        result = submit(page, lambda: page.click(SELECTOR["reserve"]))
         browser.close()
     if verbose:
         report("round1_click_fill", result)
@@ -37,4 +38,4 @@ def run(verbose=False):
 
 if __name__ == "__main__":
     print("=== Round 1: page.fill() + page.click() ===")
-    run(verbose=True)
+    finish("round1_click_fill", run(verbose=True))

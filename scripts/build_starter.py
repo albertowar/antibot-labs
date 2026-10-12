@@ -1,32 +1,37 @@
 #!/usr/bin/env python3
 """
-Build a workshop starter from a capstone lab's end state.
+Build a workshop starter: the skeleton store plus that workshop's baseline.
 
-    python scripts/build_starter.py --from workshops/01-initiation/chapters/09-mini-capstone/lab
-    python scripts/build_starter.py --from <capstone lab> --check      # exit 1 on drift, change nothing
+    python scripts/build_starter.py --workshop 2           # (re)write workshops/02-proficient/starter/
+    python scripts/build_starter.py --all                  # W2, W3 and W4
+    python scripts/build_starter.py --all --check          # exit 1 on drift, change nothing
 
-The capstone lab declares what "end state" means in starter.manifest.json:
+The skeleton is workshops/01-initiation/starter/ (the W1 starter). It is written by hand and is
+never rebuilt by this script. Every other workshop declares its starter in
+workshops/<NN>/starter.manifest.json:
 
     {
-      "targets": ["workshops/02-proficient/starter"],       # one or more (W2 Ch9 -> W3 and W4)
-      "contract_version": "1.0",
-      "overlay_rounds": 5,                                   # apply solutions/round1..N cumulatively
-      "flatten_ladder": true,                                # LADDER levels 1..N fold into level 0
-      "include": ["demo_site", "defenses", "tools", "data", "docker-compose.yml", "requirements.txt",
-                  "requirements-browser.txt", ".env.example", ".gitignore"],
-      "exclude": ["attacks/*.py", "solutions", "instance", "logs", "**/__pycache__", "**/*.bak",
-                  "tools/checkpoint.py", "tools/personas_*.py", "tools/drop.py"],
-      "readme": "starter.README.md"                          # optional README to ship in the target
+      "workshop": 2,
+      "name": "Proficient",
+      "baseline": [                                   # controls always on at LADDER[0]; often empty
+        {"check": "header_rules.CHECK",               # what LADDER[0] lists
+         "files": {"defenses/header_rules.py": "workshops/01-initiation/chapters/04-.../lab/defenses/header_rules.py"},
+         "why": "every chapter's Round 0 assumes it"}  # shown in the starter README
+      ],
+      "pending": [                                    # baseline controls chosen but with no starter-chain
+        {"check": "...", "why": "..."}                #   source yet: documented, not installed
+      ],
+      "why_empty": "..."                              # README text when the baseline is empty
     }
 
-The result is the capstone's tree with every solution installed, chapter-only files removed, the
-ladder flattened (what the capstone enforced at its last level becomes the next workshop's baseline),
-tools/checkpoint.py reset to a Round 0 stub, and STARTER.json recording provenance.
+The baselines are empty today, by decision (TODO.md §1.6): every workshop runs on its own, and a
+chapter that needs an earlier control at its Round 0 adds it in its own lab. The mechanism stays so
+that a workshop can grow a baseline later; if one does, its starter README says what changed against
+the onboarding store, and the workshop may open with a short "what's different" lesson.
 """
 
 import argparse
 import filecmp
-import fnmatch
 import json
 import os
 import re
@@ -36,170 +41,178 @@ import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SKELETON = "workshops/01-initiation/starter"
+WORKSHOPS = {2: "workshops/02-proficient", 3: "workshops/03-advanced", 4: "workshops/04-ai-era-bots"}
+SKIP = {".venv", "instance", "__pycache__", "logs"}
 
 CHECKPOINT_STUB = '''"""
 Round checkpoint for this lab. Declares the rounds and hands over to checkpoint_core.
 
-This starter has no rounds: Round 0 proves the inherited baseline hurts no shopper.
-A chapter lab fills ROUNDS in (see checkpoint_core.Round).
+The W{w} starter has no rounds: Round 0 only proves that the baseline hurts no
+shopper. A chapter lab fills ROUNDS in (see checkpoint_core.Round).
 
     python tools/checkpoint.py --round 0
 """
 
 from checkpoint_core import Round, main
 
-ROUNDS = {
-    0: Round(level=0, description="baseline inherited from the previous workshop", scenario="browse", bot_success_max=1.0),
-}
+ROUNDS = {{
+    0: Round(level=0, description="{desc}", scenario="browse", bot_success_max=1.0),
+}}
 
 if __name__ == "__main__":
     main(ROUNDS)
 '''
 
 
-def excluded(rel, patterns):
-    parts = rel.split(os.sep)
-    for pat in patterns:
-        if fnmatch.fnmatch(rel, pat) or any(fnmatch.fnmatch(p, pat.replace("**/", "")) for p in parts) or rel.startswith(pat.rstrip("/") + os.sep) or rel == pat:
-            return True
-    return False
-
-
-def copy_tree(src_lab, manifest, dst):
-    for item in manifest["include"]:
-        src = os.path.join(src_lab, item)
-        if not os.path.exists(src):
-            continue
-        if os.path.isdir(src):
-            for root, dirs, files in os.walk(src):
-                rel_root = os.path.relpath(root, src_lab)
-                dirs[:] = [d for d in dirs if not excluded(os.path.join(rel_root, d), manifest["exclude"])]
-                for f in files:
-                    rel = os.path.join(rel_root, f)
-                    if excluded(rel, manifest["exclude"]):
-                        continue
-                    os.makedirs(os.path.join(dst, rel_root), exist_ok=True)
-                    shutil.copy2(os.path.join(root, f), os.path.join(dst, rel))
-        else:
-            shutil.copy2(src, os.path.join(dst, item))
-
-
-def overlay_solutions(src_lab, dst, rounds):
-    for n in range(1, rounds + 1):
-        sdir = os.path.join(src_lab, "solutions", f"round{n}")
-        if not os.path.isdir(sdir):
-            continue
-        for root, _, files in os.walk(sdir):
-            for f in files:
-                rel = os.path.relpath(os.path.join(root, f), sdir)
-                os.makedirs(os.path.dirname(os.path.join(dst, rel)) or dst, exist_ok=True)
-                shutil.copy2(os.path.join(root, f), os.path.join(dst, rel))
-
-
-def flatten_ladder(dst):
-    """Rewrite defenses/ladder.py so every level folds into LADDER[0] (the new baseline)."""
-    path = os.path.join(dst, "defenses", "ladder.py")
-    if not os.path.exists(path):
-        return []
-    src = open(path).read()
-    m = re.search(r"LADDER\s*=\s*\{(.*?)\n\}", src, re.S)
-    if not m:
-        return []
-    body = m.group(1)
-    entries = re.findall(r"^\s*(\d+)\s*:\s*\[(.*?)\]\s*,?\s*(?:#.*)?$", body, re.M)
-    names = []
-    for _, inner in sorted(entries, key=lambda e: int(e[0])):
-        names += [x.strip() for x in inner.split(",") if x.strip() and not x.strip().startswith("#")]
-    imports = "\n".join(line for line in src.split("\n") if line.startswith(("from ", "import ")))
-    header = re.match(r'("""[\s\S]*?""")', src)
-    doc = header.group(1) if header else '"""The ladder."""'
-    doc = re.sub(r"\(YOUR FILE[^)]*\)", "(baseline inherited from the previous workshop)", doc)
-    new = f'''{doc}
-
-{imports}
-
-# Every defense the previous workshop finished with runs as the always-on baseline.
-# Your chapter's rounds go in levels 1..N below.
-LADDER = {{
-    0: [{", ".join(names)}],
-}}
-'''
-    open(path, "w").write(new)
-    return names
-
-
-def build(src_lab, manifest, dst):
-    os.makedirs(dst, exist_ok=True)
-    copy_tree(src_lab, manifest, dst)
+def copy_skeleton(dst):
+    src = os.path.join(ROOT, SKELETON)
+    for root, dirs, files in os.walk(src):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP)
+        rel_root = os.path.relpath(root, src)
+        for f in sorted(files):
+            rel = os.path.normpath(os.path.join(rel_root, f))
+            if rel in ("README.md", "STARTER.json") or f.endswith((".pyc", ".bak")):
+                continue
+            os.makedirs(os.path.join(dst, rel_root), exist_ok=True)
+            shutil.copy2(os.path.join(root, f), os.path.join(dst, rel))
     shutil.copy2(os.path.join(ROOT, "scripts", "labnet.py"), os.path.join(dst, "labnet.py"))  # the guard, canonical
-    if manifest.get("overlay_rounds"):
-        overlay_solutions(src_lab, dst, manifest["overlay_rounds"])
-        for pat in manifest["exclude"]:          # solutions may have re-added excluded files
-            for root, dirs, files in os.walk(dst):
-                for f in files:
-                    rel = os.path.relpath(os.path.join(root, f), dst)
-                    if excluded(rel, manifest["exclude"]):
-                        os.remove(os.path.join(root, f))
-    baseline = flatten_ladder(dst) if manifest.get("flatten_ladder", True) else []
-    open(os.path.join(dst, "tools", "checkpoint.py"), "w").write(CHECKPOINT_STUB)
-    if manifest.get("readme") and os.path.exists(os.path.join(src_lab, manifest["readme"])):
-        shutil.copy2(os.path.join(src_lab, manifest["readme"]), os.path.join(dst, "README.md"))
+
+
+def write_ladder(dst, w, baseline):
+    """LADDER[0] lists the baseline checks; the skeleton's docstring is kept."""
+    path = os.path.join(dst, "defenses", "ladder.py")
+    src = open(path).read()
+    doc = re.match(r'("""[\s\S]*?""")', src).group(1)
+    doc = doc.replace("(empty in the W1 starter)", "(this workshop's baseline)")
+    checks = [b["check"] for b in baseline]
+    modules = sorted({c.split(".")[0] for c in checks})
+    imports = "".join(f"from . import {m}\n" for m in modules)
+    if checks:
+        body = f"LADDER = {{\n    0: [{', '.join(checks)}],   # the W{w} baseline (README.md says why)\n}}\n"
+    else:
+        body = "# from . import example_check          # 1. import the check module\nLADDER = {\n    0: [],\n    # 1: [example_check.CHECK],        # 2. wire it into a level\n}\n"
+    open(path, "w").write(f"{doc}\n\n{imports}{body}")
+
+
+def write_requirements(dst, w):
+    path = os.path.join(dst, "requirements.txt")
+    lines = open(path).read().split("\n")
+    lines[0] = re.sub(r"^# W1 starter", f"# W{w} starter", lines[0])
+    open(path, "w").write("\n".join(lines))
+
+
+def write_readme(dst, w, ws_path, manifest, contract):
+    skel = open(os.path.join(ROOT, SKELETON, "README.md")).read()
+    body = skel[skel.index("## Boot it"):].replace(SKELETON, f"{ws_path}/starter")
+    baseline, pending = manifest.get("baseline", []), manifest.get("pending", [])
+    if baseline:
+        rows = "\n".join(f"| `{b['check']}` | {b['why']} |" for b in baseline)
+        base = f"`LADDER[0]` runs these on every request:\n\n| Check | Why it is in the baseline |\n|---|---|\n{rows}\n"
+    else:
+        base = f"None: `LADDER[0]` is empty. {manifest.get('why_empty', '')}".rstrip() + "\n"
+    if pending:
+        base += "\nChosen but not installed yet (no starter-chain source exists for them):\n\n"
+        base += "\n".join(f"- `{p['check']}`: {p['why']}" for p in pending) + "\n"
+    head = f"""# Kestrel Outfitters: the W{w} starter
+
+**Contract:** `workshops/STORE_CONTRACT.md` (version {contract}). **Source:** the skeleton store
+(`{SKELETON}/`) plus this workshop's baseline, built by `scripts/build_starter.py --workshop {w}`
+from `{ws_path}/starter.manifest.json`. Do not edit this folder by hand; change the manifest and rebuild.
+
+This folder is copied, never imported, by every Workshop {w} chapter lab. You do not need any other
+workshop to run it: it is the same store the onboarding decks tour (`onboarding/demo-store/`), with
+nothing from other chapters wired in. Do not edit it inside a lab; if a chapter needs something the
+skeleton lacks, that is a contract change (see the contract's §4).
+
+## Baseline defenses
+
+{base}
+"""
+    open(os.path.join(dst, "README.md"), "w").write(head + body)
+
+
+def build(w, dst):
+    ws_path = WORKSHOPS[w]
+    manifest = json.load(open(os.path.join(ROOT, ws_path, "starter.manifest.json")))
+    assert manifest["workshop"] == w, f"{ws_path}/starter.manifest.json says workshop {manifest['workshop']}"
+    contract = json.load(open(os.path.join(ROOT, SKELETON, "STARTER.json")))["contract_version"]
+    os.makedirs(dst, exist_ok=True)
+    copy_skeleton(dst)
+    baseline = manifest.get("baseline", [])
+    for b in baseline:
+        for rel, src in b.get("files", {}).items():
+            os.makedirs(os.path.dirname(os.path.join(dst, rel)), exist_ok=True)
+            shutil.copy2(os.path.join(ROOT, src), os.path.join(dst, rel))
+    write_ladder(dst, w, baseline)
+    write_requirements(dst, w)
+    desc = "baseline only: " + ", ".join(b["check"] for b in baseline) if baseline else "bare store: no defenses, every shopper buys"
+    open(os.path.join(dst, "tools", "checkpoint.py"), "w").write(CHECKPOINT_STUB.format(w=w, desc=desc))
+    write_readme(dst, w, ws_path, manifest, contract)
     sha = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    rel_src = os.path.relpath(src_lab, ROOT)
-    json.dump({"contract_version": manifest.get("contract_version", "1.0"), "source": rel_src, "built_from": sha or None,
-               "default_level": 0, "baseline_checks": baseline,
-               "description": f"End state of {rel_src}: its final solutions installed and its ladder flattened into the baseline."},
+    json.dump({"contract_version": contract, "workshop": w, "source": "skeleton+manifest", "skeleton": SKELETON,
+               "manifest": f"{ws_path}/starter.manifest.json", "built_from": sha or None, "default_level": 0,
+               "baseline_checks": [b["check"] for b in baseline],
+               "pending_checks": [p["check"] for p in manifest.get("pending", [])],
+               "description": f"The skeleton store plus the W{w} baseline."},
               open(os.path.join(dst, "STARTER.json"), "w"), indent=2)
+    open(os.path.join(dst, "STARTER.json"), "a").write("\n")
 
 
 def diff_trees(a, b):
     out = []
-    dc = filecmp.dircmp(a, b, ignore=[".venv", "instance", "__pycache__", "logs"])
+    dc = filecmp.dircmp(a, b, ignore=list(SKIP))
 
     def walk(d, prefix=""):
         for f in d.left_only:
-            out.append(f"only in built:  {prefix}{f}")
+            out.append(f"only in built:   {prefix}{f}")
         for f in d.right_only:
             out.append(f"only in starter: {prefix}{f}")
         for f in d.diff_files:
-            out.append(f"differs:        {prefix}{f}")
+            out.append(f"differs:         {prefix}{f}")
         for name, sub in d.subdirs.items():
             walk(sub, prefix + name + "/")
     walk(dc)
-    return out
+    return [line for line in out if not line.endswith("STARTER.json")]   # built_from moves with HEAD
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--from", dest="src", required=True, help="capstone lab folder (has starter.manifest.json)")
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--workshop", type=int, choices=sorted(WORKSHOPS))
+    g.add_argument("--all", action="store_true", help="every workshop with a manifest (W2-W4)")
     ap.add_argument("--check", action="store_true", help="diff against the existing starter(s); exit 1 on drift")
     args = ap.parse_args()
-    src_lab = os.path.abspath(args.src)
-    mpath = os.path.join(src_lab, "starter.manifest.json")
-    if not os.path.exists(mpath):
-        sys.exit(f"{mpath} not found")
-    manifest = json.load(open(mpath))
+    todo = sorted(WORKSHOPS) if args.all else [args.workshop]
     drift = 0
-    with tempfile.TemporaryDirectory() as tmp:
-        built = os.path.join(tmp, "built")
-        build(src_lab, manifest, built)
-        for target in manifest["targets"]:
-            dst = os.path.join(ROOT, target)
+    for w in todo:
+        if not os.path.exists(os.path.join(ROOT, WORKSHOPS[w], "starter.manifest.json")):
+            print(f"{WORKSHOPS[w]}: no starter.manifest.json")
+            drift += 1
+            continue
+        target = f"{WORKSHOPS[w]}/starter"
+        dst = os.path.join(ROOT, target)
+        with tempfile.TemporaryDirectory() as tmp:
+            built = os.path.join(tmp, "built")
+            build(w, built)
             if args.check:
                 if not os.path.isdir(dst):
                     print(f"{target}: missing")
                     drift += 1
                     continue
-                d = [line for line in diff_trees(built, dst) if not line.endswith("STARTER.json")]
+                d = diff_trees(built, dst)
                 print(f"{target}: {'in sync' if not d else str(len(d)) + ' differences'}")
                 for line in d[:50]:
                     print("   " + line)
                 drift += bool(d)
             else:
-                if os.path.isdir(dst):
-                    shutil.rmtree(dst)
-                shutil.copytree(built, dst)
-                print(f"wrote {target} from {os.path.relpath(src_lab, ROOT)}")
+                if os.path.isdir(dst):          # keep the student's .venv and instance/
+                    for name in os.listdir(dst):
+                        if name not in SKIP:
+                            p = os.path.join(dst, name)
+                            shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+                shutil.copytree(built, dst, dirs_exist_ok=True)
+                print(f"wrote {target}")
     sys.exit(1 if drift else 0)
 
 

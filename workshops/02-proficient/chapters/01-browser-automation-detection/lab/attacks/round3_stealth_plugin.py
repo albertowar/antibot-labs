@@ -17,21 +17,19 @@ stealth plugin's own User-Agent and Client Hints patches are switched off
 because the CDP override already handles them consistently.
 
 Expected results (verified with Playwright 1.63 / Chromium 153, playwright-stealth 2.0.3):
-  - DEFENSE_LEVEL<=2 → 200 (every Layer 2 value now looks plausible)
-  - DEFENSE_LEVEL>=3 → 403:
-      "[L3] Native code replaced by script: Navigator.plugins, ..."
-      "[L3] Another JavaScript realm disagrees with the page: Worker ua, ..."
+  - Rounds 0-2 (levels 1-3) → 200 (every Layer 2 value now looks plausible)
+  - Round 3+ (level 4+)     → 403, lie_detection:
+      "Native code replaced by script: Navigator.plugins, ..."
+      "Another JavaScript realm disagrees with the page: Worker ua, ..."
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=2 python app.py
-Then run:
+Run the store first (python demo_site/app.py), or let tools/checkpoint.py set the level; then:
     python attacks/round3_stealth_plugin.py
 """
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 
-from _common import cdp_identity_override, report, shop_in_browser
+from _common import cdp_identity_override, finish, new_context, report, shop_in_browser
 from round2_flags_off import STEALTH_LAUNCH
 
 # The attacker's own patch for what stealth does not cover
@@ -57,7 +55,7 @@ def run():
     )
     with sync_playwright() as p:
         browser = p.chromium.launch(**STEALTH_LAUNCH)
-        context = browser.new_context()
+        context = new_context(browser, "round3_stealth_plugin")
         stealth.apply_stealth_sync(context)
         context.add_init_script(GEOMETRY_PATCH)
         page = context.new_page()
@@ -68,4 +66,6 @@ def run():
 
 
 if __name__ == '__main__':
-    report("Round 3: playwright-stealth + geometry patch", run())
+    out = run()
+    report("Round 3: playwright-stealth + geometry patch", out)
+    finish("round3_stealth_plugin", out)

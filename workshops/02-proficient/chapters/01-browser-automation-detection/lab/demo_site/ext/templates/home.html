@@ -1,0 +1,94 @@
+{# Chapter 1 override of the starter's home.html: the same page plus the Quick add panel. #}
+{% extends "base.html" %}{% block page %}home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-text">
+    <p class="eyebrow">New season</p>
+    <h1>Gear that goes further than the forecast.</h1>
+    <p class="lead">Trail runners, packs and shells built with our trail crew. Limited drops every month.</p>
+    <div class="actions"><a class="btn" href="/products">Shop all gear</a><a class="btn ghost" href="/drop/{{ drops[0].sku if drops else 'lab-runner-9' }}">This month's drop</a></div>
+  </div>
+  <div class="hero-art" aria-hidden="true"><img src="/img/{{ featured[0].sku if featured else 'p001' }}.svg?w=480" alt="" width="480" height="480"></div>
+</section>
+<section id="quick-shop">
+  {# Chapter 1: the old lab's store page, inside the real store. The panel waits for the sensor
+     (window.sensorReady, from sensor/script.html), then loads /api/products and adds to the cart
+     through /api/cart/add with the click evidence. Both calls are gated from Round 1 (level 2). #}
+  <div class="section-head"><h2>Quick add</h2><span class="muted small">Lab: <a href="/lab/sensor/check">/lab/sensor/check</a> · <a href="/lab/sensor/logs">/lab/sensor/logs</a> · <a href="/lab/capture">/lab/capture</a></span></div>
+  <p id="status" data-state="loading">Loading&hellip;</p>
+  <div id="products" class="grid"></div>
+  <p id="cart-status" data-state="idle"></p>
+  <noscript><p class="muted">Quick add needs JavaScript (that is a cost: see the no-JS shopper in the lab).</p></noscript>
+</section>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const status = document.getElementById("status");
+    const cartStatus = document.getElementById("cart-status");
+    const show = (el, state, text) => { el.dataset.state = state; el.textContent = text; };
+
+    async function addToCart(event) {
+      const button = event.currentTarget;
+      const interaction = ShopSensor.describeClick(event);
+      const response = await fetch("/api/cart/add", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: button.dataset.sku, size: button.dataset.size, qty: 1, interaction }),
+      });
+      const data = await response.json();
+      if (response.ok) show(cartStatus, "added", `Added. Cart size: ${data.count}`);
+      else show(cartStatus, "blocked", "Cart blocked.");
+    }
+
+    async function loadProducts() {
+      const response = await fetch("/api/products?sort=rating");
+      if (!response.ok) { show(status, "blocked", "Blocked."); return; }
+      const data = await response.json();
+      const grid = document.getElementById("products");
+      for (const p of data.items.slice(0, 4)) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<strong>${p.name}</strong><br>$${p.price.toFixed(2)}<br>`;
+        const button = document.createElement("button");
+        button.className = "btn add-to-cart";
+        button.dataset.sku = p.sku;
+        button.dataset.size = (p.sizes || [""])[0] || "";
+        button.textContent = "Add to cart";
+        button.addEventListener("click", addToCart);
+        card.appendChild(button);
+        grid.appendChild(card);
+      }
+      show(status, "ready", `${data.items.length} products`);
+    }
+
+    (window.sensorReady || Promise.reject("no sensor")).then(loadProducts)
+      .catch((e) => show(status, "blocked", `Sensor failed: ${e}`));
+  });
+</script>
+{% if drops %}
+<section class="drops">
+  <div class="section-head"><h2>Drops</h2><a href="/drop/{{ drops[0].sku }}" class="muted">How drops work</a></div>
+  <div class="drop-grid">
+    {% for d in drops %}
+    <a class="drop-card" href="/drop/{{ d.sku }}" data-sku="{{ d.sku }}">
+      <img src="/img/{{ d.sku }}.svg" alt="" width="160" height="160">
+      <div>
+        <span class="tag drop">{% if d.drop_open %}Live now{% else %}Opens soon{% endif %}</span>
+        <h3>{{ d.name }}</h3>
+        <p class="muted">{{ d.blurb }}</p>
+        <p><span class="price">${{ "%.2f"|format(d.price) }}</span> <span class="muted">· {{ d.stock }} left</span></p>
+        {% if not d.drop_open and d.drop_at %}<p class="countdown muted" data-drop-at="{{ d.drop_at.isoformat() }}Z">Opens {{ d.drop_at.strftime('%b %d %H:%M') }} UTC</p>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section>
+  <div class="section-head"><h2>Top rated</h2><a href="/products?sort=rating" class="muted">See all</a></div>
+  <div class="grid">{% for p in featured %}{% include "partials/_card.html" %}{% endfor %}</div>
+</section>
+<section class="band">
+  <div><h3>Free returns, 60 days</h3><p class="muted">Walk it, run it, send it back if it does not fit.</p></div>
+  <div><h3>Repair before replace</h3><p class="muted">Every shell and pack comes with a lifetime repair program.</p></div>
+  <div><h3>Loyalty points</h3><p class="muted">One point per dollar. Redeem gift cards into your account.</p></div>
+</section>
+{% endblock %}

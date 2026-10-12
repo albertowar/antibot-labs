@@ -1,22 +1,19 @@
 """
 Chapter 2 — Round 2 Attack: port the solver to Python (Section 2.7)
 
-Objective: the Round 2 challenge is signed, bound to our session and single
-use, so forging or replaying a cookie no longer works (run with --replay to
-see each attempt fail). But /challenge/l2.js is plain, readable JavaScript.
-Read step() once, port it to Python, and solve every challenge without a
+Objective: the Round 2 challenge is signed, bound to our session and single use, so forging or
+replaying no longer works (run with --replay to see each attempt fail). But /jsc/l2.js is plain,
+readable JavaScript. Read step() once, port it to Python, and solve every challenge without a
 browser at ~0.1 ms per solve.
 
-This is the attack that obfuscation and polymorphism (Round 3) exist to
-make expensive: not impossible, expensive.
+This is the attack that obfuscation and polymorphism (Round 3) exist to make expensive: not
+impossible, expensive.
 
 Expected results:
-  - DEFENSE_LEVEL=2   → 300/300 pages, 1 solve
-  - DEFENSE_LEVEL>=3  → 0/300, verify fails: "wrong answer" (each variant has its own op chain)
+  - level 2   → 125/125 records, 1 solve
+  - level 3+  → 0/125, verify fails: "wrong answer" (each variant has its own op chain)
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=2 python app.py
-Then run:
+Run the store first (python demo_site/app.py), or let tools/checkpoint.py set the level; then:
     python attacks/round2_python_port.py
     python attacks/round2_python_port.py --replay
 """
@@ -24,15 +21,13 @@ Then run:
 import argparse
 import time
 
-import requests
-
-from common import BASE_URL, CHROME_UA, report, require_local, result, scrape
+from _common import BASE_URL, challenge_payload, finish, lab_session, report, result, scrape, verify
 
 MASK = 0xFFFFFFFF
 
 
 def step(h, c):
-    # Ported by hand from step() in /challenge/l2.js:
+    # Ported by hand from step() in /jsc/l2.js:
     #   h = Math.imul(h, 0x01000193) >>> 0;
     #   h = ((h << 5) | (h >>> 27)) >>> 0;
     #   h = (h + 0x9e3779b9) >>> 0;
@@ -50,58 +45,44 @@ def solve(nonce):
     return f"{h:08x}"
 
 
-def new_session():
-    session = requests.Session()
-    session.headers["User-Agent"] = CHROME_UA
-    session.get(f"{BASE_URL}/", timeout=10)          # picks up the sid cookie
-    return session
-
-
 def get_clearance(session):
-    """Fetch a challenge, solve it in Python, redeem it. Returns (ok, reason, challenge)."""
-    r = session.post(f"{BASE_URL}/challenge/new", timeout=10)
-    if r.status_code != 200:
-        return False, f"/challenge/new -> {r.status_code}", None
-    ch = r.json()
-    answer = solve(ch["nonce"])
-    v = session.post(f"{BASE_URL}/challenge/verify", timeout=10,
-                     json={"token": ch["token"], "answer": answer, "solve_ms": 0.1})
-    return v.status_code == 200, v.json().get("reason"), ch
+    """Take the challenge the gate hands out, solve it in Python, redeem it. Returns (ok, reason, payload)."""
+    ch = challenge_payload(session)
+    if not ch or "nonce" not in ch:
+        return False, f"no signed challenge here ({ch})", None
+    ok, reason = verify(session, ch["token"], solve(ch["nonce"]))
+    return ok, reason, ch
 
 
 def run():
-    require_local()
-    session = new_session()
+    session = lab_session("round2_python_port")
     t0 = time.perf_counter()
     ok, reason, _ = get_clearance(session)
     solve_seconds = time.perf_counter() - t0
     if not ok:
         return result("round2_python_port", 0, f"verify failed: {reason}", solve_seconds, 1, solve_seconds)
-    pages, reason, seconds = scrape(session)
-    return result("round2_python_port", pages, reason, seconds + solve_seconds, 1, solve_seconds)
+    got, reason, seconds, _ = scrape(session)
+    return result("round2_python_port", got, reason, seconds + solve_seconds, 1, solve_seconds)
 
 
 def replay_attempts():
-    """What Round 2's binding and single use break. Each line should fail."""
-    require_local()
-    a = new_session()
+    """What Round 2's binding and single use break. Each line after the first should fail."""
+    a = lab_session("round2_replay")
     ok, reason, ch = get_clearance(a)
     print(f"  solve + redeem once (session A)          -> {'accepted' if ok else 'refused: ' + str(reason)}")
     if not ok:
         return
-    again = a.post(f"{BASE_URL}/challenge/verify", timeout=10,
-                   json={"token": ch["token"], "answer": solve(ch["nonce"])})
-    print(f"  redeem the same token again              -> {again.status_code}: {again.json().get('reason')}")
+    again, why = verify(a, ch["token"], solve(ch["nonce"]))
+    print(f"  redeem the same token again              -> {'accepted' if again else 'refused: ' + str(why)}")
 
-    b = new_session()                                   # a second worker, its own sid
-    b.cookies.set("clr", a.cookies.get("clr"))
+    b = lab_session("round2_replay")                    # a second worker, its own cookie jar
     r = b.get(f"{BASE_URL}/api/products", timeout=10)
-    print(f"  share A's clearance with session B       -> {r.status_code}: {r.json().get('reason')}")
+    print(f"  session B, its own cookies               -> {r.status_code}")
 
-    c = requests.Session()                              # copy BOTH cookies, but forget the UA
+    c = lab_session("round2_replay", ua="python-requests/2.34")   # copy A's cookies, forget the UA
     c.cookies.update(a.cookies)
     r = c.get(f"{BASE_URL}/api/products", timeout=10)
-    print(f"  copy A's cookies, default requests UA    -> {r.status_code}: {r.json().get('reason')}")
+    print(f"  copy A's cookies, default requests UA    -> {r.status_code}  (the pass was granted to A's UA)")
 
 
 if __name__ == '__main__':
@@ -112,5 +93,7 @@ if __name__ == '__main__':
         print(f"Round 2: replay and sharing attempts -> {BASE_URL}")
         replay_attempts()
     else:
-        print(f"Round 2 attack: Python port of /challenge/l2.js -> {BASE_URL}")
-        report(run())
+        print(f"Round 2 attack: Python port of /jsc/l2.js -> {BASE_URL}")
+        r = run()
+        report(r)
+        finish(r)

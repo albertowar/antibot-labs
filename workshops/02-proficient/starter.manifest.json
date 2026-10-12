@@ -1,0 +1,6 @@
+{
+  "workshop": 2,
+  "name": "Proficient",
+  "baseline": [],
+  "why_empty": "Every workshop runs on its own, so nothing from an earlier workshop is wired in. A chapter that needs an earlier control at its Round 0 (W1's header rules or rate limit, say) adds it in its own lab, where the README explains it."
+}

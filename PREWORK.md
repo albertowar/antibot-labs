@@ -24,10 +24,10 @@ git clone <this repo> antibot-workshop-slides
 cd antibot-workshop-slides
 ```
 
-Each workshop starts from its own copy of the store, in `workshops/<NN>/starter/`. Workshop 1 starts
-from the bare skeleton; Workshop 2 from the state the W1 capstone leaves behind; Workshops 3 and 4 from
-the W2 capstone's state. For the pre-work, use the starter of the workshop you are attending; the
-commands are identical.
+Each workshop starts from its own copy of the store, in `workshops/<NN>/starter/`. All four are the
+same skeleton store with no defenses wired in, so you can start at any workshop without doing the
+earlier labs. For the pre-work, use the starter of the workshop you are attending; the commands are
+identical.
 
 ## 3. One virtualenv per lab
 

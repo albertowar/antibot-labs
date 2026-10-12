@@ -25,7 +25,7 @@ replace getters for the same reasons stealth plugins do. A modified
 environment ALONE is therefore worth 30 points ("suspicious"); it takes a
 lie AND an inconsistency to reach 40 ("bot").
 
-Enabled when DEFENSE_LEVEL >= 3.
+Round 3: enabled at DEFENSE_LEVEL >= 4 (round N runs at level N+1, see ladder.py). Try it on its own: python -m defenses.lie_detection
 """
 
 
@@ -93,6 +93,13 @@ def score_lies(signals):
         score += points
         reasons.extend(why)
     return score, reasons
+
+
+# Wiring (no need to edit): score the session's sensor report on the gated paths.
+from . import sensor  # noqa: E402
+from .pipeline import Check  # noqa: E402
+
+CHECK = Check("lie_detection", sensor.layer_check("lie_detection", score_lies), phases=("request",))
 
 
 if __name__ == '__main__':

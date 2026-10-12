@@ -23,7 +23,7 @@ deceleration take exactly the same time. Real hands do neither (l3_motor.py).
 import math
 import random
 
-from common import sleep_ms
+from _common import sleep_ms
 
 
 def _bezier(p0, p1, p2, p3, t):

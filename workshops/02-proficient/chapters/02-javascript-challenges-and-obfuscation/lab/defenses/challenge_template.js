@@ -2,12 +2,12 @@
  * Chapter 2 — Challenge script template (Sections 2.2, 2.4, 2.5)
  *
  * The server renders this template into:
- *   - Round 2: one fixed, readable script        (/challenge/l2.js)
+ *   - Round 2: one fixed, readable script        (/jsc/l2.js)
  *   - Round 3+: a pool of variants, each with its own random op chain and probe
  *     size, then obfuscated with javascript-obfuscator (tools/build_variants.py)
  *
- * The loader on the challenge page has already fetched a signed challenge from
- * /challenge/new and left it in window.__ch = { token, nonce, env, script }.
+ * The interstitial page (demo_site/ext/templates/js/interstitial.html) carries the
+ * signed challenge: window.__ch = { token, nonce, env, script }.
  *
  * What this script proves to the server, by level:
  *   L2/L3: "something executed f(nonce)"         (f is fixed at L2, per-variant at L3)
@@ -72,10 +72,10 @@
   var answer = ("0000000" + h.toString(16)).slice(-8);
   var solveMs = performance.now() - t0;
 
-  fetch("/challenge/verify", {
+  fetch("/api/challenge/verify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: ch.token, answer: answer, solve_ms: solveMs })
+    body: JSON.stringify({ type: "js", answer: { token: ch.token, answer: answer, solve_ms: solveMs } })
   }).then(function (r) {
     window.__chDone = r.status;
     if (r.ok) {

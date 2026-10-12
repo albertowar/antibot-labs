@@ -1,33 +1,27 @@
 """
 Chapter 2 — Rounds 0-1 Attack: a plain HTTP scraper (Section 2.7)
 
-Objective: scrape the whole catalog with requests. No JavaScript, no
-browser. This is the bulk of real-world scraping traffic, and it's what a
-JavaScript challenge exists to filter out.
+Objective: scrape the whole catalogue with requests. No JavaScript, no browser. This is the bulk
+of real-world scraping traffic, and it's what a JavaScript challenge exists to filter out.
 
 Expected results:
-  - DEFENSE_LEVEL=0   → 300/300 pages
-  - DEFENSE_LEVEL>=1  → 0/300, "no valid js_ok cookie" (or "no clearance cookie" at 2+)
+  - level 0   → 125/125 records
+  - level 1+  → 0/125: challenge_required (the catalogue now needs the challenge's pass)
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=0 python app.py
-Then run:
+Run the store first (python demo_site/app.py), or let tools/checkpoint.py set the level; then:
     python attacks/round1_requests_scraper.py
 """
 
-import requests
-
-from common import BASE_URL, CHROME_UA, report, require_local, result, scrape
+from _common import BASE_URL, finish, lab_session, report, result, scrape
 
 
 def run():
-    require_local()
-    session = requests.Session()
-    session.headers["User-Agent"] = CHROME_UA
-    ok, reason, seconds = scrape(session)
+    ok, reason, seconds, _ = scrape(lab_session("round1_requests_scraper"))
     return result("round1_requests_scraper", ok, reason, seconds)
 
 
 if __name__ == '__main__':
     print(f"Round 1 attack: plain requests scraper -> {BASE_URL}")
-    report(run())
+    r = run()
+    report(r)
+    finish(r)

@@ -1,0 +1,8 @@
+# The attacks drive real browsers. After installing:
+#   python -m playwright install chromium
+#   python -m patchright install chromium        # Round 4 (patchright ships its own Chromium build)
+playwright==1.63.0
+patchright==1.63.0
+playwright-stealth==2.0.3
+# Bonus challenge: Selenium + ChromeDriver (Selenium Manager fetches the driver on first use)
+selenium==4.51.0

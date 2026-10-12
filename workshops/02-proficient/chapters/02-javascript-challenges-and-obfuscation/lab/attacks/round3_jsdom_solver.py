@@ -10,13 +10,11 @@ the same User-Agent, because the clearance is bound to it) to requests.
 Cost to the attacker: a Node process and ~100-300 ms per solve. No browser.
 
 Expected results:
-  - DEFENSE_LEVEL=2,3 → 300/300 pages, 1 solve
-  - DEFENSE_LEVEL>=4  → 0/300, verify fails: "offsetWidth was 0 (no layout
-                        engine); DOM methods are not native code"
+  - level 3   → 125/125 records, 1 solve in jsdom
+  - level 4+  → 0/125, verify fails: offsetWidth was 0 (no layout engine); DOM methods are not native code
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=3 python app.py
-Then run:
+Needs `npm ci` in lab/ (jsdom). Run the store first (python demo_site/app.py), or let
+tools/checkpoint.py set the level; then:
     python attacks/round3_jsdom_solver.py
 """
 
@@ -25,38 +23,37 @@ import os
 import subprocess
 import time
 
-import requests
-
-from common import BASE_URL, CHROME_UA, report, require_local, result, scrape
+from _common import BASE_URL, CHROME_UA, bot_ip, finish, lab_session, report, result, scrape
 
 SOLVER = os.path.join(os.path.dirname(__file__), "js", "jsdom_solve.mjs")
 LAB_DIR = os.path.join(os.path.dirname(__file__), "..")
+ACTOR = "round3_jsdom_solver"
 
 
-def solve_in_jsdom():
-    out = subprocess.run(["node", SOLVER, BASE_URL, CHROME_UA], capture_output=True,
-                         text=True, cwd=LAB_DIR, timeout=30)
+def solve_in_jsdom(ip):
+    out = subprocess.run(["node", SOLVER, BASE_URL, CHROME_UA, ip, f"bot:{ACTOR}"], capture_output=True,
+                         text=True, cwd=LAB_DIR, timeout=60)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip() or "jsdom solver failed (did you run `npm ci`?)")
     return json.loads(out.stdout)
 
 
 def run():
-    require_local()
+    ip = bot_ip()
     t0 = time.perf_counter()
-    solved = solve_in_jsdom()
+    solved = solve_in_jsdom(ip)
     solve_seconds = time.perf_counter() - t0
     if not solved["ok"]:
-        return result("round3_jsdom_solver", 0, f"verify failed: {solved['reason']}",
-                      solve_seconds, 1, solve_seconds)
-    session = requests.Session()
-    session.headers["User-Agent"] = CHROME_UA
+        return result(ACTOR, 0, f"verify failed: {solved.get('reason')}", solve_seconds, 1, solve_seconds)
+    session = lab_session(ACTOR, ip=ip)
     for name, value in solved["cookies"].items():
         session.cookies.set(name, value)
-    pages, reason, seconds = scrape(session)
-    return result("round3_jsdom_solver", pages, reason, seconds + solve_seconds, 1, solve_seconds)
+    got, reason, seconds, _ = scrape(session)
+    return result(ACTOR, got, reason, seconds + solve_seconds, 1, solve_seconds)
 
 
 if __name__ == '__main__':
     print(f"Round 3 attack: run the challenge in jsdom -> {BASE_URL}")
-    report(run())
+    r = run()
+    report(r)
+    finish(r)

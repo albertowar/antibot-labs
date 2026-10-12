@@ -1,5 +1,5 @@
 """
-Chapter 3: demo of an AI agent's behavior (Section 3.8).
+Chapter 3: demo of an AI agent's behavior (Section 3.9).
 
 A deterministic mock of a computer-use agent loop. No LLM, no API keys:
     screenshot -> "think" for a few seconds -> click a coordinate -> type
@@ -24,7 +24,7 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-from common import box, identity, open_drop, report, sleep_ms, wait_result
+from _common import box, finish, identity, open_drop, report, sleep_ms, submit
 
 
 def run(dictate=False, verbose=False):
@@ -34,17 +34,20 @@ def run(dictate=False, verbose=False):
         for field in ("name", "email", "size", "reserve"):
             page.screenshot()                          # what the agent "sees"
             sleep_ms(random.uniform(1500, 3500))       # model latency
-            b = box(page, f"#{field}")
-            page.mouse.click(b["x"] + b["width"] / 2 + random.uniform(-4, 4),
-                             b["y"] + b["height"] / 2 + random.uniform(-3, 3))
+            b = box(page, field)
+
+            def click(b=b):
+                page.mouse.click(b["x"] + b["width"] / 2 + random.uniform(-4, 4),
+                                 b["y"] + b["height"] / 2 + random.uniform(-3, 3))
             if field == "reserve":
+                result = submit(page, click)
                 break
+            click()
             sleep_ms(random.uniform(300, 800))
             if dictate:
                 page.keyboard.insert_text(who[field])
             else:
                 page.keyboard.type(who[field], delay=12)
-        result = wait_result(page)
         browser.close()
     if verbose:
         report("agent (dictate)" if dictate else "agent", result)
@@ -53,4 +56,4 @@ def run(dictate=False, verbose=False):
 
 if __name__ == "__main__":
     print("=== Demo: agent-style automation ===")
-    run(dictate="--dictate" in sys.argv, verbose=True)
+    finish("agent_dictate" if "--dictate" in sys.argv else "agent", run(dictate="--dictate" in sys.argv, verbose=True))

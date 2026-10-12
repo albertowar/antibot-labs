@@ -26,10 +26,12 @@ False positives, and why the rules are shaped like this:
   - One rule alone is worth 25 ("suspicious"). Only "teleported AND dead
     centre" (or an untrusted event) reaches 40.
 
-This is the shallow end of behavioural detection; Workshop 2, Chapter 3
+This is the shallow end of behavioural detection; Chapter 3
 builds the real thing (trajectories, timing, keystroke dynamics).
 
-Enabled for POST /api/cart when DEFENSE_LEVEL >= 4.
+Enabled for POST /api/cart/add (phase action:cart_add) when DEFENSE_LEVEL >= 5 (Round 4; round N runs at level N+1). The page sends the
+click evidence in the request body ({"sku": ..., "interaction": {...}}). Try it on its own:
+    python -m defenses.interaction
 """
 
 MIN_POINTER_MOVES = 3        # Playwright's page.click() produces 1-2
@@ -78,6 +80,20 @@ def score_interaction(interaction, signals):
     score += points
     reasons.extend(why)
     return score, reasons
+
+
+# Wiring (no need to edit): runs when the cart route asks the gate about the action.
+from . import sensor  # noqa: E402
+from .pipeline import Check  # noqa: E402
+
+
+def _check(ctx):
+    interaction = (ctx.json or {}).get("interaction") if isinstance(ctx.json, dict) else None
+    points, reasons = score_interaction(interaction, sensor.report(ctx))
+    return sensor.signals("interaction", points, reasons, ctx)
+
+
+CHECK = Check("interaction", _check, phases=("action:cart_add",))
 
 
 if __name__ == '__main__':

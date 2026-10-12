@@ -7,7 +7,7 @@ trace if you saved one (tools/save_trace.py), else the shipped corpus.
 
     python attacks/round0_recon.py
 
-Then open both /behavior/view/<sid> links it prints and compare the pictures.
+Then open both /lab/behavior/view/<sid> links it prints and compare the pictures.
 """
 
 import glob
@@ -18,11 +18,11 @@ import sys
 
 import requests
 
-from common import BASE_URL
+from _common import BASE_URL, finish
 import round1_click_fill
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
-from features import extract   # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from defenses.behavior_features import extract   # noqa: E402
 
 TRACES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "traces")
 
@@ -54,8 +54,8 @@ def summary(telemetry, layout):
 
 
 if __name__ == "__main__":
-    bot = round1_click_fill.run()[0]
-    bot_trace = requests.get(f"{BASE_URL}/behavior/trace/{bot['sid']}", timeout=5).json()
+    bot = round1_click_fill.run()
+    bot_trace = requests.get(f"{BASE_URL}/lab/behavior/trace/latest", timeout=5).json()
     human, source = human_trace()
     b = summary(bot_trace["telemetry"], bot_trace["layout"])
     h = summary(human["telemetry"], human["layout"])
@@ -63,9 +63,10 @@ if __name__ == "__main__":
     print(f"  {'':<22} {'bot':>14} {'human':>14}")
     for key in b:
         print(f"  {key:<22} {str(b[key]):>14} {str(h[key]):>14}")
-    print(f"\n  bot trace:   {BASE_URL}/behavior/view/{bot['sid']}")
+    print(f"\n  bot trace:   {BASE_URL}/lab/behavior/view/{bot_trace['sid']}")
     if human.get("source") == "browser":
-        print(f"  your trace:  {BASE_URL}/behavior/view/{human['sid']}")
+        print(f"  your trace:  {BASE_URL}/lab/behavior/view/{human['sid']}")
     else:
         print("  no recording of yours yet: reserve a pair in your browser, then")
         print("  python tools/save_trace.py --name <you>")
+    finish("round0_recon", bot)

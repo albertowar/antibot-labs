@@ -1,0 +1,5 @@
+{% if pages > 1 %}<nav class="pager" aria-label="Pages">
+  {% if page > 1 %}<a href="?q={{ q }}&category={{ category }}&sort={{ sort }}&page={{ page - 1 }}">‹ Prev</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a href="?q={{ q }}&category={{ category }}&sort={{ sort }}&page={{ page + 1 }}">Next ›</a>{% endif %}
+</nav>{% endif %}

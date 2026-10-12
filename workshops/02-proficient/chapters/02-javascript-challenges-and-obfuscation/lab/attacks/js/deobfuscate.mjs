@@ -7,8 +7,8 @@
  * included), control-flow-flattening, dead code, self-defending wrappers.
  *
  * Usage:
- *   npm run deobfuscate                         # http://localhost:5000
- *   DEMO_URL=http://localhost:5050 npm run deobfuscate
+ *   npm run deobfuscate                         # http://127.0.0.1:5000
+ *   DEMO_URL=http://127.0.0.1:5050 npm run deobfuscate
  *
  * Writes attacks/out/<variant>.obf.js and attacks/out/<variant>.deobf.js.
  * Open the .deobf.js and find step(): the variant's op chain is right there.
@@ -20,17 +20,18 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { webcrack } from "webcrack";
 
-const base = process.env.DEMO_URL || "http://localhost:5000";
+const base = process.env.DEMO_URL || "http://127.0.0.1:5000";
 if (!["localhost", "127.0.0.1", "::1"].includes(new URL(base).hostname)) {
   console.error("Refusing: lab attacks only target localhost.");
   process.exit(2);
 }
 
-const first = await fetch(`${base}/`);
-const sid = first.headers.getSetCookie().find((c) => c.startsWith("sid="))?.split(";")[0];
-const ch = await (await fetch(`${base}/challenge/new`, { method: "POST", headers: { Cookie: sid } })).json();
+// The catalogue answers with the 403 interstitial, which embeds the signed challenge.
+const page = await fetch(`${base}/products`, { headers: { Accept: "text/html", "X-Lab-Actor": "bot:deobfuscate" } });
+const m = (await page.text()).match(/window\.__ch = (\{.*?\});/);
+const ch = m ? JSON.parse(m[1]) : {};
 if (!ch.script) {
-  console.error("No challenge script at this level (needs DEFENSE_LEVEL >= 2).");
+  console.error("No challenge script at this level (needs level 2 or above).");
   process.exit(1);
 }
 const source = await (await fetch(new URL(ch.script, base))).text();

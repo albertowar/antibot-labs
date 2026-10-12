@@ -85,7 +85,7 @@ def main():
     ws = os.path.relpath(chapter, ROOT).split(os.sep)[1]
     starter = os.path.join(ROOT, "workshops", ws, "starter")
     if not os.path.isdir(starter):
-        sys.exit(f"{os.path.relpath(starter, ROOT)} does not exist yet (it is built from the previous capstone).")
+        sys.exit(f"{os.path.relpath(starter, ROOT)} does not exist yet: python scripts/build_starter.py --workshop <N>.")
     lab = os.path.join(chapter, "lab")
     os.makedirs(lab, exist_ok=True)
     for item in ITEMS:

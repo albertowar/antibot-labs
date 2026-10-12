@@ -29,7 +29,7 @@ False positives to expect (and why the weights are what they are):
     vice versa (JS vs HTTP mismatch).
   - VDI and remote-desktop users render with software GPUs.
 
-Enabled when DEFENSE_LEVEL >= 2.
+Round 2: enabled at DEFENSE_LEVEL >= 3 (round N runs at level N+1, see ladder.py). Try it on its own: python -m defenses.consistency
 """
 
 import re
@@ -166,6 +166,15 @@ def score_consistency(signals, headers):
         score += points
         reasons.extend(why)
     return score, reasons
+
+
+# Wiring (no need to edit): the headers are those of the gated request (/api/products, /api/cart/add),
+# which the same browser sends with the same identity.
+from . import sensor  # noqa: E402
+from .pipeline import Check  # noqa: E402
+
+CHECK = Check("consistency", sensor.layer_check("consistency", score_consistency, with_headers=True),
+              phases=("request",))
 
 
 if __name__ == '__main__':

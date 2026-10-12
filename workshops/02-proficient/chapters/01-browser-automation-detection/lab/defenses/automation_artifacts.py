@@ -19,8 +19,9 @@ the content doc). Their weakness is recall: one launch flag
 (--disable-blink-features=AutomationControlled) or one patched driver
 (patchright) and they go silent.
 
-Enabled when DEFENSE_LEVEL >= 1, together with the sensor gate in app.py
-(no sensor payload for the session = no API access).
+Round 1: enabled at DEFENSE_LEVEL >= 2 (round N runs at level N+1, see ladder.py), together with the sensor gate (defenses/sensor_gate.py:
+no sensor report for the session = no API access). Try it on its own:
+    python -m defenses.automation_artifacts
 """
 
 import re
@@ -73,6 +74,14 @@ def score_automation_artifacts(signals):
         score += points
         reasons.extend(why)
     return score, reasons
+
+
+# Wiring (no need to edit): score the session's sensor report on the gated paths.
+from . import sensor  # noqa: E402
+from .pipeline import Check  # noqa: E402
+
+CHECK = Check("automation_artifacts", sensor.layer_check("automation_artifacts", score_automation_artifacts),
+              phases=("request",))
 
 
 if __name__ == '__main__':

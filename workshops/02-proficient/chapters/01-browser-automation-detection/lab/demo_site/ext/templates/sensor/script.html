@@ -1,0 +1,6 @@
+{# Chapter 1: the sensor runs on every store page. It reports raw facts with this page's one-time
+   nonce; the server keeps the verdict to itself. window.sensorReady resolves when the report is sent. #}
+{% if not request.path.startswith("/lab/") %}
+<script src="/static/js/sensor.js"></script>
+<script>window.sensorReady = ShopSensor.send({{ sensor_nonce()|tojson }});</script>
+{% endif %}
