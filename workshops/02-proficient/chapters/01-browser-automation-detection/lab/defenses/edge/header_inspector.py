@@ -1,5 +1,5 @@
 """
-Workshop 1, Chapter 4 — Defense Layer 2: Header Presence & Consistency (Section 4.3)
+Workshop 1, Chapter 3 — Defense Layer 2: Header Presence & Consistency (Section 4.3)
 
 User-Agent strings are trivial to fake. The rest of the header set has to
 tell the same story: real browsers always send Accept, Accept-Language and
@@ -7,7 +7,7 @@ Accept-Encoding, and every modern browser (Chrome 76+, Firefox 90+,
 Safari 16.4+) sends Fetch Metadata (Sec-Fetch-*) whose values must make
 sense for the request being made.
 
-In W1 Ch4 this was enabled at DEFENSE_LEVEL >= 2. In W2 Ch1 it is always on (edge_rules.py).
+In W1 Ch3 this was enabled at DEFENSE_LEVEL >= 2. In W2 Ch1 it is always on (edge_rules.py).
 """
 
 from urllib.parse import urlparse

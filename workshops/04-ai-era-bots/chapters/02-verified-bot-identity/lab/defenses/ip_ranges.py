@@ -7,7 +7,7 @@ everywhere, modelled on Google's:
     {"creationTime": "2026-10-08T00:00:00Z",
      "prefixes": [{"ipv4Prefix": "198.51.100.20/30"}, {"ipv6Prefix": "2001:db8::/48"}]}
 
-Workshop 1, Chapter 3 built the same index for cloud-provider ranges. Three things
+Workshop 1, Chapter 2 built the same index for cloud-provider ranges. Three things
 are different for crawlers:
 
   * **Freshness.** Operators add prefixes without notice. A vendored copy

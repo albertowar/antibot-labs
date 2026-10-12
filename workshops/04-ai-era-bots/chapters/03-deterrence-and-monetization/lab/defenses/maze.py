@@ -8,7 +8,7 @@ The maze has four parts, and each has a cost or a false positive to name:
 
   1. **Entry link** on every real page: hidden by CSS, `rel="nofollow"`,
      `tabindex=-1`, `aria-hidden`, and under a path that robots.txt Disallows
-     (W1 Ch8: a hit on a Disallowed, hidden link means the client ignored the
+     (W1 Ch7: a hit on a Disallowed, hidden link means the client ignored the
      rules or never read them). Browsers never render it; prefetchers must be
      told to skip nofollow/hidden links (tools/legit_traffic.py's prefetch
      cohort checks exactly that).
@@ -23,7 +23,7 @@ The maze has four parts, and each has a cost or a false positive to name:
   4. **Drip delivery** inside a concurrency cap: pages stream slowly to hold
      the crawler's connection, but only MAX_INFLIGHT at a time. Past the cap
      the store serves the decoy at full speed. A tarpit with no cap is a DoS
-     amplifier against yourself (W1 Ch8).
+     amplifier against yourself (W1 Ch7).
 
 Defender cost you will see in the checkpoint: generation time per page (sub-ms),
 bytes served, and how often the cap was hit.

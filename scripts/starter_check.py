@@ -18,7 +18,7 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CAPSTONES = {
-    "workshops/01-initiation/chapters/09-mini-capstone/lab": ["workshops/02-proficient/starter"],
+    "workshops/01-initiation/chapters/08-mini-capstone/lab": ["workshops/02-proficient/starter"],
     "workshops/02-proficient/chapters/09-mini-capstone/lab": ["workshops/03-advanced/starter", "workshops/04-ai-era-bots/starter"],
 }
 STARTERS = ["workshops/01-initiation/starter", "workshops/02-proficient/starter", "workshops/03-advanced/starter", "workshops/04-ai-era-bots/starter"]

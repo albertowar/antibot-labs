@@ -4,7 +4,7 @@ Chapter 5 — Round 4 Attack: stop pretending, drive a real browser (Section 5.8
 Objective: beat the JS engine proof. A real Chromium has the real
 ClientHello, the real HTTP/2 preface and a real V8, so it passes every
 layer in this chapter. The only changes are a UA without "HeadlessChrome"
-(W1 Ch4 would catch that) and scraping with in-page fetch().
+(W1 Ch3 would catch that) and scraping with in-page fetch().
 
 Gotcha: Playwright's `page.request` / `context.request` API does NOT use the
 browser's network stack. It sends from Node.js with Node's TLS, which has a

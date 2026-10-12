@@ -1,7 +1,7 @@
 """
 Chapter 5 — Round 1 Attack: every Chrome header, Python's TLS (Section 5.8)
 
-Objective: the W1 Ch4 graduate. Every header is copied from Chrome DevTools,
+Objective: the W1 Ch3 graduate. Every header is copied from Chrome DevTools,
 in Chrome's order, with matching Client Hints. Nothing at the HTTP layer
 gives it away. The ClientHello still comes from OpenSSL via urllib3: 18
 ciphers, no GREASE, ALPN http/1.1 only.

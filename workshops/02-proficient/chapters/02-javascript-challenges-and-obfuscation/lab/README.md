@@ -246,7 +246,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 - Nobody was blocked. What changed is the attacker's unit cost:
   - Round 4: one solve per scrape, however big.
   - Round 5: about 34 solves per 1,000 pages, growing linearly.
-- How expensive is *one* solve? Here, a warm browser re-solves in ~0.1 s, which is why production challenges add PoW (W1 Ch7) or heavier probes.
+- How expensive is *one* solve? Here, a warm browser re-solves in ~0.1 s, which is why production challenges add PoW (W1 Ch6) or heavier probes.
 - The power user was re-challenged once and never noticed. Would a screen-reader user notice? (Look at `role="status"` in `challenge.html`.)
 - **TODO (Round 5)** in `clearance.py`: size the budget from real traffic.
 
@@ -319,7 +319,7 @@ Things to watch for:
    Then add one probe to the template that your patch doesn't cover. Who is winning, and at what cost?
 3. **No-JS policy.** Give the `no-js` user something better than a dead end. Two options:
    - a read-only first page at a tight rate limit,
-   - a `<noscript>` link to a CAPTCHA (W1 Ch6).
+   - a `<noscript>` link to a CAPTCHA (W1 Ch5).
 
    Make the checkpoint report how many pages they can now read, and argue why that's acceptable.
-4. **Proof of work.** Fold a small SHA-256 PoW (W1 Ch7) into the variant, then re-measure Round 5. How many browser-seconds per 1,000 pages now? What does the throttled user pay?
+4. **Proof of work.** Fold a small SHA-256 PoW (W1 Ch6) into the variant, then re-measure Round 5. How many browser-seconds per 1,000 pages now? What does the throttled user pay?

@@ -12,9 +12,9 @@ Runs every layer enabled by DEFENSE_LEVEL on a sign-up and adds up points.
 From level 1 on, a sign-up must also carry a fingerprint collected in the
 same session (the collector didn't run → +40). That costs the few users
 who block JavaScript, so in production you'd send them to a challenge
-(W1 Ch6) rather than a 403.
+(W1 Ch5) rather than a 403.
 
-Thresholds (the same as W1 Ch4's header engine):
+Thresholds (the same as W1 Ch3's header engine):
     score >= 40  bot         (403)
     score >= 20  suspicious  (logged, allowed through)
     score <  20  clean

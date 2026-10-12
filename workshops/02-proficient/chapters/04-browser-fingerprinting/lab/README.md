@@ -85,7 +85,7 @@ The debug endpoints are never blocked:
 |---|---|
 | Port 5000 already in use (macOS: the AirPlay Receiver uses it) | `PORT=5050 DEFENSE_LEVEL=… python app.py`, then `export DEMO_URL=http://localhost:5050` in the shell you run attacks and tools from |
 | No Docker | `export DATABASE_URL=sqlite:///fp_lab.db` before starting the app. Everything else works the same |
-| Port 5432 taken (e.g. by the W1 Ch4 lab's database) | `docker compose -p w1-ch04-headers down`, or stop your local PostgreSQL |
+| Port 5432 taken (e.g. by the W1 Ch3 lab's database) | `docker compose -p w1-ch03-headers down`, or stop your local PostgreSQL |
 | `Executable doesn't exist` from Playwright | `playwright install chromium` inside the venv |
 | The checkpoint is slow | Each run drives 40 browser sessions, which takes about 45 s. `--signups 5` halves it |
 
@@ -289,4 +289,4 @@ Things to watch for:
 
 1. **Coherent generator.** Install BrowserForge (`pip install browserforge`, Apache-2.0), a Python port of Apify's fingerprint-suite. Generate a different, internally consistent Windows/Chrome fingerprint for every sign-up and map it onto our payload format. How many accounts does it get at level 4? Which components would you still trust?
 2. **FingerprintJS 5 (MIT).** Load the open-source FingerprintJS next to our collector and compare its `visitorId` with our `fp_id` across reloads, private windows and privacy browsers. Why should the server still recompute the ID from components?
-3. **Headers meet fingerprints.** Combine this lab's `lie_detector` with W1 Ch4's header scoring. Which Round 3 shortcut (replaying the payload from `httpx` instead of a browser) does that close?
+3. **Headers meet fingerprints.** Combine this lab's `lie_detector` with W1 Ch3's header scoring. Which Round 3 shortcut (replaying the payload from `httpx` instead of a browser) does that close?

@@ -1,5 +1,5 @@
 """
-Workshop 1, Chapter 4 — Defense Layer 3a: User-Agent Client Hints (Section 4.4)
+Workshop 1, Chapter 3 — Defense Layer 3a: User-Agent Client Hints (Section 4.4)
 
 Chromium browsers (Chrome, Edge, Opera, Brave, Samsung Internet) send three
 low-entropy Client Hints on every request to a secure context (HTTPS, or
@@ -14,7 +14,7 @@ check: brand version vs UA version, platform vs UA OS, mobile flag vs UA.
 Firefox and Safari do NOT send Client Hints, so these rules only apply when
 the UA claims to be Chromium.
 
-In W1 Ch4 this was enabled at DEFENSE_LEVEL >= 3. In W2 Ch1 it is always on (edge_rules.py).
+In W1 Ch3 this was enabled at DEFENSE_LEVEL >= 3. In W2 Ch1 it is always on (edge_rules.py).
 """
 
 import re

@@ -27,7 +27,7 @@ DATABASE_URL=sqlite:///fp_lab.db to run without Docker.
 
 Client IPs: every client in this lab is 127.0.0.1, so the scripts send a
 simulated address in X-Lab-Client-IP. The app trusts it only from loopback,
-standing in for the trusted edge proxy of W1 Ch3. Never trust a client-set
+standing in for the trusted edge proxy of W1 Ch2. Never trust a client-set
 IP header in production.
 
 Every sign-up response carries Server-Timing with the cost of judging the

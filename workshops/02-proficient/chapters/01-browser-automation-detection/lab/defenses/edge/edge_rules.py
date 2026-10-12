@@ -1,7 +1,7 @@
 """
 W2 Ch1 — The Edge Layer: Workshop 1 Header Rules, Always On
 
-Everything Workshop 1, Chapter 4 built (User-Agent parsing, header presence
+Everything Workshop 1, Chapter 3 built (User-Agent parsing, header presence
 and Fetch Metadata, Client Hints, header order, Accept-CH negotiation) runs on
 every request at every DEFENSE_LEVEL in this lab. It is the baseline the
 attacker has to get past before the JavaScript sensor matters at all.

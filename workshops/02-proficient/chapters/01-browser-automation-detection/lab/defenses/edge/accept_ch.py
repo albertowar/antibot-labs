@@ -1,5 +1,5 @@
 """
-Workshop 1, Chapter 4 — Defense Layer 4: Accept-CH Negotiation (Section 4.4.4)
+Workshop 1, Chapter 3 — Defense Layer 4: Accept-CH Negotiation (Section 4.4.4)
 
 High-entropy Client Hints are only sent when the server asks for them. The
 server answers with
@@ -15,7 +15,7 @@ When the hints do arrive we cross-check them as well: the UA string is
 frozen ("Chrome/153.0.0.0", "Windows NT 10.0") but the full version list and
 platform version are not.
 
-In W1 Ch4 this was enabled at DEFENSE_LEVEL >= 4. In W2 Ch1 it is always on (edge_rules.py).
+In W1 Ch3 this was enabled at DEFENSE_LEVEL >= 4. In W2 Ch1 it is always on (edge_rules.py).
 """
 
 import re

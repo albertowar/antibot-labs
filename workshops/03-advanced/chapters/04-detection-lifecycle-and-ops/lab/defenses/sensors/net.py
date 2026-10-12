@@ -1,5 +1,5 @@
 """
-Layer: network reputation (stand-in for W1 Ch3)
+Layer: network reputation (stand-in for W1 Ch2)
 
 Reads what the edge resolved for the source address: ASN type, Tor exit
 status and a community blocklist hit (think CrowdSec's community blocklist).

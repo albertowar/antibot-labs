@@ -14,7 +14,7 @@ Rules, enforced here:
   3. Client-supplied X-Forwarded-For never reaches the headers and the edge
      never trusts it. Like a CDN, it appends the peer and passes the chain on
      aside, as environ["lab.xff_claimed"] ("<what the client wrote>, <peer>"),
-     so W1 Ch3 can show what goes wrong when an app reads the left of it.
+     so W1 Ch2 can show what goes wrong when an app reads the left of it.
   4. X-Lab-Actor is ground truth ("human:home:03", "bot:wave2") for the
      scoreboard. It is removed BEFORE the defenses run, so no check can read it.
   5. Every other X-Lab-* request header is removed too. X-Lab-JA4 is kept

@@ -11,7 +11,7 @@ Adds up the points from every layer enabled by DEFENSE_LEVEL:
 
 Verdicts:
     score >= 60  block      (403)
-    score >= 30  challenge  (202: step up to a CAPTCHA or PoW, W1 Ch6/Ch7)
+    score >= 30  challenge  (202: step up to a CAPTCHA or PoW, W1 Ch5/Ch6)
     score <  30  allow      (200)
 
 Why three outcomes: behavior is probabilistic. A challenge costs a real

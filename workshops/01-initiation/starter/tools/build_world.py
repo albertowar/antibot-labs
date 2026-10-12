@@ -13,7 +13,7 @@ Build the published feeds a production stack would buy or download, from data/wo
     data/feeds/manifest.json           provenance of every file above
     data/feeds/README.md               the same, for people
 
-Defenses read THESE, never world.json's `type`: that is the W1 Ch3 lesson. A
+Defenses read THESE, never world.json's `type`: that is the W1 Ch2 lesson. A
 pool that is "residential_proxy" shows up in ip2asn as a residential ISP,
 exactly as a real residential proxy does.
 
@@ -58,7 +58,7 @@ POOL_FEEDS = {"cloud_ranges", "hosting_asns", "vpn_ranges", "relay_ranges", "tor
 DOC_NETS = [ipaddress.ip_network(n) for n in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/32")]
 DOC_ASNS = list(range(64496, 64512)) + list(range(65536, 65552))
 
-# What each synthetic file stands in for. Licences as listed in the W1 Ch3 tools table.
+# What each synthetic file stands in for. Licences as listed in the W1 Ch2 tools table.
 SOURCES = {
     "ip2asn.tsv": ("iptoasn.com ip2asn-combined", "https://iptoasn.com/", "PDDL", "daily"),
     "cloud_ranges.csv": ("AWS, Google Cloud, DigitalOcean, Cloudflare published ranges",
@@ -68,7 +68,7 @@ SOURCES = {
     "relay_ranges.csv": ("Apple iCloud Private Relay egress ranges", "https://mask-api.icloud.com/egress-ip-ranges.csv",
                          "Public", "daily"),
     "tor_exits.txt": ("Tor Project bulk exit list", "https://check.torproject.org/torbulkexitlist", "Public", "30 min"),
-    "open_proxies.txt": ("TheSpeedX/PROXY-List (discussed in W1 Ch3; never fetched by any lab)",
+    "open_proxies.txt": ("TheSpeedX/PROXY-List (discussed in W1 Ch2; never fetched by any lab)",
                          "https://github.com/TheSpeedX/PROXY-List", "See repository", "hourly"),
     "drop_v4.json": ("Spamhaus DROP", "https://www.spamhaus.org/drop/drop_v4.json", "Free for non-commercial use", "daily"),
     "firehol_level1.netset": ("FireHOL level 1 (without its bogon entries)",

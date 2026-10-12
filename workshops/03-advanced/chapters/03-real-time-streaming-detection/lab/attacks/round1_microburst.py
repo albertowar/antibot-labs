@@ -3,7 +3,7 @@ Round 1 attack — single-IP micro-burst
 
 The crudest credential-stuffing shape: one client hammering /api/login as fast
 as it can. 150 failed logins from one IP in ten seconds, evenly spaced because
-a tight loop with a fixed sleep is regular. The static rate limiter from W1 Ch2
+a tight loop with a fixed sleep is regular. The static rate limiter from W1 Ch1
 may split this across its fixed-window boundary; the sliding-window detector on
 the stream does not. This is the burst that finishes long before a session-level
 or batch scorer would ever look (Round 0 shows that gap).

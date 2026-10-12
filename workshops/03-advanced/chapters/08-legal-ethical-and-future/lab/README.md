@@ -25,7 +25,7 @@ lab/
 ## Setup
 
 ```bash
-cd workshops/03-advanced/chapters/07-legal-ethical-and-future/lab
+cd workshops/03-advanced/chapters/08-legal-ethical-and-future/lab
 python3 --version                                   # 3.12 or newer
 python3 tools/fp_audit.py --policy policies/policy_blunt.json
 ```

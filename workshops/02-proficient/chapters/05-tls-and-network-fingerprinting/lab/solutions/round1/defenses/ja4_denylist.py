@@ -5,7 +5,7 @@ Block the exact JA4 of HTTP libraries you have observed: python-requests,
 httpx, curl, Go net/http, Node undici and so on. A library's ClientHello is
 fixed by its TLS stack, so its JA4 is stable across requests, machines with
 the same OpenSSL build, and User-Agent changes. That's why this catches the
-W1 Ch4 attacker who copied every header from DevTools.
+W1 Ch3 attacker who copied every header from DevTools.
 
 Why it fails:
 - One `ssl_context.set_ciphers(...)` call changes JA4_b (and the cipher count

@@ -9,7 +9,7 @@ checkout, so the same JSON drives the live risk engine:
     signal              from
     agent_ua            agent_policy.classify(): a declared agent token in the User-Agent
     signature_agent     a Signature-Agent header is present (a claim; verification is separate)
-    datacenter_asn      egress kind (the lab's RFC 5737 ranges; W1 Ch3 in production)
+    datacenter_asn      egress kind (the lab's RFC 5737 ranges; W1 Ch2 in production)
     no_pointer          telemetry: no pointer clicks at all (keyboard, AT, agents)
     timing_too_regular  server-side flow log: metronome cadence (agent_behavior.features)
     cdp_artifacts       automation globals / webdriver in the fingerprint (W2 Ch1)

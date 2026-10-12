@@ -11,7 +11,7 @@ chain of 32-bit operations. This module
 
 Trade-offs:
   - f is deliberately cheap (microseconds). It is NOT proof of work (that's
-    W1 Ch7). Its job is to force the client to run *our current* code, not to
+    W1 Ch6). Its job is to force the client to run *our current* code, not to
     burn CPU.
   - Polymorphism only helps while the attacker has to re-read each variant by
     hand. A pool of 20 static files can be downloaded and machine-extracted

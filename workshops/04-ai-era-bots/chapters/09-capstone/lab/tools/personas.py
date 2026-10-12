@@ -14,7 +14,7 @@ average day's traffic:
                     first-timer              1  registers during the drop: a fresh account, like a farm's
     shared_ip       office-nat               4  four identical laptops behind one IP
                     rpa-macro                1  procurement macro: teleport clicks AND instant fills
-    vpn             vpn                      3  a person on a datacenter egress (W1 Ch3's classic FP)
+    vpn             vpn                      3  a person on a datacenter egress (W1 Ch2's classic FP)
     privacy         brave-win, firefox-rfp   4  farbled / resistFingerprinting browsers
     a11y            screen-reader            3  Tab, Tab, Enter; accessibility API in use
                     voice-control            1  activates controls through the accessibility tree

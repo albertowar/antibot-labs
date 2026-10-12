@@ -2,7 +2,7 @@
 W4 Chapter 7 — Simulated network edge: IP → ASN type and country
 
 In production your CDN or edge proxy hands the app the client IP plus an
-ASN/geo lookup (MaxMind GeoLite2, IPinfo, ...), as built in W1 Ch3. The lab
+ASN/geo lookup (MaxMind GeoLite2, IPinfo, ...), as built in W1 Ch2. The lab
 has no real network, so every simulated client sends its address in
 `X-Lab-Client-IP` and this module plays the ASN database.
 

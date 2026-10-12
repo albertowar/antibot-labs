@@ -2,7 +2,7 @@
 
 **Format:** Round 0 recon plus 4 rounds of defend ⚔️ attack, then a closing debrief. See `../chapter_05_content.md`, §5.8.
 
-The W1 Ch4 attacker copies every header from DevTools, so nothing at the HTTP layer gives it away anymore. In this lab you move the defense one layer down, to the TLS ClientHello and the HTTP/2 connection preface. Each round you write a few lines of a new layer, run the attacker that beats it, and measure two things on simulated real users: what the layer catches, and what it costs.
+The W1 Ch3 attacker copies every header from DevTools, so nothing at the HTTP layer gives it away anymore. In this lab you move the defense one layer down, to the TLS ClientHello and the HTTP/2 connection preface. Each round you write a few lines of a new layer, run the attacker that beats it, and measure two things on simulated real users: what the layer catches, and what it costs.
 
 ## Rules of engagement
 
@@ -248,7 +248,7 @@ t13d1516h2_8daaf6152771     60    1  100%     0%       33%  2:0;4:6291456;5:1638
 …
 ```
 
-Real Chromium, curl_cffi and the Playwright bot all land in the first cluster. You can't block that JA4. You *can* see that it's 84% API calls and 8% page loads, and split it further by IP/ASN (W1 Ch3), session (W1 Ch5) or account (W2 Ch6). That's the idea behind Cloudflare's JA4 Signals.
+Real Chromium, curl_cffi and the Playwright bot all land in the first cluster. You can't block that JA4. You *can* see that it's 84% API calls and 8% page loads, and split it further by IP/ASN (W1 Ch2), session (W1 Ch4) or account (W2 Ch6). That's the idea behind Cloudflare's JA4 Signals.
 
 **Scoreboard** (fill in with your checkpoint output):
 

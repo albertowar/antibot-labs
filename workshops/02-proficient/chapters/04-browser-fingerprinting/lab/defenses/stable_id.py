@@ -20,7 +20,7 @@ What we leave out on purpose:
   - the browser version: it changes every four weeks for everybody;
   - window size: users resize windows;
   - anything per-request (timestamps, nonces, collect_ms);
-  - the IP address: identity of the network, not the device (W1 Ch3).
+  - the IP address: identity of the network, not the device (W1 Ch2).
 
 Trade-off: every component you add raises entropy *and* the chance that a
 legitimate change (new font, new monitor, OS update) breaks the match.

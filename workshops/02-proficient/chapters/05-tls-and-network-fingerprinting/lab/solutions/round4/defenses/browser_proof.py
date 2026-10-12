@@ -32,7 +32,7 @@ Why it fails:
 
 False-positive profile:
 - JavaScript disabled (NoScript, Tor Browser "Safest", some accessibility
-  setups) → blocked. Offer a non-JS fallback (W1 Ch6 CAPTCHA, login) rather
+  setups) → blocked. Offer a non-JS fallback (W1 Ch5 CAPTCHA, login) rather
   than a hard 403.
 - Cookie blocking, and first visits that go straight to a deep link before
   any page sets the cookie.

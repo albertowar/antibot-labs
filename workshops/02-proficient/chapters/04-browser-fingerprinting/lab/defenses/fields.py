@@ -22,7 +22,7 @@ OSES_WITH_VOICES = {"Windows", "macOS", "iOS", "Android"}
 
 
 def os_from_ua(ua):
-    """The OS a User-Agent string claims (frozen by UA reduction, see W1 Ch4)."""
+    """The OS a User-Agent string claims (frozen by UA reduction, see W1 Ch3)."""
     ua = ua or ""
     if "iPhone" in ua or "iPad" in ua:
         return "iOS"

@@ -15,7 +15,7 @@ Shapes last compared with the real feeds: 2026-10. `manifest.json` holds the sam
 | `vpn_ranges.csv` | 2 | X4BNet/lists_vpn | https://github.com/X4BNet/lists_vpn | See repository | daily |
 | `relay_ranges.csv` | 1 | Apple iCloud Private Relay egress ranges | https://mask-api.icloud.com/egress-ip-ranges.csv | Public | daily |
 | `tor_exits.txt` | 12 | Tor Project bulk exit list | https://check.torproject.org/torbulkexitlist | Public | 30 min |
-| `open_proxies.txt` | 57 | TheSpeedX/PROXY-List (discussed in W1 Ch3; never fetched by any lab) | https://github.com/TheSpeedX/PROXY-List | See repository | hourly |
+| `open_proxies.txt` | 57 | TheSpeedX/PROXY-List (discussed in W1 Ch2; never fetched by any lab) | https://github.com/TheSpeedX/PROXY-List | See repository | hourly |
 | `drop_v4.json` | 1 | Spamhaus DROP | https://www.spamhaus.org/drop/drop_v4.json | Free for non-commercial use | daily |
 | `firehol_level1.netset` | 3 | FireHOL level 1 (without its bogon entries) | https://iplists.firehol.org/?ipset=firehol_level1 | Per-list (see repository) | daily |
 

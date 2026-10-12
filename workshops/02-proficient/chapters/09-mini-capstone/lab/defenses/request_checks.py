@@ -1,5 +1,5 @@
 """
-Chapter 9 — L0 request checks: headers and per-egress rate (W1 Ch2, Ch4)
+Chapter 9 — L0 request checks: headers and per-egress rate (W1 Ch1, Ch3)
 
 The cheapest layer, and still the one that removes most bulk traffic. It
 runs on every request, before any session state is read.
@@ -51,7 +51,7 @@ def score_headers(ctx):
 
 
 def score_rate(ctx, store, count=True):
-    """Fixed-window counters per egress IP (W1 Ch2). count=False only reads them."""
+    """Fixed-window counters per egress IP (W1 Ch1). count=False only reads them."""
     points, reasons = 0, []
     minute = int(time.time() // 60)
     key = f"rl:req:{ctx['egress']}:{minute}"

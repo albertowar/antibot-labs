@@ -1,4 +1,4 @@
-"""The lab edge: a pretend CDN in front of the store (pattern from W1 Ch9).
+"""The lab edge: a pretend CDN in front of the store (pattern from W1 Ch8).
 
 On a laptop every request comes from 127.0.0.1, which makes source-address
 reasoning impossible to practise. Every lab client therefore says which address

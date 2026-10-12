@@ -1,5 +1,5 @@
 """
-Layer: HTTP headers (stand-in for W1 Ch4)
+Layer: HTTP headers (stand-in for W1 Ch3)
 
 User-Agent family, presence of the headers every modern browser sends on a
 same-origin fetch, header order per browser family, and very old versions.
@@ -29,7 +29,7 @@ SIGNALS = {
 
 MIN_MAJOR = {"chrome": 140, "firefox": 115, "safari": 16}
 
-# Relative order of the headers a page's fetch() sends, per engine (W1 Ch4).
+# Relative order of the headers a page's fetch() sends, per engine (W1 Ch3).
 # Only headers the client controls; Host, Cookie and Content-* are left out.
 EXPECTED_ORDER = {
     "chrome": ["sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform", "user-agent", "accept",

@@ -2,7 +2,7 @@
 W2 Ch1 — Sensor Scoring Engine (Section 1.5)
 
 Adds up the points from every layer enabled by DEFENSE_LEVEL, the same
-additive model as Workshop 1, Chapter 4, so you can read every verdict as a
+additive model as Workshop 1, Chapter 3, so you can read every verdict as a
 list of reasons.
 
     Level 0  sensor collected and logged, nothing enforced (edge rules only)

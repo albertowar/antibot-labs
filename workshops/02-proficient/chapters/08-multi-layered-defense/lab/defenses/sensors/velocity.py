@@ -1,5 +1,5 @@
 """
-Layer: per-IP velocity (stand-in for W1 Ch2)
+Layer: per-IP velocity (stand-in for W1 Ch1)
 
 Counts login attempts per source IP in a 10-minute window.
 

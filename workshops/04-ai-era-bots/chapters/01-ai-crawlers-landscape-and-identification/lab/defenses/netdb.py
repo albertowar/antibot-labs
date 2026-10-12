@@ -4,7 +4,7 @@ In production these three functions are DNS and an ASN database:
 
     socket.gethostbyaddr(ip)[0]          -> PTR name          (reverse DNS)
     socket.gethostbyname_ex(name)[2]     -> list of addresses (forward DNS)
-    an ASN feed (iptoasn.com, GeoLite2-ASN; see W1 Ch3 §3.3.6)
+    an ASN feed (iptoasn.com, GeoLite2-ASN; see W1 Ch2 §2.3.6)
 
 Here they read data/world.json, so the lab needs no network and every answer is
 deterministic. The shapes and failure modes are the real ones: no PTR for CGNAT

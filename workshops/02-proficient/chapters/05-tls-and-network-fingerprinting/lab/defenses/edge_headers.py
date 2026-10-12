@@ -15,7 +15,7 @@ shares, and loads the fingerprint lists.
 Three things to remember:
 - These headers are only trustworthy if the origin can't be reached any
   other way. In production that means a private network, mTLS or a signed
-  header between edge and origin (W1 Ch3 made the same point for
+  header between edge and origin (W1 Ch2 made the same point for
   X-Forwarded-For). In the lab, the attack scripts refuse to talk to :5000.
 - fingerproxy v1.2.3 keeps GREASE values inside signature_algorithms when it
   hashes JA4 part c. Chromium sends a random GREASE sig-alg, so its JA4_c

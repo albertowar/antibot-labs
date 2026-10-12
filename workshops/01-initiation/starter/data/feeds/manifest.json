@@ -47,7 +47,7 @@
   },
   "open_proxies.txt": {
    "rows": 57,
-   "shaped_like": "TheSpeedX/PROXY-List (discussed in W1 Ch3; never fetched by any lab)",
+   "shaped_like": "TheSpeedX/PROXY-List (discussed in W1 Ch2; never fetched by any lab)",
    "real_source_url": "https://github.com/TheSpeedX/PROXY-List",
    "licence": "See repository",
    "production_refresh": "hourly"
