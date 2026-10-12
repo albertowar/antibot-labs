@@ -45,7 +45,8 @@ def consume(store, payload):
     used = store.incr(key)
     if used == 1:
         store.expire(key, TTL_S)
-    # TODO (Round 5): what budget would a real user on your busiest page need?
+    # TODO (Round 5, optional): what budget would a real user on your busiest
+    # page need?
     return used <= BUDGET, used
 
 

@@ -97,7 +97,7 @@ def redeem_challenge(store, key, token, sid, level):
         return None, "challenge was issued to a different session"
     if payload["lvl"] != level:
         return None, "challenge was issued at a different level"
-    # TODO (Round 2): swap getdel() for get() and re-run
+    # TODO (Round 2, optional): swap getdel() for get() and re-run
     # `python attacks/round2_python_port.py --replay`. What changes?
     owner = store.getdel(f"nonce:{payload['n']}")
     if owner is None:

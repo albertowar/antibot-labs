@@ -55,8 +55,8 @@ def expected_engine(user_agent):
     ua = user_agent or ""
     if NAIVE_ENGINE_CHECK:
         return ENGINE_V8            # the bug: assumes everyone runs Chrome
-    # TODO (Round 4): is this complete? Think about Edge, Opera, Samsung
-    # Internet, Chrome on iOS (CriOS) and Firefox on iOS (FxiOS).
+    # TODO (Round 4, optional): is this complete? Think about Edge, Opera,
+    # Samsung Internet, Chrome on iOS (CriOS) and Firefox on iOS (FxiOS).
     is_chromium = ("Chrome/" in ua or "Chromium/" in ua) and "Firefox/" not in ua
     return ENGINE_V8 if is_chromium else ENGINE_OTHER
 

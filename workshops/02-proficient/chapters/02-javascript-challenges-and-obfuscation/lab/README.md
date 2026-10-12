@@ -140,6 +140,8 @@ Cost
 
 **Fell behind?** Every defense is already written, so catching up means restarting the demo site with `DEFENSE_LEVEL=<N>`. Levels 3+ also need the variant pool (`python tools/build_variants.py`). The checkpoint tells you if you're on the wrong level.
 
+The `TODO (Round N, optional)` markers in the defense and tool files are tuning exercises, not stubs: every defense already works, and the checkpoints pass without touching them.
+
 ---
 
 ## Round 0: Baseline
@@ -167,7 +169,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 - How long did the forge take to write? Real attackers don't keep the regex. They hard-code `ec0d7e1` (`FALLBACK`).
 - The no-JS user is now locked out. Who is that in real life? Decide what they should get.
-- **TODO (Round 1)** in `cookie_gate.py`: what would it take to give every visitor a different value?
+- **TODO (Round 1, optional)** in `cookie_gate.py`: what would it take to give every visitor a different value?
 
 ---
 
@@ -184,7 +186,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 **Exercises:**
 
 1. Decode a `clr` cookie: `python -c "import base64,sys; print(base64.urlsafe_b64decode(sys.argv[1].split('.')[0] + '=='))" <value>`. What can the client read? What can it change?
-2. **TODO (Round 2)** in `tokens.py`: swap `getdel()` for `get()`, restart, and re-run `--replay`. Which line changes?
+2. **TODO (Round 2, optional)** in `tokens.py`: swap `getdel()` for `get()`, restart, and re-run `--replay`. Which line changes?
 3. The port solves in ~0.1 ms. The challenge did force the attacker to read 40 lines of JS, once. That's all it did.
 
 ---
@@ -204,7 +206,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 - Obfuscation made the script 6× bigger and cost us ~240 ms per build. How long did it hold against webcrack?
 - Polymorphism broke the *hand-written* port. Would it break a *script* that extracts the chain from each variant? (That's bonus challenge 1.)
 - The jsdom attacker never read anything. What does that tell you about where to spend your effort?
-- **TODO (Round 3)** in `tools/obfuscate.mjs`: turn off control-flow flattening and dead-code injection, then rebuild. Compare the size and the webcrack output.
+- **TODO (Round 3, optional)** in `tools/obfuscate.mjs`: turn off control-flow flattening and dead-code injection, then rebuild. Compare the size and the webcrack output.
 
 ---
 
@@ -226,9 +228,9 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
 
 **Discuss:**
 
-- The harvester needed no stealth plugin: it *is* a real browser. What would catch it? (W2 Ch1 and W2 Ch3.)
+- The harvester needed no stealth plugin: it *is* a real browser. What would catch it? (Chapter 1 and Chapter 3.)
 - Why fold the checks into the hash instead of sending `{"layout_ok": true}`?
-- **TODO (Round 4)** in `env_integrity.py`: does `expected_engine()` handle Edge, Samsung Internet, CriOS and FxiOS?
+- **TODO (Round 4, optional)** in `env_integrity.py`: does `expected_engine()` handle Edge, Samsung Internet, CriOS and FxiOS?
 
 ---
 
@@ -248,7 +250,7 @@ Remember the last line: at level 0 even the no-JS user gets everything. It's the
   - Round 5: about 34 solves per 1,000 pages, growing linearly.
 - How expensive is *one* solve? Here, a warm browser re-solves in ~0.1 s, which is why production challenges add PoW (W1 Ch7) or heavier probes.
 - The power user was re-challenged once and never noticed. Would a screen-reader user notice? (Look at `role="status"` in `challenge.html`.)
-- **TODO (Round 5)** in `clearance.py`: size the budget from real traffic.
+- **TODO (Round 5, optional)** in `clearance.py`: size the budget from real traffic.
 
 ---
 
@@ -322,4 +324,4 @@ Things to watch for:
    - a `<noscript>` link to a CAPTCHA (W1 Ch6).
 
    Make the checkpoint report how many pages they can now read, and argue why that's acceptable.
-4. **Proof of work.** Fold a small SHA-256 PoW (W1 Ch7) into the variant, then re-measure Round 5. How many browser-seconds per 1,000 pages now? What does the throttled user pay?
+4. **Proof of work.** Fold W1 Ch7's puzzle into the variant (copy `solve()`/`meets_difficulty()` from its `lab/defenses/pow_core.py`; the puzzle and its cost model are taught there), then re-measure Round 5. How many browser-seconds per 1,000 pages now? What does the throttled user pay?

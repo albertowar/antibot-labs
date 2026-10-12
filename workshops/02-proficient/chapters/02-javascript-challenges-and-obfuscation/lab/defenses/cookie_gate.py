@@ -35,8 +35,8 @@ INLINE_SCRIPT = """
 
 def passes(cookies):
     """True if the client carries the cookie the inline script would have set."""
-    # TODO (Round 1): make the value different for every visitor. What would the
-    # server need to remember, and for how long? (That's Round 2.)
+    # TODO (Round 1, optional): make the value different for every visitor.
+    # What would the server need to remember, and for how long? (That's Round 2.)
     return cookies.get(COOKIE_NAME) == EXPECTED_VALUE
 
 
