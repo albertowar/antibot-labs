@@ -13,3 +13,13 @@
 203.0.113.224	203.0.113.255	64508	US	Example Hosting LLC
 2001:db8:a::	2001:db8:a:ffff:ffff:ffff:ffff:ffff	64496	US	Example Broadband
 2001:db8:b::	2001:db8:b:ffff:ffff:ffff:ffff:ffff	64497	US	Example Cable
+198.51.100.96	198.51.100.127	65537	US	Example Cloud Platform
+2001:db8:c1::	2001:db8:c1:0:ffff:ffff:ffff:ffff	65536	NL	Example VPS Hosting
+198.51.100.128	198.51.100.191	65539	US	Example Hosting LLC West
+198.51.100.192	198.51.100.223	65538	NL	Example Bulletproof Hosting
+2001:db8:100::	2001:db8:100:ffff:ffff:ffff:ffff:ffff	65540	US	Example Cable West
+2001:db8:101::	2001:db8:101:ffff:ffff:ffff:ffff:ffff	65541	GB	Example Broadband UK
+2001:db8:102::	2001:db8:102:ffff:ffff:ffff:ffff:ffff	65542	FR	Example Telecom FR
+2001:db8:103::	2001:db8:103:ffff:ffff:ffff:ffff:ffff	65543	BR	Example Fibra BR
+2001:db8:104::	2001:db8:104:ffff:ffff:ffff:ffff:ffff	65544	JP	Example Hikari JP
+2001:db8:105::	2001:db8:105:ffff:ffff:ffff:ffff:ffff	65545	IN	Example Broadband IN

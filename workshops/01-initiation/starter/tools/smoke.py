@@ -43,6 +43,29 @@ def check(cond, msg):
         print("  FAIL", msg)
 
 
+def check_world(client):
+    """world.json, labclient and build_world agree; spread pools really spread; groups resolve."""
+    import ipaddress
+    import build_world
+    from labclient import WORLD
+    problems = build_world.validate(WORLD)
+    check(not problems, f"world.json rules: {problems}")
+    for k, v in build_world.build(WORLD).items():
+        path = os.path.join(build_world.FEEDS, k)
+        check(os.path.exists(path) and open(path).read() == v, f"data/feeds/{k} is stale: run python tools/build_world.py")
+    for name, p in WORLD["pools"].items():
+        check(world_pool(name) == build_world.hosts(p), f"world_pool({name}) disagrees with build_world.hosts")
+        if "spread" in p:
+            ips = world_pool(name)
+            nets = {ipaddress.ip_network(f"{ip}/{p['spread']}", strict=False) for ip in ips}
+            check(len(nets) == len(ips), f"{name}: spread pool hosts share a /{p['spread']}")
+            r = client.get("/whoami", ip=ips[-1])
+            check(r.status_code == 200 and r.json()["pool"] == name, f"edge: {name} host {ips[-1]} -> {r.status_code}")
+    for g, members in WORLD.get("groups", {}).items():
+        ips = world_pool(g)
+        check(ips and len(set(ips)) == len(ips), f"group {g}: empty or duplicate addresses")
+
+
 def run():
     admin("POST", "/lab/reset")
     for path in GETS:
@@ -72,6 +95,9 @@ def run():
     j = r.json()
     check(j["ip"] == world_pool("cloud_vm")[0] and j["asn"] == 64501, "edge: rented IP resolves to pool ASN")
     check(j["actor"] == "bot:smoke", "edge: actor passes to whoami")
+    check(j["xff_claimed"] == f"1.2.3.4, {world_pool('cloud_vm')[0]}", f"edge: client XFF kept as a claimed chain: {j['xff_claimed']}")
+    check(c.get("/whoami").json()["xff_claimed"] == world_pool("cloud_vm")[0], "edge: no client XFF -> claimed chain is the peer")
+    check_world(c)
     check(c.get("/api/products").status_code == 200, "bot can list products at level 0")
     r = requests.get(BASE_URL + "/whoami", timeout=30).json()
     check(r["ip"] == "192.0.2.10", "edge: no header -> student_ip")

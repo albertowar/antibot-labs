@@ -11,7 +11,10 @@ Rules, enforced here:
   2. X-Lab-Client-IP must fall inside a world.json pool. Nobody can forge a
      TCP source address and still get the reply, so an attacker may rent a
      different address, but may not invent one. Anything else is a 421.
-  3. Client-supplied X-Forwarded-For is dropped, as a trusted edge does.
+  3. Client-supplied X-Forwarded-For never reaches the headers and the edge
+     never trusts it. Like a CDN, it appends the peer and passes the chain on
+     aside, as environ["lab.xff_claimed"] ("<what the client wrote>, <peer>"),
+     so W1 Ch3 can show what goes wrong when an app reads the left of it.
   4. X-Lab-Actor is ground truth ("human:home:03", "bot:wave2") for the
      scoreboard. It is removed BEFORE the defenses run, so no check can read it.
   5. Every other X-Lab-* request header is removed too. X-Lab-JA4 is kept
@@ -50,7 +53,7 @@ class World:
             return None
         for net, name, p in self.pools:
             if addr.version == net.version and addr in net:
-                return {"ip": ip, "asn": p["asn"], "org": p["org"], "country": p["country"], "pool": name}
+                return {"ip": str(addr), "asn": p["asn"], "org": p["org"], "country": p["country"], "pool": name}
         return None
 
     def pool_type(self, name):
@@ -73,10 +76,11 @@ class LabEdge:
         environ["lab.actor"] = environ.pop("HTTP_X_LAB_ACTOR", None) or "you"
         environ["lab.edge"] = info
         environ["lab.ja4_claimed"] = environ.pop("HTTP_X_LAB_JA4", "")
-        environ.pop("HTTP_X_FORWARDED_FOR", None)
+        client_xff = environ.pop("HTTP_X_FORWARDED_FOR", "")[:512].strip()
+        environ["lab.xff_claimed"] = f"{client_xff}, {info['ip']}" if client_xff else info["ip"]
         for k in [k for k in environ if k.startswith("HTTP_X_LAB_")]:
             environ.pop(k)
-        environ["REMOTE_ADDR"] = claimed
+        environ["REMOTE_ADDR"] = info["ip"]
         return self.app(environ, start_response)
 
     @staticmethod

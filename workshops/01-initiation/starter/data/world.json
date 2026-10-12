@@ -1,14 +1,19 @@
 {
  "_comment": [
   "The simulated internet for every lab. Every address comes from a documentation range",
-  "(RFC 5737 IPv4, RFC 3849 IPv6) and every ASN from the documentation range (RFC 5398), so",
-  "nothing here can ever point at a real network. demo_site/lab_edge.py accepts X-Lab-Client-IP",
-  "only for addresses inside these pools; tools/labclient.py picks source addresses from them.",
+  "(RFC 5737 IPv4, RFC 3849 IPv6) and every ASN from the documentation ranges (RFC 5398: 64496-64511",
+  "and 65536-65551), so nothing here can ever point at a real network. demo_site/lab_edge.py accepts",
+  "X-Lab-Client-IP only for addresses inside these pools; tools/labclient.py picks source addresses from them.",
   "`type` is ground truth for the scoreboard and is NEVER exposed to defenses: they must infer",
   "it from data/feeds/* (built by tools/build_world.py), like a production stack would.",
   "Allocation: 192.0.2.0/24 residential ISPs; 198.51.100.0/24 mobile, corporate, universities,",
-  "privacy relays; 203.0.113.0/24 datacenter, hosting, VPN, Tor, open proxies; 2001:db8::/32",
-  "one /48 per pool that needs a large fleet. See workshops/STORE_CONTRACT.md before adding a pool."
+  "privacy relays (.0-.95), then cloud_gcp (.96/27), free_proxy (.128/26), bulletproof_host (.192/27);",
+  "203.0.113.0/24 datacenter, hosting, VPN, Tor, open proxies (full); 2001:db8::/32 one /48 or /64 per",
+  "pool that needs a large fleet (2001:db8:10x::/48 for the spread residential-proxy pools).",
+  "Optional pool keys (tools/build_world.py): `spread` (one host per /N, e.g. 64), `listed` (share of a",
+  "per-address feed that lists the pool), `feeds` ({feed: true|false} overrides the type's defaults).",
+  "`groups` names a set of pools a client can rotate over as one (tools/labclient.py world_pool).",
+  "See workshops/STORE_CONTRACT.md before adding a pool."
  ],
  "student_ip": "192.0.2.10",
  "pools": {
@@ -85,7 +90,10 @@
    "org": "Example Privacy Relay",
    "type": "relay",
    "country": "US",
-   "tz": "America/Los_Angeles"
+   "tz": "America/Los_Angeles",
+   "feeds": {
+    "vpn_ranges": true
+   }
   },
   "consumer_vpn": {
    "cidr": "203.0.113.128/27",
@@ -149,10 +157,127 @@
    "type": "residential",
    "country": "US",
    "tz": "America/Chicago"
+  },
+  "cloud_gcp": {
+   "cidr": "198.51.100.96/27",
+   "hosts": 20,
+   "asn": 65537,
+   "org": "Example Cloud Platform",
+   "type": "datacenter",
+   "country": "US",
+   "tz": "America/Chicago",
+   "feeds": {
+    "hosting_asns": false
+   }
+  },
+  "cloud_v6": {
+   "cidr": "2001:db8:c1::/64",
+   "hosts": 256,
+   "asn": 65536,
+   "org": "Example VPS Hosting",
+   "type": "datacenter",
+   "country": "NL",
+   "tz": "Europe/Amsterdam",
+   "feeds": {
+    "cloud_ranges": false,
+    "hosting_asns": false
+   }
+  },
+  "free_proxy": {
+   "cidr": "198.51.100.128/26",
+   "hosts": 60,
+   "asn": 65539,
+   "org": "Example Hosting LLC West",
+   "type": "proxy",
+   "country": "US",
+   "tz": "America/Denver",
+   "listed": 0.75,
+   "feeds": {
+    "hosting_asns": false
+   }
+  },
+  "bulletproof_host": {
+   "cidr": "198.51.100.192/27",
+   "hosts": 12,
+   "asn": 65538,
+   "org": "Example Bulletproof Hosting",
+   "type": "blocklisted",
+   "country": "NL",
+   "tz": "Europe/Amsterdam"
+  },
+  "resi_us": {
+   "cidr": "2001:db8:100::/48",
+   "hosts": 64,
+   "asn": 65540,
+   "org": "Example Cable West",
+   "type": "residential_proxy",
+   "country": "US",
+   "tz": "America/Los_Angeles",
+   "spread": 64
+  },
+  "resi_gb": {
+   "cidr": "2001:db8:101::/48",
+   "hosts": 64,
+   "asn": 65541,
+   "org": "Example Broadband UK",
+   "type": "residential_proxy",
+   "country": "GB",
+   "tz": "Europe/London",
+   "spread": 64
+  },
+  "resi_fr": {
+   "cidr": "2001:db8:102::/48",
+   "hosts": 64,
+   "asn": 65542,
+   "org": "Example Telecom FR",
+   "type": "residential_proxy",
+   "country": "FR",
+   "tz": "Europe/Paris",
+   "spread": 64
+  },
+  "resi_br": {
+   "cidr": "2001:db8:103::/48",
+   "hosts": 64,
+   "asn": 65543,
+   "org": "Example Fibra BR",
+   "type": "residential_proxy",
+   "country": "BR",
+   "tz": "America/Sao_Paulo",
+   "spread": 64
+  },
+  "resi_jp": {
+   "cidr": "2001:db8:104::/48",
+   "hosts": 64,
+   "asn": 65544,
+   "org": "Example Hikari JP",
+   "type": "residential_proxy",
+   "country": "JP",
+   "tz": "Asia/Tokyo",
+   "spread": 64
+  },
+  "resi_in": {
+   "cidr": "2001:db8:105::/48",
+   "hosts": 64,
+   "asn": 65545,
+   "org": "Example Broadband IN",
+   "type": "residential_proxy",
+   "country": "IN",
+   "tz": "Asia/Kolkata",
+   "spread": 64
   }
  },
  "community_blocklist": [
   "203.0.113.224/27",
   "203.0.113.192/27"
- ]
+ ],
+ "groups": {
+  "residential_proxy_net": [
+   "resi_us",
+   "resi_gb",
+   "resi_fr",
+   "resi_br",
+   "resi_jp",
+   "resi_in"
+  ]
+ }
 }

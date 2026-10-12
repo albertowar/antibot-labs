@@ -43,7 +43,8 @@ def _edge_info():
     if not ja4 and request.environ.get("lab.ja4_claimed"):
         ja4, src = request.environ["lab.ja4_claimed"], "claimed"
     return EdgeInfo(ip=e.get("ip", ""), asn=e.get("asn", 0), org=e.get("org", ""), country=e.get("country", ""),
-                    pool=e.get("pool", ""), ja4=ja4, ja4_source=src, h2=request.environ.get("lab.h2", ""))
+                    pool=e.get("pool", ""), ja4=ja4, ja4_source=src, h2=request.environ.get("lab.h2", ""),
+                    xff_claimed=request.environ.get("lab.xff_claimed", ""))
 
 
 def build_ctx(app):

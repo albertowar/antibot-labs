@@ -48,16 +48,32 @@ with open(WORLD_FILE) as f:
 
 
 def world_pool(name, n=None):
-    """Source addresses in one pool: the explicit `ips`, or the first `hosts` of the `cidr`."""
+    """
+    Source addresses in one pool, or in every pool of a `groups` entry (in order): the explicit
+    `ips`, or the first `hosts` of the `cidr`, one per /`spread` when the pool sets it.
+    Same rule as tools/build_world.py hosts(); tools/smoke.py checks that they agree.
+    """
+    if name in WORLD.get("groups", {}):
+        ips = [ip for member in WORLD["groups"][name] for ip in world_pool(member)]
+        return ips[:n] if n else ips
     p = WORLD["pools"][name]
     if "ips" in p:
         ips = list(p["ips"])
     else:
         net = ipaddress.ip_network(p["cidr"])
         count = p.get("hosts", 50)
-        base = int(net.network_address) + (1 if net.version == 4 and net.prefixlen < 31 else 0)
-        ips = [str(ipaddress.ip_address(base + i)) for i in range(count)]
+        if "spread" in p:
+            step = 1 << (net.max_prefixlen - p["spread"])
+            ips = [str(ipaddress.ip_address(int(net.network_address) + i * step + 1)) for i in range(count)]
+        else:
+            base = int(net.network_address) + (1 if net.version == 4 and net.prefixlen < 31 else 0)
+            ips = [str(ipaddress.ip_address(base + i)) for i in range(count)]
     return ips[:n] if n else ips
+
+
+def group_members(name):
+    """The pool names behind a `groups` entry (or [name] for a plain pool)."""
+    return list(WORLD.get("groups", {}).get(name, [name]))
 
 
 def pool_type(name):
@@ -70,7 +86,7 @@ class LabClient:
     library defaults), from a rented source IP, with a scoreboard label.
 
     ip      one fixed source IP (a sticky proxy, or a real home connection)
-    pool    rotate: pick a random IP from this pool on EVERY request
+    pool    rotate: pick a random IP from this list on EVERY request (e.g. world_pool("cloud_vm"))
     ja4     a claimed TLS fingerprint (honoured as "claimed" until a TLS edge measures one)
     """
 

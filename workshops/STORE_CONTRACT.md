@@ -6,7 +6,7 @@ and the hook points a chapter uses to add a defense or a feature. The Demo Store
 (`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
-Contract version: **1.2** (recorded in each starter's `STARTER.json`). Changing anything under
+Contract version: **1.3** (recorded in each starter's `STARTER.json`). Changing anything under
 "Canonical surface" is a contract bump: rebuild the starters (`scripts/build_starter.py`) and rerun
 `tools/smoke.py` in every lab.
 
@@ -15,6 +15,7 @@ Contract version: **1.2** (recorded in each starter's `STARTER.json`). Changing 
 | 1.0 | first version |
 | 1.1 | backward-compatible hook additions from the W1 Ch7 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
 | 1.2 | the series-wide guard: `labnet.py` at the lab root (a byte-identical copy of `scripts/labnet.py`) refuses non-local `DEMO_URL` and side-service URLs; the client moves from `tools/labnet.py` to `tools/labclient.py` (attacks import `labclient`); `checkpoint.py --restore`; `postgres:18.6-alpine` in compose |
+| 1.3 | additive, for W1 Ch3: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
 
 ## 1. The store
 
@@ -43,7 +44,7 @@ files; they add `defenses/<name>.py` checks and `demo_site/ext/<name>.py` module
 edited by hand: change the capstone lab, rebuild (`scripts/build_starter.py --from <capstone lab>`),
 and `scripts/starter_check.py` reports drift.
 
-Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.2). Adds: …`.
+Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.3). Adds: …`.
 
 ## 3. Canonical surface
 
@@ -136,13 +137,26 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
   before the app runs; only the decision logger and the order record read it. `tools/smoke.py` fails
   any defense or ext that reads it.
 - `X-Lab-JA4` is kept as a *claimed* fingerprint (`ctx.edge.ja4_source == "claimed"`) until a TLS edge
-  (W2 Ch5) sets a measured one. Every other `X-Lab-*` and `X-Forwarded-For` request header is dropped.
-- Defenses see `ctx.edge = EdgeInfo(ip, asn, org, country, pool, ja4, ja4_source, h2)`. The pool's
-  `type` is never exposed; infer it from `data/feeds/*` (`tools/build_world.py`), as production does.
-- Addresses: RFC 5737 / RFC 3849 only. Allocation: `192.0.2.0/24` residential ISPs; `198.51.100.0/24`
-  mobile CGNAT, corporate, university, privacy relay; `203.0.113.0/24` datacenter, hosting, VPN, Tor,
-  open proxies; one `2001:db8:<x>::/48` per pool that needs a large fleet. Add a pool to `world.json`
-  (and rebuild feeds) rather than inventing addresses in a script.
+  (W2 Ch5) sets a measured one. Every other `X-Lab-*` request header is dropped.
+- Client-supplied `X-Forwarded-For` is removed from the headers and never trusted by the edge. Like a CDN,
+  the edge appends the peer and keeps the chain aside as `ctx.edge.xff_claimed` (`"<client value>, <ip>"`,
+  or just `<ip>`): everything left of the last entry is attacker-controlled. Only W1 Ch3 reads it, to
+  show the leftmost-entry bug; `ctx.edge.ip` is always the rented address.
+- Defenses see `ctx.edge = EdgeInfo(ip, asn, org, country, pool, ja4, ja4_source, h2, xff_claimed)`. The
+  pool's `type` is never exposed; infer it from `data/feeds/*` (`tools/build_world.py`), as production does.
+- Addresses: RFC 5737 / RFC 3849 only, ASNs from RFC 5398 (64496-64511, 65536-65551); `build_world.py
+  --check` rejects anything else. Allocation: `192.0.2.0/24` residential ISPs; `198.51.100.0/24` mobile
+  CGNAT, corporate, university, privacy relay (.0-.95), `cloud_gcp`, `free_proxy`, `bulletproof_host`
+  (.96-.223); `203.0.113.0/24` datacenter, hosting, VPN, Tor, open proxies (full); one `2001:db8:<x>::/48`
+  (or /64) per pool that needs a large fleet. Add a pool to `world.json` (and rebuild feeds) rather than
+  inventing addresses in a script.
+- Pool keys beyond `cidr`/`hosts`/`asn`/`org`/`type`/`country`/`tz`: `spread: 64` enumerates one host per
+  /64; `listed: 0.75` puts only the first 75 % of the hosts on a per-address feed (Tor, open proxies);
+  `feeds: {"hosting_asns": false}` overrides the feeds a type lands in (the gaps of free feeds). Top-level
+  `groups` names pools a client rotates over as one (`world_pool("residential_proxy_net")`: six countries,
+  one address per /64).
+- Feeds are synthetic. `data/feeds/manifest.json` and `README.md` (generated) record, per file, the real
+  feed it is shaped like, that feed's URL, licence and production refresh cadence. No lab fetches a real feed.
 
 ### 3.7 Seed data (deterministic from `LAB_SEED`)
 
@@ -270,14 +284,14 @@ those requests still show in `human_requests_stopped`. `purchases` respects `sin
 | File | Purpose |
 |---|---|
 | `../labnet.py` | at the lab root, not in `tools/`: the one localhost guard (`target`, `require_local`, `require_local_env`) and the catch-up helper (`catch_up`, `restore`); a byte-identical copy of `scripts/labnet.py` |
-| `labclient.py` | the lab client, guarded by `labnet` on import; `LabClient` (ordered headers, rented IP, actor label), `world_pool`, `admin`, `reset`, `set_level`, `scoreboard`, `browser_context` for Playwright |
+| `labclient.py` | the lab client, guarded by `labnet` on import; `LabClient` (ordered headers, rented IP, actor label), `world_pool` (pools and groups), `group_members`, `admin`, `reset`, `set_level`, `scoreboard`, `browser_context` for Playwright |
 | `browsers.py` | header templates of real browsers in wire order |
 | `population.py` | the 40 shoppers (personas and scenarios); `PAGE_HOOKS` for chapter JS equivalents (a hook may return a replacement response); every `tools/personas_*.py` is auto-imported |
 | `scoreboard.py` | table or markdown from `/lab/scoreboard` |
 | `checkpoint_core.py`, `checkpoint.py` | `ROUNDS = {n: Round(...)}`; `--round N`, `--level L`, `--catch-up`, `--restore`, `--all`, `--markdown` |
 | `verify.py` | in-process harness on a free port (or `$PORT`): `--smoke`, `--round N [--level L] [--catch-up]`, `--all --markdown` |
 | `smoke.py` | this contract, as a test |
-| `doctor.py`, `reset.py`, `build_world.py` | readiness check, reset, feeds from `world.json` |
+| `doctor.py`, `reset.py`, `build_world.py` | readiness check, reset, feeds (+ provenance manifest) from `world.json` |
 
 Solutions live in `solutions/round<N>/` mirroring the lab tree; `checkpoint.py --catch-up` installs rounds
 1..N cumulatively, keeping one `.bak` per student file, and `--restore` puts them back. Attack scripts live in

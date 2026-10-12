@@ -1,6 +1,6 @@
 # Kestrel Outfitters: the W1 starter (the skeleton store)
 
-**Contract:** `workshops/STORE_CONTRACT.md` (version 1.1). **Source:** bare; this is the skeleton every
+**Contract:** `workshops/STORE_CONTRACT.md` (version 1.3). **Source:** bare; this is the skeleton every
 other starter derives from. **Baseline defenses:** none (`defenses/ladder.py` has an empty `LADDER[0]`).
 
 This folder is copied, never imported, by every Workshop 1 chapter lab. Do not edit it inside a lab;
@@ -41,7 +41,8 @@ demo_site/      the Flask store: app factory, models, seed, images, lab edge, ga
 defenses/       the engine (pipeline, policy, context, store, decision log) and the wiring file ladder.py
 tools/          labclient (the guarded lab client), population (shoppers), checkpoint, verify, smoke, doctor, build_world
 attacks/        empty; a chapter adds roundN_*.py
-data/           world.json (simulated internet), feeds/ (built from it), wordlists/
+data/           world.json (simulated internet), feeds/ (built from it; feeds/README.md says what each
+                stands in for), wordlists/
 ```
 
 ## Rules of engagement

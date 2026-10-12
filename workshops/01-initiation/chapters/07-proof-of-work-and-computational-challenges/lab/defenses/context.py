@@ -20,6 +20,8 @@ class EdgeInfo:
     ja4: str = ""           # measured by a TLS edge (W2 Ch5) or claimed over plain HTTP
     ja4_source: str = ""    # "measured" | "claimed" | ""
     h2: str = ""
+    xff_claimed: str = ""   # X-Forwarded-For as a CDN forwards it: everything left of the last
+                            # entry was written by the client; only the last entry (== ip) is the edge's
 
 
 @dataclass
