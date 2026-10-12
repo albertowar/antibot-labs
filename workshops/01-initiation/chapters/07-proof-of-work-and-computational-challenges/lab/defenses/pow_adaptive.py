@@ -34,9 +34,12 @@ from .store import Counters
 def rate_key(ip):
     """Which requests share a rate counter.
 
-    TODO (Round 4): try keying by the /24 instead of the IP, with
+    Exercise (Round 4, discussion): try keying by the /24 instead of the IP, with
     `from defenses.store import prefix_of` and `return prefix_of(ip)`.
-    Re-run the checkpoint: what happens to round4_distributed, and to the CGNAT shoppers?
+    Re-run the checkpoint: what happens to round4_distributed, and to the shoppers?
+    The model answer is in the README's Round 4 section. The checkpoint FAILs on purpose
+    (it expects the IP key), and --catch-up does not undo the edit: put `return ip`
+    back before Round 5.
     """
     return ip
 

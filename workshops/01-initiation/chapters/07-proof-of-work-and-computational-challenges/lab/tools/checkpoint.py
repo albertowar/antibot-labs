@@ -136,7 +136,7 @@ ROUNDS = {
              extra_checks=[expect("round3_solver_pool", "full", bits=lambda b: max(b) >= 20),
                            expect("round4_distributed", "full", bits=all_bits([16])),
                            prices(["round3_solver_pool", "round4_distributed"]), shoppers, cgnat_pays_more],
-             solutions=("defenses/ladder.py", "defenses/policy.py", "defenses/pow_adaptive.py")),
+             solutions=("defenses/ladder.py", "defenses/policy.py")),
     5: Round(level=4, description="the browser pays: a real Chromium solves with the page's own JavaScript",
              attack=attack("round5_playwright_browser.py"), scenario="browse", allowed_fp=("no_js", "mobile_cgnat"),
              extra_checks=[expect("round5_playwright_browser", "full"), prices(["round5_playwright_browser"]), shoppers],

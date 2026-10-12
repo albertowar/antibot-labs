@@ -6,8 +6,8 @@ the Round 2 attacker gets), your all-core rate (the Round 3 solver pool), and wh
 22 bits cost at those rates, at p50 and p95. It does not need the store.
 
 Then open http://127.0.0.1:5000/lab/pow/bench in your browser: that is what a real user pays,
-with the store's own JavaScript solver. A GPU running hashcat does ~20,000 MH/s of SHA-256;
-keep that number in mind for Round 3.
+with the store's own JavaScript solver. An RTX 4090 running hashcat does ~21,000 MH/s of SHA-256
+(hashcat 6.2.6 benchmark, mode 1400); keep that number in mind for Round 3.
 
     python attacks/round0_bench.py
 """

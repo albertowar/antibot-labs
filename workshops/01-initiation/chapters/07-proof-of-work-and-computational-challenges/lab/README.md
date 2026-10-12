@@ -28,7 +28,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: a `pow` chal
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack and defense and a debrief. See `../chapter_07_content.md`, section 7.7.
+**Format:** 6 rounds of attack and defense, two lessons on PoW in production and the people it hurts, and a debrief. See `../chapter_07_content.md`, section 7.7.
 
 You play both sides. The scraper wants the whole catalog: all 120 product records. The defender puts a proof-of-work (PoW) gate in front of it, and each round tightens the gate.
 
@@ -233,7 +233,7 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 | Attack | `python attacks/round3_solver_pool.py` | `120/120`, 6 solves at 16 bits. Note the **price per 1,000 products** |
 | Checkpoint | `python tools/checkpoint.py --round 3` | solve-once partial (20/120), share stopped, pool gets through, only `no_js` hurt |
 
-**Exercise:** write the bot's price next to Chapter 6's CAPTCHA-farm price (about $1 per 1,000 solves). How many orders of magnitude apart are they? Now take Round 0's GPU figure (~20,000 MH/s of SHA-256) and redo the sum.
+**Exercise:** write the bot's price next to Chapter 6's CAPTCHA-farm price (about $1 per 1,000 solves). How many orders of magnitude apart are they? Now take Round 0's GPU figure (~21,000 MH/s of SHA-256: an RTX 4090 in hashcat 6.2.6's mode 1400 benchmark) and redo the sum.
 
 ---
 
@@ -250,10 +250,26 @@ Then `export DESKTOP_MHS=<browser, 4 workers>` so the simulated shoppers match y
 **False positive:** the `mobile_cgnat` shoppers are budget phones that share two carrier-NAT addresses with their neighbours, so they pay the
 price the neighbours' browsing set. An Android phone at 22 bits needs about 16 s on average and leaves.
 
-**Exercise:** do the `TODO (Round 4)` in `pow_adaptive.py`, which keys the rate by /24 instead of by IP. Re-run the checkpoint.
+**Exercise (discussion):** follow the `Exercise (Round 4, discussion)` note in `pow_adaptive.py`'s `rate_key`, which keys the rate by /24 instead of by IP. Re-run the checkpoint.
 
 - What happens to `round4_distributed`? All its IPs sit in `203.0.113.0/24`.
 - What happens to everybody else in a /24? Chapter 3's IP reputation has the same trade-off.
+
+There is no reference file for this one: the Round 4 checkpoint expects the IP key, so with the /24 key it reports
+`FAIL: round4_distributed: unexpected difficulty [22]`. That is the expected result. `--catch-up` does not undo the edit;
+put `return ip` back before Round 5.
+
+*Model answer (measured on the test machine):*
+
+- **The distributed bot pays.** Its 10 addresses share one counter, so every solve climbs to 22 bits: 120/120 still,
+  but about 900 CPU-s per 1,000 products instead of 10–16. That is the 64× of Round 4's pool.
+- **So do the neighbours.** The 3 `consumer_vpn` shoppers (203.0.113.128/27) share the bot's /24 and pay 22 bits.
+  The 24 `home` shoppers sit in two ISPs' /26s inside 192.0.2.0/24, so they now share one rate, and all of them meet
+  22 bits instead of 16. The desktops still finish in about a second, so nobody new gave up in this run, but a phone in
+  that /24 would. `mobile_cgnat` and `private_relay` share 198.51.100.0/24; 2 of the 8 CGNAT phones gave up, as before.
+- **The lesson:** the bigger the key, the more strangers share a price. A /24 catches the farm and charges everyone
+  near it, which is the same trade-off as Chapter 3's reputation by prefix. The attacker's next move is addresses
+  spread across many /24s: residential proxies.
 
 ---
 
