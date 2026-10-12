@@ -3,7 +3,7 @@ Chapter 4 — Round 1 Attack: Default Headless Sign-up Farm (Section 4.7)
 
 Objective: claim the €10 welcome credit 20 times. Each sign-up uses a fresh
 browser context (new cookies, new session) and a different simulated IP,
-so the IP rate limits from W1 Ch1/Ch2 see 20 unrelated visitors.
+so the IP rate limits from W1 Ch2/Ch3 see 20 unrelated visitors.
 
 The browser is Playwright's default headless Chromium: it runs the
 collector honestly, so the store sees the real render stack of a server

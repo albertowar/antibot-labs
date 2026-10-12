@@ -1,7 +1,7 @@
 """
 Chapter 8: The response ladder's rungs
 
-    pow       hashcash proof-of-work, as in W1 Ch6. Real users' browsers
+    pow       hashcash proof-of-work, as in W1 Ch7. Real users' browsers
               solve it in well under a second. A bot pays the same CPU, which
               is nothing for one login and real money for millions.
     step_up   a one-time code emailed to the account (W2 Ch6). Real users pay

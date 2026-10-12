@@ -1,5 +1,5 @@
 """
-W3 Ch1 — L0 request checks: client shape and per-egress rate (W1 Ch1, Ch3)
+W3 Ch1 — L0 request checks: client shape and per-egress rate (W1 Ch2, Ch4)
 
 The cheapest layer. It runs on every request before any attestation is read.
 For a mobile API the "shape" checks are different from a web page:
@@ -54,7 +54,7 @@ def score_headers(ctx):
 
 
 def score_rate(ctx, store, count=True):
-    """Fixed-window counter per egress IP (W1 Ch1). count=False only reads it."""
+    """Fixed-window counter per egress IP (W1 Ch2). count=False only reads it."""
     points, reasons = 0, []
     minute = int(time.time() // 60)
     key = f"rl:req:{ctx['egress']}:{minute}"

@@ -13,9 +13,9 @@ Contract version: **1.3** (recorded in each starter's `STARTER.json`). Changing 
 | Version | Change |
 |---|---|
 | 1.0 | first version |
-| 1.1 | backward-compatible hook additions from the W1 Ch6 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
+| 1.1 | backward-compatible hook additions from the W1 Ch7 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
 | 1.2 | the series-wide guard: `labnet.py` at the lab root (a byte-identical copy of `scripts/labnet.py`) refuses non-local `DEMO_URL` and side-service URLs; the client moves from `tools/labnet.py` to `tools/labclient.py` (attacks import `labclient`); `checkpoint.py --restore`; `postgres:18.6-alpine` in compose |
-| 1.3 | additive, for W1 Ch2: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
+| 1.3 | additive, for W1 Ch3: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
 
 ## 1. The store
 
@@ -33,7 +33,7 @@ registration). Nothing is real: no payments are processed, every user is synthet
 
 ```
 workshops/01-initiation/starter/     the bare skeleton (this contract, no defenses wired)
-workshops/02-proficient/starter/     W1 Ch8 end state: every W1 defense in the baseline
+workshops/02-proficient/starter/     W1 Ch9 end state: every W1 defense in the baseline
 workshops/03-advanced/starter/       W2 Ch9 end state
 workshops/04-ai-era-bots/starter/    identical to W3's (W3 and W4 depend only on W1 + W2)
 ```
@@ -124,7 +124,7 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
 | `LAB_SHADOW` | 0 | 1 runs above-level checks in shadow (logged, never enforced) |
 | `LAB_SHADOW_CHECKS` | | checks forced to shadow regardless of level (W4 crawler labs) |
 | `LAB_RELOAD` | 1 | reload `defenses/*.py` on change (no restarts between rounds) |
-| `DROP_STOCK` | 50 | units per drop at seed and reset (W1 Ch8 uses 20) |
+| `DROP_STOCK` | 50 | units per drop at seed and reset (W1 Ch9 uses 20) |
 | `LAB_HASH_ITERS` | 5000 | PBKDF2 iterations (lab speed) |
 | `DEMO_URL` | `http://127.0.0.1:5000` | client side; `labnet.py` (via `tools/labclient.py`) refuses non-local hosts |
 
@@ -140,7 +140,7 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
   (W2 Ch5) sets a measured one. Every other `X-Lab-*` request header is dropped.
 - Client-supplied `X-Forwarded-For` is removed from the headers and never trusted by the edge. Like a CDN,
   the edge appends the peer and keeps the chain aside as `ctx.edge.xff_claimed` (`"<client value>, <ip>"`,
-  or just `<ip>`): everything left of the last entry is attacker-controlled. Only W1 Ch2 reads it, to
+  or just `<ip>`): everything left of the last entry is attacker-controlled. Only W1 Ch3 reads it, to
   show the leftmost-entry bug; `ctx.edge.ip` is always the rented address.
 - Defenses see `ctx.edge = EdgeInfo(ip, asn, org, country, pool, ja4, ja4_source, h2, xff_claimed)`. The
   pool's `type` is never exposed; infer it from `data/feeds/*` (`tools/build_world.py`), as production does.
@@ -170,7 +170,7 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
   `created_at`; plus `mallory@example.test` / `mallory-owns-this-1`, the attacker's own account.
   PBKDF2-SHA256 at `LAB_HASH_ITERS`.
 - 200 gift cards `GC-XXXX-XXXX` ($10-$100), ~800 historical orders.
-- `hidden=True` products never appear in listings or the sitemap: the honeypot-SKU hook (W1 Ch7).
+- `hidden=True` products never appear in listings or the sitemap: the honeypot-SKU hook (W1 Ch8).
 - Chapter-specific columns go in the `extra` JSON of each table, or in a chapter's own model.
 
 ### 3.8 Sessions and cookies

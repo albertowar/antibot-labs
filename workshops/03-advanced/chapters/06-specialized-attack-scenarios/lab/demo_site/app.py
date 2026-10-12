@@ -8,8 +8,8 @@ The end-of-Workshop-2 store, extended with the five surfaces this chapter attack
     /register                   Round 4  fake-account farming
     /track/impression /track/click    Round 5  click / ad fraud
 
-The generic layers the store already had (per-IP rate limit from W1 Ch1, datacenter
-detection from W1 Ch2) live in defenses/netintel.py and run on every request. Each
+The generic layers the store already had (per-IP rate limit from W1 Ch2, datacenter
+detection from W1 Ch3) live in defenses/netintel.py and run on every request. Each
 round's *scenario-specific* signature lives in its own defense module under
 defenses/, which starts as a permissive stub you complete. The store calls the
 module fresh on every request, so `checkpoint.py --round N --catch-up` takes effect
@@ -141,7 +141,7 @@ def login():
     password = data.get("password") or ""
     ip = client_ip()
 
-    # Generic layer (W1 Ch1): per-IP login rate limit. A distributed stuffer that
+    # Generic layer (W1 Ch2): per-IP login rate limit. A distributed stuffer that
     # rotates X-Lab-Client-IP resets this counter every request and walks past it.
     if not netintel.rate_ok(rds, f"login:{ip}", limit=20, window_s=60):
         g.lat_ms = (time.perf_counter() - t0) * 1000

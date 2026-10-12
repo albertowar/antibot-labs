@@ -21,7 +21,7 @@ BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
 PAGES = int(os.environ.get("PAGES", "300"))
 
-# What a scraper puts in User-Agent once it has been blocked for python-requests (W1 Ch3)
+# What a scraper puts in User-Agent once it has been blocked for python-requests (W1 Ch4)
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 

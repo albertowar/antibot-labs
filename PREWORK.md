@@ -92,7 +92,7 @@ pip install -r requirements-browser.txt
 python -m playwright install chromium
 ```
 
-Only labs whose README asks for it (W1 Ch8, most of W2, parts of W4) need this.
+Only labs whose README asks for it (W1 Ch9, most of W2, parts of W4) need this.
 
 ## 8. Rules of engagement (you agree to these before your first lab)
 

@@ -2,7 +2,7 @@
 """
 What does a lab add to its starter? File-hash diff of demo_site/, defenses/, tools/, data/.
 
-    python scripts/lab_diff.py workshops/01-initiation/chapters/06-proof-of-work/lab
+    python scripts/lab_diff.py workshops/01-initiation/chapters/07-proof-of-work/lab
     python scripts/lab_diff.py <lab> --write-readme     # refresh the "Adds:" block between
                                                         # <!-- lab-diff:start --> and <!-- lab-diff:end --> in lab/README.md
     python scripts/lab_diff.py <lab> --shared            # assert that modules listed in lab/shared.json match their source labs

@@ -270,7 +270,7 @@ Things to watch for:
 - **Version drift is the whole game.** When Playwright, patchright or Chrome update, rerun `scoreboard.py --bonus` at every level. Then re-capture `tools/profiles/chromium-153-linux.json` with `/capture`, and update the version strings in the synthetic profiles.
 - **Synthetic profiles.** Twelve of the thirteen profiles are synthetic. Their header order and native-code strings come from the real Chromium capture, and the identity values (UA, brands, GPU, geometry) are edited per browser. The Firefox, Safari and resistFingerprinting values are representative, not captured. Ask students to add their own browsers with `/capture` in Round 0. That's the best false-positive data you will get in the room.
 - **Headed attacks.** Every attack runs headless, so no display is needed. If a student runs patchright headed on a real desktop, the SwiftShader signal disappears too.
-- **Docker.** The expected results above were verified on SQLite; the docker compose (PostgreSQL) path is verified separately. It uses the same models and the same compose file as W1 Ch3.
+- **Docker.** The expected results above were verified on SQLite; the docker compose (PostgreSQL) path is verified separately. It uses the same models and the same compose file as W1 Ch4.
 
 ---
 

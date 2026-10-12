@@ -14,7 +14,7 @@ server scores it with the layers enabled by DEFENSE_LEVEL (0-4):
 
 Verdicts (defenses/scoring.py):
     score >= 60  block      403
-    score >= 30  challenge  202  (in production: a CAPTCHA or PoW step-up, W1 Ch5/Ch6)
+    score >= 30  challenge  202  (in production: a CAPTCHA or PoW step-up, W1 Ch6/Ch7)
     score <  30  allow      200  reserved
 
 Debug endpoints (never scored):

@@ -1,12 +1,12 @@
 """
-Workshop 1, Chapter 3 — Defense Layer 1: User-Agent Parsing (Section 4.2)
+Workshop 1, Chapter 4 — Defense Layer 1: User-Agent Parsing (Section 4.2)
 
 Parses the User-Agent with the open source `user-agents` library and scores
 the obvious giveaways: library/CLI/headless markers, empty or truncated UA
 strings, and browser versions that are too old (or on an OS they no longer
 support) to be a real visitor.
 
-In W1 Ch3 this was enabled at DEFENSE_LEVEL >= 1. In W2 Ch1 it is always on (edge_rules.py).
+In W1 Ch4 this was enabled at DEFENSE_LEVEL >= 1. In W2 Ch1 it is always on (edge_rules.py).
 
 (Named ua_inspector, not ua_parser: a local ua_parser.py would shadow the
 ua_parser package that user-agents imports.)

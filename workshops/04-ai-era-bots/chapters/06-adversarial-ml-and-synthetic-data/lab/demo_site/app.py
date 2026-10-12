@@ -103,7 +103,7 @@ PAGE = """<!doctype html>
   {% if home %}
   <p><a href="/product/drop">Limited drop: Model 7 sneakers</a></p>
   <ul>{% for i in range(1, 9) %}<li><a href="/product/{{ i }}">Product {{ i }}</a></li>{% endfor %}</ul>
-  <!-- honeypot (W1 Ch7): invisible to humans, irresistible to crawlers -->
+  <!-- honeypot (W1 Ch8): invisible to humans, irresistible to crawlers -->
   <a href="/specials-archive" class="hp" aria-hidden="true" tabindex="-1">archive</a>
   {% endif %}
   <img src="/img/{{ img }}.svg" alt="">

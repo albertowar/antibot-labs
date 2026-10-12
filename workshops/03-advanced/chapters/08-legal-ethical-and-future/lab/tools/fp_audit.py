@@ -153,7 +153,7 @@ def exposure_notes(policy, cohorts):
     ct = policy.get("challenge_type", "pow")
     if ct == "captcha_thirdparty":
         notes.append("challenge_type captcha_thirdparty: a third party receives device data on every challenge. "
-                     "You need a transfer basis and a consent story (ePrivacy Art 5(3); W1 Ch5, §8.2).")
+                     "You need a transfer basis and a consent story (ePrivacy Art 5(3); W1 Ch6, §8.2).")
     elif ct == "captcha_selfhosted":
         notes.append("challenge_type captcha_selfhosted: no third-party transfer, but a visual CAPTCHA still needs "
                      "an accessible alternative (WCAG 1.1.1).")

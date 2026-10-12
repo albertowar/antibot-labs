@@ -1,7 +1,7 @@
 """Network intelligence and the generic rate limiter — shared, not edited by you.
 
 These are the layers the store already had coming out of Workshop 2: it knows a
-datacenter IP from a residential one (W1 Ch2), and it rate-limits per IP (W1 Ch1).
+datacenter IP from a residential one (W1 Ch3), and it rate-limits per IP (W1 Ch2).
 They are *not* the point of this chapter. Each round shows where these generic
 layers alone fall short and a scenario-specific signature catches what they miss.
 
@@ -50,7 +50,7 @@ def asn_of(client_ip: str) -> str:
 def rate_ok(rds, key: str, limit: int, window_s: int) -> bool:
     """A plain fixed-window per-key counter. True while under the limit.
 
-    This is the generic rate limit from W1 Ch1. It stops a naive single-IP flood
+    This is the generic rate limit from W1 Ch2. It stops a naive single-IP flood
     and nothing more: an attacker who rotates egress resets the key every request.
     """
     bucket = f"rl:{key}:{int(_time() // window_s)}"

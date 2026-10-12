@@ -15,7 +15,7 @@ gets a hard-coded cookie. That's Round 1's attack.
 Who it hurts: everyone with JavaScript off. That includes NoScript users,
 Tor Browser on "Safest", some corporate lockdowns, text browsers, and many
 crawlers you might want (link previews, feed readers, archivers). Decide
-what they get: a no-JS fallback, a CAPTCHA (W1 Ch5), or an allowlist for
+what they get: a no-JS fallback, a CAPTCHA (W1 Ch6), or an allowlist for
 verified bots (W4 Ch2). Don't let the gate decide for you.
 
 Cost: one cookie compare. Effectively free.

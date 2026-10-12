@@ -5,7 +5,7 @@ A crawler announces who it is in the User-Agent string:
     Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
     Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.3; +https://openai.com/gptbot)
 
-Workshop 1, Chapter 3 parsed these for the opposite purpose (spotting scripts).
+Workshop 1, Chapter 4 parsed these for the opposite purpose (spotting scripts).
 Here the token is the *claim* the rest of the gate has to verify. At
 DEFENSE_LEVEL=0 the store believes the claim outright, which is how a lot of real
 allowlists still work and why Round 1 takes ten minutes.

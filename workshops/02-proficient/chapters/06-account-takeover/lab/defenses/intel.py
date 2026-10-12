@@ -2,7 +2,7 @@
 
 Maps a (simulated) client IP to the signals a real edge would attach: the ASN,
 a coarse network type, and a /24 cohort key. In production these come from an IP
-intelligence feed (W1 Ch2) and your CDN; here they come from a small synthetic
+intelligence feed (W1 Ch3) and your CDN; here they come from a small synthetic
 table over documentation and benchmark ranges only (RFC 5737, RFC 6598 CGNAT,
 RFC 2544 benchmark, RFC 5398 documentation ASNs). No real address space is used.
 """

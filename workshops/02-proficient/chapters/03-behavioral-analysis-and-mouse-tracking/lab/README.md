@@ -66,7 +66,7 @@ Each level includes every level below it. `defenses/scoring.py` adds up the poin
 | Score | Verdict | Response | In production |
 |---|---|---|---|
 | **≥ 60** | `block` | **403** | |
-| **≥ 30** | `challenge` | **202** | step up to a CAPTCHA or proof of work (W1 Ch5, Ch6) |
+| **≥ 30** | `challenge` | **202** | step up to a CAPTCHA or proof of work (W1 Ch6, Ch7) |
 | **< 30** | `allow` | **200** | reserved |
 
 These debug endpoints are never scored:

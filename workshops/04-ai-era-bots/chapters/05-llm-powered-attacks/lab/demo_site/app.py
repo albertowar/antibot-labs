@@ -258,7 +258,7 @@ _ROLES = ["grid", "card", "name", "price", "sku", "link", "hidden", "hp", "wrap"
 
 def _classes(session_id: str) -> dict:
     """Per-session class names: a selector written against one session's HTML
-    matches nothing in the next. Cheap layout churn (W1 Ch7)."""
+    matches nothing in the next. Cheap layout churn (W1 Ch8)."""
     salt = app.secret_key
     return {role: "c" + hashlib.sha256(f"{session_id}:{role}:{salt}".encode()).hexdigest()[:6]
             for role in _ROLES}
@@ -307,7 +307,7 @@ def product(sku):
         return jsonify({"outcome": INVALID, "reason": "no such product"}), 404
     g.lat_ms = (time.perf_counter() - t0) * 1000
     if p.honeypot:
-        # Pre-wired (W1 Ch7 / W3 Ch6): nobody is ever shown this SKU. Whoever asks
+        # Pre-wired (W1 Ch8 / W3 Ch6): nobody is ever shown this SKU. Whoever asks
         # for it read something a person cannot see.
         return respond(3, "product", block("fetched a honeypot SKU: only a machine reader finds it", 100.0),
                        extra=f"sku={sku}")

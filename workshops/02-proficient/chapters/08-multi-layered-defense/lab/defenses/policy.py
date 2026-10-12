@@ -26,11 +26,11 @@ positives, and change them with data (tools/sweep.py), not with feelings.
 # sensors/*.py. Which persona does each one hurt? Try changing one weight,
 # run `python tools/sweep.py`, and see who moves.
 WEIGHTS = {
-    # network (W1 Ch2)
+    # network (W1 Ch3)
     "ip_blocklist": 60,
     "tor_exit": 30,      # 40 blocks every Tor Browser user (sweep.py --signal tor_exit)
     "datacenter_asn": 25,
-    # headers (W1 Ch3)
+    # headers (W1 Ch4)
     "http_library_ua": 60,
     "missing_browser_headers": 30,
     "header_order_mismatch": 10,
@@ -38,10 +38,10 @@ WEIGHTS = {
     # TLS (W2 Ch5)
     "ja4_non_browser": 50,
     "ja4_ua_mismatch": 30,
-    # velocity (W1 Ch1)
+    # velocity (W1 Ch2)
     "ip_burst": 30,
     "ip_elevated": 15,
-    # honeypot (W1 Ch7)
+    # honeypot (W1 Ch8)
     "honeypot_filled": 100,
     # automation (W2 Ch1-2)
     "no_telemetry": 40,

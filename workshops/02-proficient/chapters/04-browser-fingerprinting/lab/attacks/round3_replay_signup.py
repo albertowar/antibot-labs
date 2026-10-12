@@ -9,7 +9,7 @@ PC (data/harvested_fp.json). Fingerprint shops sell exactly this.
 
 To make the headers agree with the payload, the attacker sets the full
 User-Agent *and* Client Hints metadata through the Chrome DevTools
-Protocol (Emulation.setUserAgentOverride). That is the step W1 Ch3 Round 5
+Protocol (Emulation.setUserAgentOverride). That is the step W1 Ch4 Round 5
 ended on: every header is now genuine-looking, brands included.
 
 L1 sees a real NVIDIA GPU, L2 finds no contradictions. The weakness:

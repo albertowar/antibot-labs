@@ -2,7 +2,7 @@
 """
 Start (or restart) a chapter lab as a copy of its workshop's starter.
 
-    python scripts/new_lab.py workshops/01-initiation/chapters/03-headers-user-agent-and-client-hints
+    python scripts/new_lab.py workshops/01-initiation/chapters/04-headers-user-agent-and-client-hints
     python scripts/new_lab.py <chapter folder> --force     # replace an existing lab's store files
 
 Copies demo_site/, defenses/, tools/, data/, docker-compose.yml, requirements*.txt, .env.example

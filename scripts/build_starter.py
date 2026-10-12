@@ -2,7 +2,7 @@
 """
 Build a workshop starter from a capstone lab's end state.
 
-    python scripts/build_starter.py --from workshops/01-initiation/chapters/08-mini-capstone/lab
+    python scripts/build_starter.py --from workshops/01-initiation/chapters/09-mini-capstone/lab
     python scripts/build_starter.py --from <capstone lab> --check      # exit 1 on drift, change nothing
 
 The capstone lab declares what "end state" means in starter.manifest.json:

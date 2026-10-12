@@ -49,7 +49,7 @@ DEFENSE_LEVEL=0 python app.py               # http://localhost:5000
 | 3 | + **Correlation layer**, and blocks become indistinguishable from a wrong password | `defenses/correlation.py` |
 | 4 | + **Campaign layer**: a cluster that fails logins like a stuffing run gets a step-up code | `defenses/campaign.py` |
 
-The eight sensors in `defenses/sensors/` run at every level. Each one is a small stand-in for a chapter you have already done (W1 Ch1–3, Ch7; W2 Ch1–5), and each docstring starts with who it hurts by mistake.
+The eight sensors in `defenses/sensors/` run at every level. Each one is a small stand-in for a chapter you have already done (W1 Ch2–4, Ch8; W2 Ch1–5), and each docstring starts with who it hurts by mistake.
 
 Open `http://localhost:5000/login` in your own browser at any level: the page runs a tiny collector, solves the proof-of-work with WebCrypto, and asks for the code (read it at `/lab/mailbox/<email>`) when stepped up. Sign in as `user000@example.test` with the password that `python -c "import demo_site.users as u; print(u.password(0))"` prints.
 

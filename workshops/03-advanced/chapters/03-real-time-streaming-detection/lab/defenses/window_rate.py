@@ -1,7 +1,7 @@
 """
 Round 1 defense — sliding-window rate detector (on the stream)
 
-The static rate limiter from W1 Ch1 counts requests in a *fixed* window: it
+The static rate limiter from W1 Ch2 counts requests in a *fixed* window: it
 resets on the minute, so a burst that straddles the boundary is split in two
 and may never cross the threshold. On a stream we keep a true *sliding*
 window per (IP, endpoint): a sorted set scored by event time, trimmed to the

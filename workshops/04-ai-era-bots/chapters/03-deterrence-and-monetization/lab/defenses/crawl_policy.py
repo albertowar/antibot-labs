@@ -26,7 +26,7 @@ from defenses import crawler_registry as registry
 
 POLICY = {
     # Paths nobody should crawl: the decoy maze (Round 3) and the lab oracle.
-    # Listing a trap here is what makes a hit on it a hard tell (W1 Ch7).
+    # Listing a trap here is what makes a hit on it a hard tell (W1 Ch8).
     "traps": ["/maze/", "/lab/"],
     "license_path": "/license.xml",
 }

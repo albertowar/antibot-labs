@@ -8,7 +8,7 @@ changing everything that depends on it does.
 
   JS vs HTTP     navigator.userAgent vs the User-Agent header;
                  navigator.userAgentData brands/platform vs Sec-CH-UA.
-                 This is the check Workshop 1, Chapter 3 handed over.
+                 This is the check Workshop 1, Chapter 4 handed over.
   Headless shape A desktop browser window has toolbars, so outerHeight is
                  larger than innerHeight. Headless windows have no UI.
   Self-contradiction

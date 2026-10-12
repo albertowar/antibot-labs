@@ -2,7 +2,7 @@
 Chapter 5 — TLS & network scoring engine (Section 5.3)
 
 Runs every layer enabled by DEFENSE_LEVEL and adds up the points, like the
-W1 Ch3 header engine.
+W1 Ch4 header engine.
 
     Level 0  no defense (log fingerprints only)
     Level 1  + edge check and JA4 library denylist   (ja4_denylist.py)

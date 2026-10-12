@@ -1,5 +1,5 @@
 """
-Workshop 1, Chapter 3 — Defense Layer 3b: Header Order Fingerprinting (Section 4.6)
+Workshop 1, Chapter 4 — Defense Layer 3b: Header Order Fingerprinting (Section 4.6)
 
 Browsers emit headers in a fixed order baked into their network stack.
 HTTP libraries use their own order (python-requests always starts with
@@ -16,7 +16,7 @@ CDNs re-order or normalise headers. HTTP/2 lower-cases names, so casing is
 not a signal here. Keep the weight low: alone it should only reach
 "suspicious".
 
-In W1 Ch3 this was enabled at DEFENSE_LEVEL >= 3. In W2 Ch1 it is always on (edge_rules.py).
+In W1 Ch4 this was enabled at DEFENSE_LEVEL >= 3. In W2 Ch1 it is always on (edge_rules.py).
 """
 
 # (before, after) pairs that hold for Chromium on navigation and fetch requests

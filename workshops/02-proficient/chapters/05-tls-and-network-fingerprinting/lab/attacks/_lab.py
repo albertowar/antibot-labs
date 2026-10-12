@@ -21,7 +21,7 @@ CA_FILE = os.path.join(LAB, "certs", "tls.crt")
 BASE_URL = labnet.target("DEMO_URL", "https://localhost:8443")
 ORIGIN_PORT = int(os.environ.get("PORT", "5000"))
 
-# What a W1 Ch3 graduate sends: every header copied from Chrome DevTools.
+# What a W1 Ch4 graduate sends: every header copied from Chrome DevTools.
 # Update the major version to current stable before teaching.
 CHROME_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36")

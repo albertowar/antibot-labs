@@ -1,12 +1,12 @@
 """
 Header templates for real browsers, in wire order.
 
-Built from the W1 Ch3 captures (Chrome 145, Firefox 155)
+Built from the W1 Ch4 captures (Chrome 145, Firefox 155)
 and generalised to other versions and platforms. The shopper simulator uses
 them to look like the browsers real customers run.
 
 Attackers use them too: copying a real browser's headers out of DevTools is
-the first thing any scraper learns (W1 Ch3, Round 3). That is the point.
+the first thing any scraper learns (W1 Ch4, Round 3). That is the point.
 Headers are free to forge; the layers below them are not.
 
 Each function returns a list of (name, value) pairs. `kind` is:

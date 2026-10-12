@@ -4,7 +4,7 @@ Chapter 7 — Weak labels: where "bot" and "human" come from (Section 7.2)
 Nobody hands you a labeled dataset. You assemble one from signals that are
 high-precision but low-coverage:
 
-  bot    = the session hit a honeypot (hidden link or robots-disallowed API, W1 Ch7)
+  bot    = the session hit a honeypot (hidden link or robots-disallowed API, W1 Ch8)
   human  = the session logged into a long-standing account
            (>= 3 past orders, account older than 90 days)
   manual = analyst decisions in data/manual_labels.jsonl (Round 2:

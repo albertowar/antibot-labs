@@ -5,7 +5,7 @@ Two scalper families from earlier chapters, running on cheap cloud servers:
 
   naive_scalper     httpx script: no JS, no assets, metronome pacing.
                     Crawls every link on the home page, including the
-                    hidden honeypot link (W1 Ch7), and pokes the API that
+                    hidden honeypot link (W1 Ch8), and pokes the API that
                     robots.txt disallows.
   headless_scalper  automated Chrome with the webdriver flag patched
                     (W2 Ch1): loads assets, runs the page collector, but
@@ -51,7 +51,7 @@ def naive_scalper(rng):
     ip, _ = labnet.Pool("datacenter", rng=rng).next()
     if rng.random() < 0.5:
         ua, headers = "python-httpx/0.28.1", {}
-    else:  # borrowed Chrome UA, nothing else (W1 Ch3 Round 2)
+    else:  # borrowed Chrome UA, nothing else (W1 Ch4 Round 2)
         ua, headers = UA["chrome_win"], {"Accept": "*/*"}
     return Persona(actor="round0_baseline", cohort="naive_scalper", is_bot=True, ip=ip,
                    user_agent=ua, headers=headers, fp=None, behavior=None,
