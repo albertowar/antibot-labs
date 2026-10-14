@@ -62,9 +62,11 @@ def estimate(redis, key, limit, window, now=None):
 def _check(ctx):
     ip = client_ip(ctx)
     limit, window = policy.SLIDING_WINDOW
-    allowed, _est, retry = estimate(ctx.redis, ip, limit, window)
-    if not allowed:
-        return Verdict("rate_limit", retry_after=retry, signals=(Signal("rate_limit", "sliding_window", 0, ip),))
+    # TODO (Round 3, if you pick this over the token bucket): judge the request with
+    # estimate(ctx.redis, ip, limit, window) above and turn a refusal into a
+    # Verdict("rate_limit", retry_after=..., signals=(Signal("rate_limit",
+    # "sliding_window", 0, ip),)). Run it next to the bucket in tools/limiter_lab.py
+    # and watch the boundary burst die.
     return None
 
 

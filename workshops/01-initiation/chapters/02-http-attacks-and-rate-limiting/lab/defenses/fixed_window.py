@@ -48,9 +48,10 @@ def hit(redis, key, limit, window, now=None):
 def _check(ctx):
     ip = client_ip(ctx)
     limit, window = policy.FIXED_WINDOW
-    allowed, retry = hit(ctx.redis, ip, limit, window)
-    if not allowed:
-        return Verdict("rate_limit", retry_after=retry, signals=(Signal("rate_limit", "fixed_window", 0, ip),))
+    # TODO (Round 2): spend this request against hit(ctx.redis, ip, limit, window) above.
+    # When it refuses, return Verdict("rate_limit", retry_after=<what hit computed>,
+    # signals=(Signal("rate_limit", "fixed_window", 0, ip),)) — the Retry-After header is
+    # how a 429 stays polite. Watch hit() on its own first: python tools/limiter_lab.py.
     return None
 
 

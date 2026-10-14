@@ -33,13 +33,14 @@ def _check(ctx):
     chain = forwarded_chain(ctx)
     if len(chain) < 2:
         return None
-    claimed = _valid_ip(chain[0])
-    if claimed == ctx.edge.ip:
-        return None                    # the client told the truth
-    if claimed is None:
-        return [Signal("trusted_proxy", "xff_mismatch", policy.XFF_POINTS["xff_mismatch"], chain[0][:40])]
-    name = "xff_internal_claim" if is_internal(claimed) else "xff_mismatch"
-    return [Signal("trusted_proxy", name, policy.XFF_POINTS[name], claimed)]
+    # TODO (Round 5): two jobs. Wiring a check with this name into the ladder is half of
+    # it — client_ip() flips to the right-hand reader the moment "trusted_proxy" is
+    # enforced — but that reader is yours to write too (the other TODO (Round 5), in
+    # defenses/client_ip.py). What is left here: compare the leftmost claim
+    # (_valid_ip(chain[0])) against ctx.edge.ip, and when they disagree return the
+    # xff_mismatch / xff_internal_claim Signal (points in policy.XFF_POINTS) so the
+    # forged chains show up in the decision log.
+    return None
 
 
 CHECK = Check("trusted_proxy", _check)

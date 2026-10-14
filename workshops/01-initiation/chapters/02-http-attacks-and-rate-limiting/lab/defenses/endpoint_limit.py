@@ -35,9 +35,11 @@ def _check(ctx):
     bucket = policy.ENDPOINT_LIMITS.get(name) if name else None
     if not bucket:
         return None
-    if not ctx.bucket(bucket, client_ip(ctx)):
-        return Verdict("rate_limit", retry_after=10,
-                       signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0, client_ip(ctx)),))
+    # TODO (Round 4): spend from the endpoint's own bucket — ctx.bucket(bucket,
+    # client_ip(ctx)) — and when it is empty return Verdict("rate_limit",
+    # retry_after=10, signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0,
+    # client_ip(ctx)),)). A browsing session never touches login_ip; a stuffing run
+    # drains it in ten tries.
     return None
 
 

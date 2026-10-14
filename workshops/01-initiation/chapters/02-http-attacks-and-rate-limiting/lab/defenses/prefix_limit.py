@@ -31,10 +31,11 @@ def _check(ctx):
     ip = client_ip(ctx)
     if is_internal(ip):
         return None
-    bucket = "prefix" if ipaddress.ip_address(ip).version == 4 else "prefix6"
-    prefix = prefix_of(ip)
-    if not ctx.bucket(bucket, prefix):
-        return Verdict("rate_limit", retry_after=2, signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0, prefix),))
+    # TODO (Round 5): pick the bucket by address family — "prefix" for IPv4 (/24),
+    # "prefix6" for IPv6 (/64) — key it on prefix_of(ip), and when
+    # ctx.bucket(bucket, prefix) refuses, return Verdict("rate_limit", retry_after=2,
+    # signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0, prefix),)). Shared with
+    # Chapter 3: its lab starts from the reference version of this file.
     return None
 
 

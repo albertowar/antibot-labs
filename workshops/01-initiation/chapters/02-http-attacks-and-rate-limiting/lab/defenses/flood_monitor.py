@@ -32,9 +32,12 @@ from .store import Counters
 def _check(ctx):
     ip = client_ip(ctx)
     threshold, window = policy.FLOOD_MONITOR
-    n = Counters(ctx.redis, "lab:fm").hit("req", ip, window)
-    if n > threshold:
-        return [Signal("flood_monitor", "high_rate", policy.FLOOD_MONITOR_POINTS, f"{ip} {n}/{window}s")]
+    # TODO (Round 1): count this request for `ip` in a sliding log —
+    # Counters(ctx.redis, "lab:fm").hit("req", ip, window) returns the count — and once
+    # it passes `threshold`, return a list with one Signal("flood_monitor", "high_rate",
+    # policy.FLOOD_MONITOR_POINTS, ...) naming the address and its rate. The request is
+    # still served either way: a monitor's whole job is the decision log. Until you
+    # write it, wire it and run the flood: /lab/decisions stays empty.
     return None
 
 

@@ -69,13 +69,13 @@ def naive_client_ip(ctx):
 
 def trusted_client_ip(ctx, trusted_proxies=TRUSTED_PROXIES):
     """Walk X-Forwarded-For from the right and return the first hop we don't operate."""
-    for hop in reversed(forwarded_chain(ctx)):
-        ip = _valid_ip(hop)
-        if ip is None:
-            break                      # garbage in the chain: stop, fall back to the peer
-        if ip not in trusted_proxies:
-            return ip
-    return ctx.edge.ip
+    # TODO (Round 5): walk forwarded_chain(ctx) in REVERSE, skip every hop that is in
+    # `trusted_proxies` (those are yours), and return the first address you do not
+    # operate: the client as your edge saw it. A hop that is not a valid address means
+    # the chain is garbage — stop and fall back to the peer (ctx.edge.ip). Until you
+    # write it, this still believes the leftmost claim, so wiring trusted_proxy into
+    # the ladder fixes nothing and the xff attack stays at 120/120.
+    return naive_client_ip(ctx)
 
 
 def trusted_proxy_enforced(ctx):

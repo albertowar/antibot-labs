@@ -46,10 +46,12 @@ def _check(ctx):
     if not email:
         return None
     attempts, window = policy.ACCOUNT_LIMIT
-    n = Counters(ctx.redis, "lab:acct").hit("login", email, window)
-    if n > attempts:
-        return Verdict("rate_limit", retry_after=policy.ACCOUNT_RETRY_AFTER,
-                       signals=(Signal("rate_limit", "account_login_rate", 0, email),))
+    # TODO (Round 4): count this attempt against `email` in a sliding log —
+    # Counters(ctx.redis, "lab:acct").hit("login", email, window) — on EVERY attempt,
+    # real account or not, BEFORE the password is checked (the docstring says why), and
+    # past `attempts` return Verdict("rate_limit",
+    # retry_after=policy.ACCOUNT_RETRY_AFTER, signals=(Signal("rate_limit",
+    # "account_login_rate", 0, email),)).
     return None
 
 

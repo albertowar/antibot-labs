@@ -29,13 +29,12 @@ from .pipeline import Check, Signal, Verdict
 
 def _check(ctx):
     ip = client_ip(ctx)
-    buckets = [("ip", ip)]
-    if ctx.method == "POST" and ctx.path == "/checkout":
-        buckets.append(("checkout_ip", ip))
-    for bucket, key in buckets:
-        if not ctx.bucket(bucket, key):
-            return Verdict("rate_limit", retry_after=2,
-                           signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0, key),))
+    # TODO (Round 3): spend one token from the "ip" bucket — ctx.bucket("ip", ip) is the
+    # atomic check-and-take, sized by policy.RATE_LIMITS — and on POST /checkout spend
+    # from the tighter "checkout_ip" bucket too. The first empty bucket is a
+    # Verdict("rate_limit", retry_after=2, signals=(Signal("rate_limit",
+    # f"{bucket}_rate_limit", 0, key),)). Shared with Chapter 3: its lab starts from the
+    # reference version of this file.
     return None
 
 
