@@ -1,6 +1,6 @@
 # Chapter 1 Lab: Browser Automation Detection
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.3). Adds: W1 Ch4's header rules as the Round 0 layer, a bot sensor on every store page (telemetry kind `sensor`), a sensor gate and four layer checks on `/api/products` and `/api/cart/add`, `/lab/sensor/*` and `/lab/capture`, eight bots and 13 real-browser profiles the shoppers replay.
+Starts from: `workshops/02-proficient/starter/` (contract 1.4). Adds: W1 Ch4's header rules as the Round 0 layer, a bot sensor on every store page (telemetry kind `sensor`), a sensor gate and four layer checks on `/api/products` and `/api/cart/add`, `/lab/sensor/*` and `/lab/capture`, eight bots and 13 real-browser profiles the shoppers replay.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

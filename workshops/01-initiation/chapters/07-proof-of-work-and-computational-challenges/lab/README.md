@@ -1,6 +1,6 @@
 # Chapter 7 Lab: The Price of a Page
 
-Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: a `pow` challenge type, a three-scheme verifier (naive, signed, single-use), a pass budget and adaptive difficulty, the browser solver, six attack scripts and the Chapter 7 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: a `pow` challenge type, a three-scheme verifier (naive, signed, single-use), a pass budget and adaptive difficulty, the browser solver, six attack scripts and the Chapter 7 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

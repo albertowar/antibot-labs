@@ -125,7 +125,7 @@ class LabClient:
 
     def verdict(self):
         r = self.last
-        return (r.headers.get("X-Lab-Verdict"), r.headers.get("X-Lab-Score"), r.headers.get("X-Lab-Signals", "")) if r else None
+        return (r.headers.get("X-Lab-Verdict"), r.headers.get("X-Lab-Score"), r.headers.get("X-Lab-Signals", "")) if r is not None else None
 
 
 # --- Reading the store's pages (what a scraper or the JS on the page would see) ---

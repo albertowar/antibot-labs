@@ -1,6 +1,6 @@
 # Chapter 2 Lab: JavaScript Challenges & Obfuscation
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.3). Adds: a registered `js` challenge type (cookie gate, signed single-use nonce, an obfuscated variant pool, an environment-bound answer, a clearance budget), the gate that serves it on the catalogue, the Node build of the variant pool, six bots and the shoppers' challenge solver.
+Starts from: `workshops/02-proficient/starter/` (contract 1.4). Adds: a registered `js` challenge type (cookie gate, signed single-use nonce, an obfuscated variant pool, an environment-bound answer, a clearance budget), the gate that serves it on the catalogue, the Node build of the variant pool, six bots and the shoppers' challenge solver.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

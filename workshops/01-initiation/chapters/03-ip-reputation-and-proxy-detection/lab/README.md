@@ -1,6 +1,6 @@
 # Chapter 3 Lab: Who Is Knocking?
 
-Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: six IP checks (`rate_limit`, `blocklists`, `ip_reputation`, `trusted_proxy`, `prefix_limit`, `geo_velocity`) on a shared feed index and client-IP helper, the `/lab/ip-check/<ip>` page, five attack scripts on one shared scraper and the Chapter 3 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: six IP checks (`rate_limit`, `blocklists`, `ip_reputation`, `trusted_proxy`, `prefix_limit`, `geo_velocity`) on a shared feed index and client-IP helper, the `/lab/ip-check/<ip>` page, five attack scripts on one shared scraper and the Chapter 3 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

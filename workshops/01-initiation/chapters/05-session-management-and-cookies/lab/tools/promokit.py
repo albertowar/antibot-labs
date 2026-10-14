@@ -60,8 +60,7 @@ def decode_cookie(value):
 
 
 def tally(client, counter):
-    # Read the header off the last response directly: LabClient.verdict() returns None for any
-    # non-2xx response (a requests.Response is falsy when not .ok), which hides blocks.
+    # Read the signals off the last response directly, so blocked (4xx) responses count too.
     r = client.last
     sigs = r.headers.get("X-Lab-Signals", "") if r is not None else ""
     for flag in filter(None, sigs.split(",")):

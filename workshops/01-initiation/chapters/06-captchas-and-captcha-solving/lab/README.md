@@ -1,6 +1,6 @@
 # Chapter 6 Lab: Price the Puzzle
 
-Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: the `captcha` challenge type and widget templates, the Turnstile-style siteverify check, the self-hosted image CAPTCHA and its challenge store, the solver signals, the local mock provider, eight attack scripts (bypass, replay, OCR, farm) and the Chapter 6 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: the `captcha` challenge type and widget templates, the Turnstile-style siteverify check, the self-hosted image CAPTCHA and its challenge store, the solver signals, the local mock provider, eight attack scripts (bypass, replay, OCR, farm) and the Chapter 6 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

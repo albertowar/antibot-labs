@@ -6,7 +6,7 @@ and the hook points a chapter uses to add a defense or a feature. The Demo Store
 (`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
-Contract version: **1.3** (recorded in each starter's `STARTER.json`). Changing anything under
+Contract version: **1.4** (recorded in each starter's `STARTER.json`). Changing anything under
 "Canonical surface" is a contract bump: rebuild the starters (`scripts/build_starter.py`) and rerun
 `tools/smoke.py` in every lab.
 
@@ -16,6 +16,7 @@ Contract version: **1.3** (recorded in each starter's `STARTER.json`). Changing 
 | 1.1 | backward-compatible hook additions from the W1 Ch7 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
 | 1.2 | the series-wide guard: `labnet.py` at the lab root (a byte-identical copy of `scripts/labnet.py`) refuses non-local `DEMO_URL` and side-service URLs; the client moves from `tools/labnet.py` to `tools/labclient.py` (attacks import `labclient`); `checkpoint.py --restore`; `postgres:18.6-alpine` in compose |
 | 1.3 | additive, for W1 Ch3: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
+| 1.4 | two fixes: the baseline pins `fakeredis[lua]` so `ctx.bucket` (a Lua script) works on `REDIS_URL=memory://` instead of raising into a silent `<check>:error` allow, and `smoke.py` exercises it once; `LabClient.verdict()` returns the `X-Lab-Verdict`/`X-Lab-Score`/`X-Lab-Signals` of a blocked (4xx) response instead of `None` (the old guard treated a falsy `requests.Response` as "no response") |
 
 ## 1. The store
 
@@ -49,7 +50,7 @@ state: each workshop runs on its own, and a chapter that needs an earlier contro
 header rules, say) adds it in its own lab. A baseline that ever grows is listed in its starter's README,
 with why each control is there.
 
-Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.3). Adds: …`.
+Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.4). Adds: …`.
 
 ## 3. Canonical surface
 

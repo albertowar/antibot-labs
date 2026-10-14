@@ -66,8 +66,20 @@ def check_world(client):
         check(ips and len(set(ips)) == len(ips), f"group {g}: empty or duplicate addresses")
 
 
+def check_bucket():
+    """ctx.bucket's Lua script must run on the configured backend (plain fakeredis has no Lua)."""
+    from defenses import store as dstore
+    try:
+        r = dstore.get_redis()
+        takes = [dstore.token_bucket(r, "smoke", "smoke-bucket", limits={"smoke": (2, 0.001)}) for _ in range(3)]
+        check(takes == [True, True, False], f"token_bucket: bucket of 2 gave {takes}, expected [True, True, False]")
+    except Exception as e:
+        check(False, f"token_bucket raised {type(e).__name__}: {e} (fakeredis needs the [lua] extra)")
+
+
 def run():
     admin("POST", "/lab/reset")
+    check_bucket()
     for path in GETS:
         r = requests.get(BASE_URL + path, timeout=30)
         check(r.status_code == 200, f"GET {path} -> {r.status_code}")
