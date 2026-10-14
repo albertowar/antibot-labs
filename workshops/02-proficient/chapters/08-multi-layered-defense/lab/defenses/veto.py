@@ -1,25 +1,22 @@
 """
-Chapter 8, Round 1: The veto chain (DEFENSE_LEVEL = 1)
+Round 1: The veto chain (DEFENSE_LEVEL = 1)
 
-This is how most stacks grow: every chapter's defense was added with its own
-"block if" rule, and any one of them can reject the request. Each layer was
-tuned on its own data, so each one looks fine in isolation.
+This is how most stacks grow: every chapter's defense was added with its own "block if" rule, and
+any one of them can reject the request. Each layer was tuned on its own data, so each one looks
+fine in isolation.
 
 Two problems appear the moment you run them together:
 
-1. False positives add up. Every layer blocks the slice of real users that
-   looks odd *to that layer*: VPN users at the network layer,
-   keyboard-only users at the behaviour layer, privacy browsers at the
-   fingerprint layer. The slices barely overlap, so the union is roughly
-   the sum: 1 - prod(1 - fp_i).
-2. Detection does not add up. A bot that keeps every layer just under its
-   own line sails through, however many weak signals it shows at once.
-   That is Round 1's attack.
+1. False positives add up. Every layer blocks the slice of real users that looks odd *to that
+   layer*: VPN users at the network layer, keyboard-only users at the behaviour layer, privacy
+   browsers at the fingerprint layer. The slices barely overlap, so the union is roughly the sum:
+   1 - prod(1 - fp_i).
+2. Detection does not add up. A bot that keeps every layer just under its own line sails through,
+   however many weak signals it shows at once. That is Round 1's attack.
 
-The points are the same WEIGHTS that policy.py uses, summed per layer.
+The points are the same WEIGHTS that policy.py uses, summed per layer. policy.decide() calls
+`blocking_layer()` at level 1 and ignores the score.
 """
-
-from policy import WEIGHTS
 
 # Each layer blocks when its own points reach this line
 VETO_AT = {
@@ -34,14 +31,19 @@ VETO_AT = {
 }
 
 
-def layer_points(signals_by_layer):
-    return {layer: sum(WEIGHTS.get(s, 0) for s in signals)
-            for layer, signals in signals_by_layer.items()}
+def layer_points(signals):
+    """{layer: points} for a list of Signals (or (layer, points) pairs)."""
+    out = {}
+    for s in signals:
+        layer, points = (s.layer, s.points) if hasattr(s, "layer") else s
+        out[layer] = out.get(layer, 0) + points
+    return out
 
 
-def decide(signals_by_layer):
-    """Return ("block", layer) for the first layer over its line, else ("allow", None)."""
-    for layer, points in layer_points(signals_by_layer).items():
-        if layer in VETO_AT and points >= VETO_AT[layer]:
-            return "block", layer
-    return "allow", None
+def blocking_layer(signals):
+    """The first layer over its own line, or None. Layers in VETO_AT order, cheapest first."""
+    points = layer_points(signals)
+    for layer, line in VETO_AT.items():
+        if points.get(layer, 0) >= line:
+            return layer
+    return None

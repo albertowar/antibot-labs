@@ -1,53 +1,60 @@
 """
-Chapter 8: Reading the decision log
+Chapter 8: reading the decision log
 
-Shared by checkpoint.py, layer_report.py and sweep.py. The log is one JSON
-object per line, written by demo_site/app.py for every scored login:
+Shared by checkpoint.py, layer_report.py and sweep.py. The store logs one row per gated request
+(GET /lab/decisions). The rows that matter here are the logins:
 
-    actor     human:<persona>      ground truth, from X-Lab-Actor (never read by a defense)
-    signals   {layer: [signal...]} what every sensor reported
-    score     the policy.py score of those signals
-    action    allow | pow | step_up | block   what the decision engine chose
-    cred      valid | wrong_password | unknown_user
-    ms        pipeline time for this request
+    phase     action:login
+    actor     human:<persona>:<id>   ground truth, from X-Lab-Actor (no defense reads it)
+    action    the highest-score decision of the request (a 0-point campaign step-up reads "allow")
+    outcome   served | challenged | blocked | deceived: what the client actually got
+    ms        gate time for this request (the defender's cost)
+    extra     signals {layer: [name, ...]}  what every layer reported (also at level 0)
+              cluster, cred                 the campaign layer's key and the password outcome (level 4)
+              cleared                       the challenge type this request had already solved
+
+A challenged person logs in twice: the first row is the scored attempt, the second (extra.cleared)
+is the same attempt resumed. `attempts()` keeps the first.
 """
 
-import json
 import os
-import sys
 import statistics
-import urllib.request
+import sys
 
-LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-LOG_PATH = os.environ.get("DECISION_LOG", os.path.join(LAB, "decision_log.jsonl"))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import labclient  # noqa: E402  (lab root on sys.path; runs the labnet guard)
 
-CHALLENGES = ("pow", "step_up")
+LOGIN = ("/api/login", "/login")
+CHALLENGES = ("challenge",)
 
 
-def read_log(path=LOG_PATH):
-    if not os.path.exists(path):
-        return []
-    with open(path) as f:
-        return [json.loads(line) for line in f if line.strip()]
+def read_log(since=None):
+    """Every login POST of the lab's human customers since `since`, oldest first."""
+    rows = []
+    for path in LOGIN:
+        params = {"path": path, "limit": 5000, "actor": "human:"}
+        if since:
+            params["since"] = since
+        rows += labclient.admin("GET", "/lab/decisions", params=params)["items"]
+    rows = [r for r in rows if r["phase"] == "action:login" and r["method"] == "POST"]
+    return sorted(rows, key=lambda r: (r["ts"], r.get("sid") or ""))
 
 
-def decisions(entries):
-    return [e for e in entries if e["type"] == "decision"]
+def attempts(rows):
+    """The scored attempt of each login (not the retry after a solved challenge)."""
+    return [r for r in rows if not (r.get("extra") or {}).get("cleared")]
 
 
-def humans(entries):
-    return [e for e in decisions(entries) if e["actor"].startswith("human:")]
+def persona(row):
+    return row["actor"].split(":")[1]
 
 
-def persona(entry):
-    return entry["actor"].split(":", 1)[1]
+def layers(row):
+    return (row.get("extra") or {}).get("signals") or {}
 
 
-def flat_signals(entry):
-    return [s for sigs in entry["signals"].values() for s in sigs]
+def flat_signals(row):
+    return [s for names in layers(row).values() for s in names]
 
 
 def percentiles(values):
@@ -56,17 +63,6 @@ def percentiles(values):
     if len(values) < 2:
         return values[0], values[0]
     return statistics.median(values), statistics.quantiles(values, n=20)[-1]
-
-
-def server_status():
-    with urllib.request.urlopen(f"{BASE_URL}/lab/status", timeout=5) as r:
-        return json.loads(r.read())
-
-
-def server_reset():
-    req = urllib.request.Request(f"{BASE_URL}/lab/reset", method="POST")
-    with urllib.request.urlopen(req, timeout=5) as r:
-        return json.loads(r.read())
 
 
 def pct(n, total):

@@ -1,71 +1,134 @@
 """
-Chapter 8: The detection pipeline
+The engine: Signal, Verdict, Check and run().
 
-    edge attributes + request + session telemetry
-        -> sensors (always; cheapest first)
-        -> correlation (level >= 3) -> campaign (level >= 4)
-        -> decision engine: none (0), veto chain (1), score + ladder (2+)
+Every check turns what it sees into Signals on one 0-100 scale, or into a hard
+Verdict. The engine adds the points up and policy.decide() maps the sum to
+allow / monitor / challenge / block. One scale, because:
+  - weak evidence adds up: an odd header (15) from a hosting ASN (25) earns a
+    challenge (40); either alone does not;
+  - strong evidence still wins alone: a honeypot hit (100) blocks by itself;
+  - every decision can be explained: the log lists each signal and its points.
 
-    Level 0  shadow mode: every sensor runs and logs, nothing is enforced
-    Level 1  veto chain:  any layer over its own line blocks       (veto.py)
-    Level 2  risk score:  one score, response ladder               (policy.py)
-    Level 3  + correlation layer, opaque and deceptive responses   (correlation.py)
-    Level 4  + campaign layer and step-up                          (campaign.py)
+Order matters for cost, not for the verdict. A hard verdict (rate_limit, block,
+deceive) stops the gate, so put the cheap, certain checks first.
 
-The pipeline returns a Decision and never touches the response. Turning a
-decision into an HTTP response (and choosing how much to tell the client)
-is the app's job; see respond() in demo_site/app.py.
+Levels: ladder.LADDER[k] runs enforced when k <= DEFENSE_LEVEL. Higher levels
+run in shadow when LAB_SHADOW=1 (logged, never enforced), which is how you
+measure a new layer's false positives before turning it on.
+
+Trade-off baked in here: additive scores assume independent signals. They are
+not (a cloud VM is usually also a hosting ASN). W2 Ch8 replaces the sum with
+calibrated weights; the starter keeps it readable.
 """
 
 import time
 from dataclasses import dataclass, field
+from typing import Callable, Iterable, Optional
 
-import campaign
-import correlation
-import policy
-import veto
-from sensors import BASE_SENSORS
+HARD_ACTIONS = ("rate_limit", "block", "deceive")
+ACTIONS = ("allow", "monitor", "challenge") + HARD_ACTIONS
 
 
-@dataclass
-class Context:
-    edge: dict          # resolved by the edge: ip, asn, type, tz, blocklisted
-    ja4: str            # from the edge's TLS terminator
-    headers: list       # [(name, value)] in arrival order, lab headers removed
-    ua: dict            # parsed User-Agent
-    telemetry: dict     # features from /telemetry, or None
-    form: dict
-    counters: object
-    sid: str
+@dataclass(frozen=True)
+class Signal:
+    layer: str              # which check produced it: "headers", "ip_reputation", ...
+    name: str               # what it means: "datacenter", "honeypot_field", ...
+    points: int = 0
+    detail: str = ""
+
+    def flag(self):
+        return f"{self.layer}:{self.name}"
+
+
+@dataclass(frozen=True)
+class Verdict:
+    action: str = "allow"
+    score: int = 0
+    signals: tuple = ()
+    challenge: Optional[str] = None     # challenge type to serve when action == "challenge"
+    retry_after: int = 0                # seconds, for rate_limit
+
+
+@dataclass(frozen=True)
+class Check:
+    name: str
+    fn: Callable
+    phases: tuple = ("request",)        # "request" | "action:<name>" | "action:*" | "response" | "ws:*"
+    shadow: bool = False                # force shadow regardless of level
+
+    def applies(self, phase):
+        for p in self.phases:
+            if p == phase or p == "*":
+                return True
+            if p.endswith("*") and phase.startswith(p[:-1]):
+                return True
+        return False
 
 
 @dataclass
 class Decision:
-    signals: dict = field(default_factory=dict)   # {layer: [signal, ...]}
+    action: str = "allow"
     score: int = 0
-    action: str = "allow"                         # allow | pow | step_up | block
-    veto_layer: str = None
-    ms: float = 0.0
+    signals: list = field(default_factory=list)
+    checks: list = field(default_factory=list)       # [(name, ms)]
+    shadow: list = field(default_factory=list)       # signals from shadow checks
+    challenge: Optional[str] = None
+    retry_after: int = 0
+    hard_by: Optional[str] = None                    # check that short-circuited
 
-    def reasons(self):
-        return [f"[{layer}] {s} (+{policy.WEIGHTS.get(s, 0)})"
-                for layer, sigs in self.signals.items() for s in sigs]
+    def flags(self):
+        return [s.flag() for s in self.signals if s.points or s.layer == "rate_limit" or s.name in ("hard", "trap")]
+
+    def shadow_flags(self):
+        return [s.flag() for s in self.shadow if s.points]
 
 
-def evaluate(ctx, level):
-    started = time.perf_counter()
-    signals = {sensor.LAYER: sensor.sense(ctx) for sensor in BASE_SENSORS}
-    if level >= 3:
-        signals[correlation.LAYER] = correlation.sense(ctx)
-    if level >= 4:
-        signals[campaign.LAYER] = campaign.sense(ctx)
+def _normalise(check, out):
+    """A check may return None, an iterable of Signals, or a Verdict."""
+    if out is None:
+        return Verdict()
+    if isinstance(out, Verdict):
+        return out
+    sigs = tuple(out)
+    return Verdict(action="allow", score=sum(s.points for s in sigs), signals=sigs)
 
-    flat = [s for sigs in signals.values() for s in sigs]
-    decision = Decision(signals={k: v for k, v in signals.items() if v},
-                        score=policy.score(flat))
-    if level == 1:
-        decision.action, decision.veto_layer = veto.decide(signals)
-    elif level >= 2:
-        decision.action, _ = policy.decide(flat)
-    decision.ms = (time.perf_counter() - started) * 1000
-    return decision
+
+def run(phase, ctx, ladder, level, shadow_enabled=False, shadow_names=(), policy=None):
+    """Run every applicable check for `phase`. Returns a Decision."""
+    from . import policy as default_policy
+    policy = policy or default_policy
+    d = Decision()
+    ctx.phase, ctx.level = phase, level
+    for k in sorted(ladder):
+        enforced = k <= level
+        if not enforced and not shadow_enabled:
+            continue
+        for check in ladder[k]:
+            if not check.applies(phase):
+                continue
+            is_shadow = (not enforced) or check.shadow or check.name in shadow_names
+            t0 = time.perf_counter()
+            try:
+                v = _normalise(check, check.fn(ctx))
+            except Exception as e:                      # a broken check must never take the store down
+                v = Verdict(signals=(Signal(check.name, "error", 0, repr(e)),))
+            d.checks.append((check.name, (time.perf_counter() - t0) * 1000))
+            if is_shadow:
+                d.shadow.extend(v.signals)
+                if v.action in HARD_ACTIONS:
+                    d.shadow.append(Signal(check.name, v.action, 100, "shadow hard verdict"))
+                continue
+            d.signals.extend(v.signals)
+            if v.action in HARD_ACTIONS:
+                d.action, d.hard_by, d.retry_after = v.action, check.name, v.retry_after
+                d.score = 100 if v.action != "rate_limit" else d.score
+                if not v.signals:
+                    d.signals.append(Signal(check.name, "hard", 0, v.action))
+                return d
+            if v.challenge and not d.challenge:
+                d.challenge = v.challenge
+    d.score = min(100, sum(s.points for s in d.signals))
+    d.action = policy.decide(d.score, d.signals, level)
+    if d.action == "challenge" and not d.challenge:
+        d.challenge = policy.DEFAULT_CHALLENGE
+    return d

@@ -1,164 +1,93 @@
 """
-Chapter 8: Shared counter store (Redis, or memory:// without Docker)
+Shared Redis helpers for every defense.
 
-Several layers keep state that has to be the same on every app server:
-per-IP velocity, telemetry replay, fingerprint reuse and the campaign
-counters. In production that state lives in Redis (or Valkey), never in one
-process. Two app servers that each keep their own counters see half the
-attack each.
+    REDIS_URL=memory://                   default: in-process fakeredis (single process, lab only)
+    REDIS_URL=redis://localhost:6379/0    docker compose
 
-    REDIS_URL=redis://localhost:6379/0   default, from ../docker-compose.yml
-    REDIS_URL=memory://                  in-process fallback for laptops without Docker
-
-Trade-offs:
-- Every counter is a network round trip on the request path. The pipeline
-  makes about ten of them per login, which is most of the "defender cost"
-  that the checkpoint reports. Batch with pipelines or move the
-  non-blocking counters off the request path once you have more traffic.
-- Fixed windows (INCR + EXPIRE) are cheap but reset all at once. An attacker
-  who learns the window can pace around it (Round 4).
-- If Redis is down, decide per layer whether to fail open or closed
-  (Section 8.4). This lab fails loudly so you notice.
+The in-process fallback loses all state on restart and only works because the
+store is the one process talking to it. Production uses the real thing.
 """
 
-import fnmatch
+import ipaddress
 import os
-import threading
 import time
 
-PREFIX = "w2ch8:"
-WINDOW_S = 600  # every counter in this lab uses a 10-minute window
+_client = None
+
+TOKEN_BUCKET_LUA = """
+local key      = KEYS[1]
+local capacity = tonumber(ARGV[1])
+local refill   = tonumber(ARGV[2])
+local now      = tonumber(ARGV[3])
+local state  = redis.call('HMGET', key, 'tokens', 'ts')
+local tokens = tonumber(state[1]) or capacity
+local ts     = tonumber(state[2]) or now
+tokens = math.min(capacity, tokens + (now - ts) * refill)
+local allowed = 0
+if tokens >= 1 then
+  tokens = tokens - 1
+  allowed = 1
+end
+redis.call('HSET', key, 'tokens', tokens, 'ts', now)
+redis.call('EXPIRE', key, math.ceil(capacity / refill) + 1)
+return allowed
+"""
+_scripts = {}
 
 
-class MemoryStore:
-    """Just enough of the Redis API for the lab, with expiry. Thread-safe."""
-
-    def __init__(self):
-        self._data, self._expiry = {}, {}
-        self._lock = threading.Lock()
-
-    def _live(self, key):
-        if key in self._expiry and self._expiry[key] < time.time():
-            self._data.pop(key, None)
-            self._expiry.pop(key, None)
-        return key in self._data
-
-    def get(self, key):
-        with self._lock:
-            return self._data.get(key) if self._live(key) else None
-
-    def set(self, key, value, ex=None):
-        with self._lock:
-            self._data[key] = str(value)
-            if ex:
-                self._expiry[key] = time.time() + ex
-
-    def incr(self, key):
-        with self._lock:
-            value = int(self._data[key]) + 1 if self._live(key) else 1
-            self._data[key] = str(value)
-            return value
-
-    def expire(self, key, seconds):
-        with self._lock:
-            if self._live(key):
-                self._expiry[key] = time.time() + seconds
-
-    def sadd(self, key, member):
-        with self._lock:
-            if not self._live(key):
-                self._data[key] = set()
-            self._data[key].add(member)
-
-    def scard(self, key):
-        with self._lock:
-            return len(self._data[key]) if self._live(key) else 0
-
-    def hincrby(self, key, field, amount=1):
-        with self._lock:
-            if not self._live(key):
-                self._data[key] = {}
-            self._data[key][field] = self._data[key].get(field, 0) + amount
-            return self._data[key][field]
-
-    def hgetall(self, key):
-        with self._lock:
-            return {k: str(v) for k, v in self._data[key].items()} if self._live(key) else {}
-
-    def delete(self, *keys):
-        with self._lock:
-            for key in keys:
-                self._data.pop(key, None)
-                self._expiry.pop(key, None)
-
-    def scan_iter(self, match):
-        with self._lock:
-            return [k for k in list(self._data) if fnmatch.fnmatch(k, match)]
-
-    def ping(self):
-        return True
+def get_redis(url=None):
+    global _client
+    if _client is None:
+        url = url or os.environ.get("REDIS_URL", "memory://")
+        if url.startswith(("memory://", "fakeredis://")):
+            import fakeredis
+            _client = fakeredis.FakeStrictRedis(decode_responses=True)
+        else:
+            import redis
+            _client = redis.Redis.from_url(url, decode_responses=True)
+    return _client
 
 
-def connect(url=None):
-    url = url or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    if url.startswith("memory://"):
-        return MemoryStore()
-    import redis
-    client = redis.Redis.from_url(url, decode_responses=True)
-    try:
-        client.ping()
-    except redis.exceptions.ConnectionError as exc:
-        raise SystemExit(
-            f"Cannot reach Redis at {url} ({exc}).\n"
-            "Start it with `docker compose up -d --wait`, or run without Docker:\n"
-            "    REDIS_URL=memory:// DEFENSE_LEVEL=... python app.py")
-    return client
+def token_bucket(redis, bucket, key, limits=None):
+    """Take one token from `bucket` for `key`. Atomic in Lua. True if allowed."""
+    from . import policy
+    capacity, refill = (limits or policy.RATE_LIMITS)[bucket]
+    script = _scripts.get(id(redis))
+    if script is None:
+        script = _scripts[id(redis)] = redis.register_script(TOKEN_BUCKET_LUA)
+    return bool(script(keys=[f"lab:rl:{bucket}:{key}"], args=[capacity, refill, time.time()]))
+
+
+def prefix_of(ip):
+    """The /24 (IPv4) or /64 (IPv6) an address belongs to: the unit of cheap rotation."""
+    addr = ipaddress.ip_address(ip)
+    bits = 24 if addr.version == 4 else 64
+    return str(ipaddress.ip_network(f"{ip}/{bits}", strict=False))
 
 
 class Counters:
-    """The handful of counters the layers need, all namespaced and windowed."""
+    """Windowed counters: how many times did `key` do `event` in the last `window` seconds."""
 
-    def __init__(self, backend):
-        self.r = backend
+    def __init__(self, redis, prefix="lab:c"):
+        self.redis, self.prefix = redis, prefix
 
-    def _k(self, *parts):
-        return PREFIX + ":".join(str(p) for p in parts)
+    def hit(self, event, key, window=60):
+        k = f"{self.prefix}:{event}:{key}"
+        now = time.time()
+        p = self.redis.pipeline()
+        p.zadd(k, {f"{now}": now})
+        p.zremrangebyscore(k, 0, now - window)
+        p.zcard(k)
+        p.expire(k, window + 1)
+        return p.execute()[2]
 
-    def bump(self, *parts):
-        """Increment a windowed counter and return the new value."""
-        key = self._k(*parts)
-        value = self.r.incr(key)
-        if value == 1:
-            self.r.expire(key, WINDOW_S)
-        return value
+    def count(self, event, key, window=60):
+        k = f"{self.prefix}:{event}:{key}"
+        now = time.time()
+        self.redis.zremrangebyscore(k, 0, now - window)
+        return self.redis.zcard(k)
 
-    def add_distinct(self, member, *parts):
-        """Add `member` to a windowed set and return how many distinct members it has."""
-        key = self._k(*parts)
-        self.r.sadd(key, member)
-        self.r.expire(key, WINDOW_S)
-        return self.r.scard(key)
 
-    def hbump(self, field, *parts, amount=1):
-        key = self._k(*parts)
-        self.r.hincrby(key, field, amount)
-        self.r.expire(key, WINDOW_S)
-
-    def hget_all(self, *parts):
-        return {k: int(v) for k, v in self.r.hgetall(self._k(*parts)).items()}
-
-    def put(self, value, *parts, ttl=WINDOW_S):
-        self.r.set(self._k(*parts), value, ex=ttl)
-
-    def fetch(self, *parts):
-        return self.r.get(self._k(*parts))
-
-    def drop(self, *parts):
-        self.r.delete(self._k(*parts))
-
-    def reset(self):
-        """Delete only this lab's keys, never the whole database."""
-        keys = list(self.r.scan_iter(match=PREFIX + "*"))
-        if keys:
-            self.r.delete(*keys)
-        return len(keys)
+def flush_lab_state(redis):
+    for k in redis.scan_iter("lab:*"):
+        redis.delete(k)

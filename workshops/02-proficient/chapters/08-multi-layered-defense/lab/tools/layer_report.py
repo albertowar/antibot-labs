@@ -1,68 +1,58 @@
 """
-Chapter 8, Round 0: What each layer says about real customers
+Chapter 8, Round 0: which layer fires on which real customers?
 
-Shadow mode (DEFENSE_LEVEL=0) scores every login and blocks nothing, which
-makes it the only safe way to learn what a new layer would do to your real
-users before it is allowed to decide anything. This report reads the
-decision log and answers, per layer and per signal:
+Run it after a Round 0 checkpoint (shadow mode: every layer runs, nothing is enforced). The first
+table shows, for each layer, how many of the logged logins carry one of its signals and who they
+are; the second, how many each layer would BLOCK if it were allowed to decide alone (its points
+reach its veto line). Layers overlap very little, which is why a veto chain's false positives add
+up: the sum of the second table is close to its union.
 
-  - how many real customers it fired on, and which personas they were
-  - what would happen if that layer alone were allowed to block (Round 1's
-    veto chain), and how those slices add up across layers
-
-Run the population first, then:
-    python tools/population.py && python tools/layer_report.py
+    python tools/layer_report.py
 """
 
-import os
 import sys
 from collections import Counter, defaultdict
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
-
-import policy  # noqa: E402
-import veto  # noqa: E402
-from report import humans, pct, persona, read_log  # noqa: E402
+from report import attempts, layers, pct, persona, read_log
+from defenses import policy, veto
 
 
 def main():
-    people = humans(read_log())
-    if not people:
-        print("No logged human sessions. Run `python tools/population.py` first.")
+    rows = attempts(read_log())
+    if not rows:
+        print("No logged human logins. Run `python tools/checkpoint.py --round 0` first.")
         return 1
-    total = len(people)
-    print(f"=== Layer report: {total} real customers (shadow mode) ===\n")
-
-    print(f"{'layer':<12} {'signal':<24} {'humans':>7}  {'weight':>6}  personas hit")
-    by_signal = defaultdict(Counter)
-    layer_hits = defaultdict(set)
-    for e in people:
-        for layer, sigs in e["signals"].items():
-            for s in sigs:
-                by_signal[(layer, s)][persona(e)] += 1
-            if sigs:
-                layer_hits[layer].add(e["sid"])
-    for (layer, s), who in sorted(by_signal.items(), key=lambda kv: (kv[0][0], -sum(kv[1].values()))):
-        n = sum(who.values())
-        tops = ", ".join(f"{p} {c}" for p, c in who.most_common(3))
-        print(f"{layer:<12} {s:<24} {pct(n, total):>7}  {policy.WEIGHTS.get(s, 0):>6}  {tops}")
-
-    print("\nIf each layer blocked on its own line (Round 1's veto chain):")
-    print(f"{'layer':<12} {'line':>5} {'humans blocked':>15}")
-    union, total_rate = set(), 0.0
-    for e in people:
-        points = veto.layer_points(e["signals"])
-        for layer, pts in points.items():
-            if layer in veto.VETO_AT and pts >= veto.VETO_AT[layer]:
-                layer_hits.setdefault(f"veto:{layer}", set()).add(e["sid"])
-    for layer, line in veto.VETO_AT.items():
-        hit = layer_hits.get(f"veto:{layer}", set())
-        union |= hit
-        total_rate += len(hit) / total
-        print(f"{layer:<12} {line:>5} {pct(len(hit), total):>15}")
-    print(f"{'sum of layers':<18} {pct(round(total_rate * total), total):>15}   (if nobody tripped two)")
-    print(f"{'union (actual)':<18} {pct(len(union), total):>15}   <- what the veto chain would block")
-    print("\nEvery one of these is a real customer. Round 1 turns this table into 403s.")
+    total = len(rows)
+    print(f"{total} real logins (level {rows[0]['level']}); per layer, how many carry one of its signals\n")
+    print(f"  {'layer':<12} {'logins':>6} {'share':>7}  top signals                       who")
+    by_layer = defaultdict(list)
+    for r in rows:
+        for layer, names in layers(r).items():
+            by_layer[layer].append((r, names))
+    for layer, hits in sorted(by_layer.items(), key=lambda kv: -len(kv[1])):
+        sigs = Counter(n for _, names in hits for n in names)
+        who = Counter(persona(r) for r, _ in hits)
+        print(f"  {layer:<12} {len(hits):>6} {pct(len(hits), total):>7}  "
+              f"{', '.join(f'{s} {n}' for s, n in sigs.most_common(3)):<33} "
+              f"{', '.join(f'{p} {n}' for p, n in who.most_common(3))}")
+    alone = Counter()
+    union = []
+    for r in rows:
+        points = {layer: sum(policy.WEIGHTS.get(n, 0) for n in names) for layer, names in layers(r).items()}
+        over = [layer for layer, line in veto.VETO_AT.items() if points.get(layer, 0) >= line]
+        alone.update(over)
+        if over:
+            union.append((r, over))
+    print(f"\n  would block alone (points >= the layer's veto line)")
+    for layer, n in alone.most_common():
+        print(f"  {layer:<12} {n:>6} {pct(n, total):>7}")
+    both = [r for r, over in union if len(over) > 1]
+    print(f"  {'sum':<12} {sum(alone.values()):>6} {pct(sum(alone.values()), total):>7}      "
+          f"union {len(union)} ({pct(len(union), total).strip()}); over two or more lines: "
+          + (", ".join(f"{r['actor'].split(':')[1]}:{r['actor'].split(':')[2]}" for r in both) or "none"))
+    flagged = sum(1 for r in rows if layers(r))
+    print(f"\n{flagged}/{total} logins ({pct(flagged, total).strip()}) carry at least one signal; "
+          f"{total - flagged} are clean.")
     return 0
 
 
