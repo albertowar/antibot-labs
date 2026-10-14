@@ -1,8 +1,8 @@
 """
-Chapter 4, Round 5 attack: give up faking, drive a real browser.
+Chapter 4, Round 3 attack (the second attacker): stop faking, drive a real browser.
 
-Objective: modelling Chrome's headers by hand is a losing game, so the attacker launches a real
-Chromium with Playwright. The default headless User-Agent says "HeadlessChrome", so they override
+Objective: level 2 checks that the headers tell one story. Round 3's first attacker copies a
+browser's header set; this one skips the copying and launches a real Chromium with Playwright. The default headless User-Agent says "HeadlessChrome", so they override
 it with a Windows Chrome UA built from the real browser version.
 
 Recent Playwright versions are careful: they derive matching Client Hints from the override
@@ -16,7 +16,7 @@ Expected (Playwright 1.63 / Chromium 153):
 
 Needs: pip install -r requirements-browser.txt && python -m playwright install chromium
 
-    python attacks/round5_playwright_ua_override.py [--no-override]
+    python attacks/round3_playwright_ua_override.py [--no-override]
 """
 
 import json
@@ -33,7 +33,7 @@ FETCH = "async url => { const r = await fetch(url); return [r.status, r.headers.
 def run(override=True):
     from playwright.sync_api import sync_playwright
 
-    tally = Tally("round5_playwright_ua_override" if override else "round5_playwright_headless")
+    tally = Tally("round3_playwright_ua_override" if override else "round3_playwright_headless")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         options = {}
@@ -58,5 +58,5 @@ def run(override=True):
 
 if __name__ == "__main__":
     override = "--no-override" not in sys.argv
-    print(f"=== Round 5: Playwright Chromium ({'UA override' if override else 'default headless UA'}) ===")
+    print(f"=== Round 3: Playwright Chromium ({'UA override' if override else 'default headless UA'}) ===")
     finish(run(override))

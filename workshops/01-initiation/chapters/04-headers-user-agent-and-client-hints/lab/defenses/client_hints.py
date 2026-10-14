@@ -12,8 +12,8 @@ They duplicate what the User-Agent says, which gives a free consistency check: b
 version, platform vs UA OS, mobile flag vs UA. Firefox and Safari do NOT send Client Hints, so these
 rules only apply when the UA claims to be Chromium.
 
-What it catches: Round 3 (copied headers without hints) and a headless Chromium with a UA override
-(Round 5: the override changes the string, not the brand list Chromium builds from the real binary).
+What it catches: both Round 3 attacks: copied headers without hints, and a headless Chromium with a
+UA override (the override changes the string, not the brand list Chromium builds from the real binary).
 
 What it misses: a bot that writes the three hints by hand and gets them right (Round 4).
 

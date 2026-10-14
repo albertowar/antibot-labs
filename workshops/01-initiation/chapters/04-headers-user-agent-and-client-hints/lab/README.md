@@ -1,6 +1,6 @@
 # Chapter 4 Lab: Headers, User-Agent & Client Hints
 
-Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: five header checks (`ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `accept_ch`) wired into the ladder, the `headers` feature module, the browser-profile capture and replay tools, six attack scripts and the Chapter 4 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: five header checks (`ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `accept_ch`) wired into the ladder, the `headers` feature module, the browser-profile capture and replay tools, five attack scripts and the Chapter 4 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -26,112 +26,160 @@ Starts from: workshops/01-initiation/starter/ (contract 1.3). Adds: five header 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack ⚔️ defend. See `../chapter_04_content.md`, §4.7.
+**Format:** 5 rounds (0–4) of attack ⚔️ defend. See `../chapter_04_content.md`, §4.7. **Lab style:** pre-written.
+Every defense is written and already wired into `defenses/ladder.py`; each round you read one layer, the checkpoint
+switches the store to that round's `DEFENSE_LEVEL`, and you re-run the attacks.
 
-You play both sides. In each round, the attacker runs a script against the demo store. The defender then turns on the next defense layer and measures two things: what it catches, and what it costs. Then the attacker works out what to try next.
+You play both sides. In each round, the attacker runs a script against the demo store. The defender then turns on the
+next defense layer and measures two things: what it catches, and what it costs real shoppers. Then the attacker works
+out what to try next.
 
 ## Rules of engagement
 
-- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
-- Every request comes from your own machine; the browser profiles in `tools/profiles/` are header sets, not people.
-- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- **Local only, enforced in code.** Every attack script and tool reaches the store through `tools/labclient.py`, which asks
+  `labnet.py` at the lab root for `DEMO_URL` and refuses anything that is not this machine. The store's edge accepts the
+  lab headers only from loopback. Do not remove that check.
+- **Everything is synthetic.** Scrapers and shoppers rent documentation addresses (RFC 5737) from `data/world.json` and
+  send them in `X-Lab-Client-IP`; header checks ignore the address anyway. The browser profiles in `tools/profiles/` are
+  header sets captured from real browsers on the author's machine, not people.
+- **The real browser is yours.** The Round 3 Playwright attack drives a local headless Chromium against `127.0.0.1` only.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages and the Chromium build.
 - Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
-  docker-compose.yml   PostgreSQL 18 for the header logs
-  demo_site/app.py     Flask store; DEFENSE_LEVEL=0..4 picks the defense layers
-  defenses/            ua_inspector · header_inspector · client_hints · header_order · accept_ch · scoring
-  attacks/             round0_recon … round5_playwright_ua_override
-  tools/               checkpoint.py · legit_traffic.py · capture_profiles.py · profiles/*.json
+  defenses/ua_inspector.py      L1: the User-Agent on its own (libraries, headless markers, stale versions)
+  defenses/header_inspector.py  L2: Accept*, Fetch Metadata and Referer tell one story
+  defenses/client_hints.py      L3: Sec-CH-UA* against the User-Agent
+  defenses/header_order.py      L3: Chromium's header order (weak: 15 points)
+  defenses/accept_ch.py         L4: the high-entropy hints a real Chromium sends after Accept-CH
+  defenses/ladder.py            which checks run at which level (pre-wired 0..4)
+  defenses/policy.py            the bands (20 monitor, 40 block), MIN_CHROME_MAJOR, ACCEPT_CH_HINTS, CRITICAL_CH
+  demo_site/ext/headers.py      Accept-CH on pages at level 4, /lab/headers/check, /lab/headers/logs
+  attacks/                      round0_recon … round4_client_hints_spoof, round3_playwright_ua_override
+  tools/                        checkpoint.py · replay_profiles.py · capture_profiles.py · profiles/*.json
+                                personas_ch4.py (the shoppers' Accept-CH behaviour)
+  solutions/round1..4/          the reference ladder.py per round (the catch-up files)
 ```
+
+The rest of the store (catalog, cart, checkout, accounts, the simulated edge, the decision log) is the Workshop 1 starter,
+unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ---
 
 ## Setup
 
+Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+
 ```bash
 cd lab
-docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
-pip install -r requirements.txt
-playwright install chromium                 # Round 5 attack
+python3.12 -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                         # one venv per chapter
+pip install -r requirements-browser.txt                 # Playwright, for the Round 3 browser attack
+python -m playwright install chromium
+python tools/doctor.py                                  # READY?
+python demo_site/app.py                                 # http://127.0.0.1:5000
 ```
 
-Start the demo site, and restart it with a new `DEFENSE_LEVEL` each round:
+No Docker is needed (SQLite and an in-process Redis). With Docker, `docker compose up -d --wait` starts Redis 8.10 and
+PostgreSQL 18 as in the starter README. Port 5000 busy (macOS AirPlay)? `PORT=8099 python demo_site/app.py`, then
+`export DEMO_URL=http://127.0.0.1:8099` in the shell where you run attacks and tools. No browser? Every checkpoint takes
+`SKIP_BROWSER=1` and leaves the two Playwright runs out.
 
-```bash
-cd demo_site
-DEFENSE_LEVEL=0 python app.py               # http://localhost:5000
-```
+You never restart the store between rounds: the checkpoint sets the level (`POST /lab/level`), and edits to
+`defenses/*.py` are picked up on the next request. To set a level by hand:
+`curl -X POST localhost:5000/lab/level -H 'content-type: application/json' -d '{"level": 2}'`.
 
 | Level | Adds | Module |
 |---|---|---|
-| 0 | Nothing. Every request is scored and logged, but none are blocked | – |
+| 0 | Nothing. No check runs; every request is still logged | – |
 | 1 | User-Agent parsing | `defenses/ua_inspector.py` |
 | 2 | Header presence and Fetch Metadata consistency | `defenses/header_inspector.py` |
 | 3 | Client Hints consistency and header order | `defenses/client_hints.py`, `defenses/header_order.py` |
 | 4 | `Accept-CH` negotiation for high-entropy hints | `defenses/accept_ch.py` |
 
-Each level includes every level below it, and `defenses/scoring.py` adds up the points:
+Each level includes every level below it, and the gate adds up the points (`defenses/policy.py`, `BANDS`):
 
-- **≥ 40** → `bot`: the request is blocked with a 403.
-- **≥ 20** → `suspicious`: logged but allowed through.
-- **< 20** → `clean`.
+- **≥ 40** → block (`403`). Chapter 4 registers no challenge type, so the challenge band is a block too.
+- **≥ 20** → monitor: served, logged as suspicious.
+- **< 20** → allow.
 
-Two debug endpoints are never blocked:
+**Fell behind?** `python tools/checkpoint.py --round N --catch-up` installs the reference `defenses/ladder.py` for round N
+(your file is kept as `ladder.py.bak`; `python tools/checkpoint.py --restore` puts it back) and sets the level.
 
-- `/header-check` shows how your current request is scored, and the headers in the order they arrived.
-- `/header-logs` shows the last 50 scored requests.
+**Look around while you work** (lab pages, never gated, never in production):
 
-> The 403 response includes the reasons it fired. That is for teaching only.
-> In production, never tell a client which rule caught it.
+```bash
+curl -s localhost:5000/lab/headers/check | python -m json.tool    # how THIS request scores, check by check, level by level
+curl -s localhost:5000/lab/headers/logs  | python -m json.tool    # the last 50 scored requests and their reasons
+curl -s 'localhost:5000/lab/decisions?actor=bot:&limit=5' | python -m json.tool
+python -m defenses.client_hints                                   # every check scores its own samples from the CLI
+```
 
-**Troubleshooting**
-
-| Problem | Fix |
-|---|---|
-| Port 5000 already in use (macOS: the AirPlay Receiver uses it) | `PORT=5050 DEFENSE_LEVEL=… python app.py`, then `export DEMO_URL=http://localhost:5050` in the shell you run attacks and tools from |
-| No Docker | `export DATABASE_URL=sqlite:///header_logs.db` before starting the app. Everything else works the same |
-| `connection refused` on 5432 | `docker compose ps`. The container must show as `healthy` |
-| Fresh logs | `docker compose down -v && docker compose up -d --wait` |
+Every response carries `X-Lab-Verdict`, `X-Lab-Score`, `X-Lab-Signals` and `Server-Timing`. They tell the attacker
+exactly what tripped: never send them in production (`LAB_HEADERS=0` turns them off).
 
 ---
 
 ## How to measure a round
 
-Finish every round with a **checkpoint**:
-
 ```bash
-python tools/checkpoint.py --round <N>      # add --skip-browser to skip the Playwright attack
+python tools/checkpoint.py --round N              # level N: this round's layer on
+python tools/checkpoint.py --round N --level N-1  # the same attacks one level lower: the "before"
 ```
 
+The checkpoint sets the level, resets the store, runs **every** scraper (rounds 1–4, plus the Playwright browser with and
+without its UA override) while the 40 shoppers browse, and prints:
+
+- **The scoreboard**: requests served and stopped per actor, and the gate's cost in milliseconds.
+- **The shoppers table**: per persona, how many finished and how many a defense stopped. Watch `old_chrome`: Chrome 138 is
+  below `MIN_CHROME_MAJOR`, so it is *suspicious* (20 points) from level 1 on, served but logged.
+- **The attacks**: each scraper's share of catalog pages fetched, against what this level should allow. A scraper is
+  expected to get through until the level built to stop it, and to stay stopped after that.
+- **Real browsers**: `tools/replay_profiles.py` replays the profiles in `tools/profiles/` byte for byte (same names, values
+  and order). Any stopped request is a **false positive** and fails the round.
+- **PASS or FAIL** against those expectations.
+
+Trimmed output (the shoppers table, the attacks' JSON and the per-profile lines left out):
+
+```text
+$ python tools/checkpoint.py --round 3
+
+== Round 3: Client Hints and header order: copied browser headers and a real browser with a UA override are stopped (level 3)
+actor                          req  served  bought  stopped  score      ms
+bot:devtools-copy                5       0       0        5   45.0    0.84
+bot:fake-ua                      5       0       0        5   95.0    1.18
+bot:headers-playwright          12       0       0       12   75.0    1.03
+bot:hints-spoof                  6       6       0        0    0.0    0.98
+bot:naive-requests               5       0       0        5   65.0    0.87
+human:autofill                   6       6       1        0    0.0    1.54
+human:consumer_vpn              18      18       3        0    0.0    1.51
+human:home                     144     144      24        0    0.0    1.56
+human:mobile_cgnat              48      48       8        0    0.0    1.67
+human:no_js                      6       6       1        0    0.0    1.32
+human:old_chrome                 6       6       1        0   20.0    1.78
+human:private_relay             12      12       2        0    0.0    1.16
+
+bots stopped 27/33 requests   shoppers hurt 0/40 people (0/240 requests stopped)   purchases {'human': 40}   drop stock {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+attacks:
+  naive                            0% succeeded
+  fake_ua                          0% succeeded
+  copied                           0% succeeded
+  spoof                            100% succeeded
+  headless                         0% succeeded
+  override                         0% succeeded
+
+=== Real browsers (replayed profiles) ===
+
+  Stopped: 0/6 requests across 2 profiles
+
+  Defender cost on these requests: median 3.49 ms, p95 6.68 ms (the gate: Ctx build + every check)
+
+  suspicious but served: human:old_chrome averaged score 20.0 over 6 requests
+
+Round 3 at level 3: PASS
 ```
-=== Checkpoint: Round 3 (server at DEFENSE_LEVEL=3) ===
-
-Bot traffic
-  ✅ round1_naive_requests            1/1 blocked (expected: blocked)
-  ✅ round2_fake_ua                   1/1 blocked (expected: blocked)
-  ✅ round3_devtools_copy             1/1 blocked (expected: blocked)
-  ✅ round4_client_hints_spoof        0/3 blocked (expected: gets through)
-  ✅ round5_playwright_ua_override    2/2 blocked (expected: blocked)
-
-Real users (replayed browser profiles)
-  ✅ 0/4 requests blocked across 2 profiles
-
-Defender cost
-  header scoring: median 0.21 ms, p95 0.26 ms per request
-
-✅ Round 3 checkpoint passed.
-```
-
-What it reports:
-
-- **Bot traffic:** every attack script, compared with what should happen at this level.
-- **Real users:** `tools/legit_traffic.py` replays header profiles captured from real browsers, with byte-identical values and order. Any 403 here is a **false positive**.
-- **Defender cost:** the time spent scoring each request, read from the `Server-Timing` response header.
-
-**Fell behind?** Every defense is already written, so catching up just means restarting the demo site with `DEFENSE_LEVEL=<N>`. The checkpoint tells you if you're on the wrong level.
 
 ---
 
@@ -140,10 +188,10 @@ What it reports:
 **🗡️ Attack (look):**
 
 ```bash
-python attacks/round0_recon.py              # requests, urllib and curl hit /header-check
+python attacks/round0_recon.py              # requests, urllib and curl hit /lab/headers/check
 ```
 
-**🛡️ Defend (look):** open `http://localhost:5000/` and `/header-check` in **Chrome** and **Firefox**, then fill in:
+**🛡️ Defend (look):** open `http://127.0.0.1:5000/` and `/lab/headers/check` in **Chrome** and **Firefox**, then fill in:
 
 | | requests | curl | Chrome | Firefox |
 |---|---|---|---|---|
@@ -154,11 +202,24 @@ python attacks/round0_recon.py              # requests, urllib and curl hit /hea
 | `Sec-CH-UA*`? | | | | |
 | Position of `User-Agent` | | | | |
 
-**Add yourself to the real-user set:** save your browser's `/header-check` output as `tools/profiles/<your-browser>.json`.
-From now on, every checkpoint checks that *your* browser isn't blocked.
-If you have a display, `python tools/capture_profiles.py` does the same for Chrome, Firefox and WebKit.
+Reference answer (counting `Host`), from `round0_recon.py` and the shipped profiles in `tools/profiles/` (Chrome 145 and
+Firefox 155 on Linux, captured at level 4 after a page load):
 
-**Checkpoint:** `python tools/checkpoint.py --round 0`. Nothing should be blocked.
+| | requests | curl | Chrome | Firefox |
+|---|---|---|---|---|
+| Number of headers | 5 | 3 | 18 (14 on a first visit, before `Accept-CH` and the cookie) | 13 |
+| `Accept` | `*/*` | `*/*` | `text/html,…` | `text/html,…` |
+| `Accept-Language`? | no | no | yes | yes |
+| `Sec-Fetch-*`? | no | no | yes | yes |
+| `Sec-CH-UA*`? | no | no | yes (3 low-entropy, 3 negotiated) | no |
+| Position of `User-Agent` | 2nd | 2nd | 10th, after the hints | 2nd |
+
+**Add yourself to the real-user set:** at level 4 (so Chromium has negotiated its hints), save your browser's
+`/lab/headers/check` output as `tools/profiles/<your-browser>.json`. From now on every checkpoint checks that *your*
+browser isn't blocked. With a display, `python tools/capture_profiles.py` does the same for Chrome, Firefox and WebKit.
+
+**Checkpoint:** `python tools/checkpoint.py --round 0`. Nothing is blocked; the checkpoint also checks that the shoppers'
+header templates (`tools/browsers.py`) agree with the captured profiles.
 
 ---
 
@@ -166,10 +227,10 @@ If you have a display, `python tools/capture_profiles.py` does the same for Chro
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round1_naive_requests.py` (level 0) | `200`, products scraped |
-| 🛡️ Defend | Read `defenses/ua_inspector.py`, then restart with `DEFENSE_LEVEL=1` | – |
-| 🗡️ Re-run | `python attacks/round1_naive_requests.py` | `403`, `[L1] UA red flag: Raw HTTP library (Python requests)` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | round 1 blocked · 0 real users blocked |
+| 🗡️ Attack | `python attacks/round1_naive_requests.py` (level 0) | `200`, the whole catalog |
+| 🛡️ Defend | Read `defenses/ua_inspector.py` | – |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | level 1 · the naive scraper and headless Chrome blocked · 0 real users blocked |
+| 🗡️ Re-run | `python attacks/round1_naive_requests.py` | `403`, `ua:red_flag` (Raw HTTP library) |
 
 **Discuss:** how long does this defense survive? (About one line of attacker code.)
 
@@ -180,28 +241,35 @@ If you have a display, `python tools/capture_profiles.py` does the same for Chro
 | Step | Do | Expected |
 |---|---|---|
 | 🗡️ Attack | `python attacks/round2_fake_ua.py` (level 1) | `200` |
-| 🛡️ Defend | Read `defenses/header_inspector.py`, then restart with `DEFENSE_LEVEL=2` | – |
-| 🗡️ Re-run | `python attacks/round2_fake_ua.py` | `403` (score 50): `Missing Accept-Language`, `Sec-Fetch-* headers are absent`, `Accept is */*` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | rounds 1–2 blocked · 0 real users blocked |
+| 🛡️ Defend | Read `defenses/header_inspector.py` | – |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | level 2 · rounds 1–2 blocked · 0 real users blocked |
+| 🗡️ Re-run | `python attacks/round2_fake_ua.py` | `403` (score 50): `headers:missing_accept_language`, `headers:no_sec_fetch`, `headers:accept_any_on_navigation` |
 
-**Exercise:** check `/header-check` in Firefox, and in Safari if you have a Mac.
-Both send `Sec-Fetch-*`: Safari since 16.4, Firefox since 90.
-The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
+**Exercise:** check `/lab/headers/check` in Firefox, and in Safari if you have a Mac. Both send `Sec-Fetch-*`: Safari
+since 16.4, Firefox since 90. The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 ---
 
-## Round 3: Copied browser headers ⚔️ Client Hints & order
+## Round 3: Copied headers and a real browser ⚔️ Client Hints & order
+
+Level 2 checks that the headers tell one story. The attacker tries two ways to tell it: copy a browser's headers, or
+stop faking and drive a real Chromium with a UA override.
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round3_devtools_copy.py` (level 2) | `200`: every presence and Fetch Metadata check passes |
-| 🛡️ Defend | Read `defenses/client_hints.py` and `defenses/header_order.py`, then restart with `DEFENSE_LEVEL=3` | – |
-| 🗡️ Re-run | `python attacks/round3_devtools_copy.py` | `403` (score 45): `Sec-CH-UA is absent` (30) + `Header order unlike Chromium` (15) |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | rounds 1–3 and 5 blocked · round 4 gets through · 0 real users blocked |
+| 🗡️ Attack 1 | `python attacks/round3_devtools_copy.py` (level 2) | `200`: every presence and Fetch Metadata check passes |
+| 🗡️ Attack 2 | `python attacks/round3_playwright_ua_override.py` (level 2) | `200`: Playwright even rewrites `Sec-CH-UA-Platform` to `"Windows"`; the missing `Accept-Language` is only 15 points |
+| 🛡️ Defend | Read `defenses/client_hints.py` and `defenses/header_order.py` | – |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | level 3 · rounds 1–3 blocked · round 4 gets through · 0 real users blocked |
+| 🗡️ Re-run 1 | `python attacks/round3_devtools_copy.py` | `403` (score 45): `client_hints:hints_absent` (30) + `header_order:unlike_chromium` (15) |
+| 🗡️ Re-run 2 | `python attacks/round3_playwright_ua_override.py` | `403` (score 55): `client_hints:headless_brand` (40) + `headers:missing_accept_language` (15). The brand list still says `"HeadlessChrome";v="153"` |
+
+The override changes the `User-Agent` string, not the brand list Chromium builds from the real binary. Without the
+override (`--no-override`) the browser never got this far: `HeadlessChrome` in the UA is a level-1 red flag.
 
 **Exercises:**
 
-1. Run `python defenses/client_hints.py` and `python defenses/header_order.py`, and read each sample.
+1. Run `python -m defenses.client_hints` and `python -m defenses.header_order`, and read each sample.
 2. Find the GREASE brand in your Chrome's `sec-ch-ua`.
 3. Header order alone scores only 15. Why so little? Think about proxies, CDNs and HTTP/2.
 
@@ -211,12 +279,13 @@ The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round4_client_hints_spoof.py` (level 3) | `200` on all four requests |
-| 🛡️ Defend | Read `defenses/accept_ch.py` and `offer_client_hints()` in `app.py`, then restart with `DEFENSE_LEVEL=4` | – |
-| 🗡️ Re-run | `python attacks/round4_client_hints_spoof.py` | navigation `200` (the server replies with `Accept-CH`), then each fetch `403`: `Accept-CH was offered but the client ignored it` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | everything blocked · 0 real users blocked |
+| 🗡️ Attack | `python attacks/round4_client_hints_spoof.py` (level 3) | `200` on the navigation and every catalog page |
+| 🛡️ Defend | Read `defenses/accept_ch.py` and `_offer_client_hints()` in `demo_site/ext/headers.py` | – |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | level 4 · everything blocked · 0 real users blocked |
+| 🗡️ Re-run | `python attacks/round4_client_hints_spoof.py` | navigation `200` (the store replies with `Accept-CH`), then each fetch `403`: `accept_ch:ignored` |
 
-**False-positive check:** open `/` in Chrome, then reload `/header-check`. You should see `sec-ch-ua-full-version-list`, and the verdict should be `clean`.
+**False-positive check:** at level 4, open `/` in Chrome, then reload `/lab/headers/check`. You should see
+`sec-ch-ua-full-version-list`, and a score of 0. The Chrome shoppers do the same (`tools/personas_ch4.py`).
 
 **Discuss:**
 
@@ -225,57 +294,179 @@ The old rule "Safari + Sec-Fetch = forgery" would block every real Safari user.
 
 ---
 
-## Round 5: Real browser with a UA override
+## Wrap-up: where headers stop
 
-| Step | Do | Expected |
-|---|---|---|
-| 🗡️ Attack | `python attacks/round5_playwright_ua_override.py --no-override` | level ≥ 1: `403`, `UA red flag: Headless Chrome` |
-| 🗡️ Attack | `python attacks/round5_playwright_ua_override.py` | level 2: `200` · level ≥ 3: `403`, `brand list contains HeadlessChrome` · level 4 adds `Platform-Version '10.0' is not in browser format` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 5` | everything blocked · 0 real users blocked |
-
-Playwright rewrites the `User-Agent` and even the `Sec-CH-UA-Platform` hint. But the brand list still comes from the real binary, so it names `HeadlessChrome`. Headless mode also sends no `Accept-Language`.
-
-**Debrief:** set the `userAgentMetadata` brands through the CDP command `Emulation.setUserAgentOverride`, or run headed Chrome on a real Windows box. At that point **every header is genuine**. Header inspection ends here; the next layers are:
+The Playwright browser was caught by one leaked brand. Set the `userAgentMetadata` brands through the CDP command
+`Emulation.setUserAgentOverride`, or run headed Chrome on a real Windows box, and **every header is genuine**. Header
+inspection ends here; the next layers are:
 
 - TLS and HTTP/2 fingerprints: W2 Ch5
 - Automation artefacts: W2 Ch1
 - JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): W2 Ch4
 - Behaviour: W2 Ch3
 
----
-
-## Wrap-up: false positives and cost
+Then look at the defender's side:
 
 ```bash
-python tools/legit_traffic.py               # per-profile verdicts and reasons
-docker compose exec postgres psql -U workshop -d shop \
-  -c "SELECT level, verdict, count(*) FROM header_log GROUP BY 1, 2 ORDER BY 1, 2;"
+python tools/replay_profiles.py                                   # per-profile verdicts and reasons, at the current level
+curl -s localhost:5000/lab/headers/logs | python -m json.tool     # which rule fired on which request
 ```
 
 - Did any real-browser request score above 0? Which rule fired, and why?
-- Which rules would you only ever use for `suspicious`, never for `bot`?
-- Header scoring costs well under a millisecond. Which part of *this* app's request path costs more? (Hint: the log insert.)
+- Which rules would you only ever use for `suspicious`, never for block? (`old_chrome` is your evidence.)
+- The checkpoint prints the gate's cost per request. Which part of *this* store's request path costs more than every
+  header check together? (Look at `app;dur` next to `gate;dur` in `Server-Timing`.)
 
 ---
 
 ## Expected results (self-check)
 
-Verified with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, psycopg 3.3.6, requests 2.34.2, user-agents 2.2.0 and Playwright 1.63.0 (Chromium 153.0.8010.12 headless shell) on Linux, on the no-Docker path (`DATABASE_URL=sqlite:///...`); the shipped `tools/profiles/` come from real Chrome 145 and Firefox 155. The `docker compose` path has not been run for the migrated lab. "403" means every scraping request was blocked.
+Generated by `python tools/verify.py --all --markdown` (the per-round scoreboards, then the attack-by-level matrix that
+`tools/checkpoint.py` prints at the end: catalog products scraped out of 120); do not edit by hand. Verified on Linux with
+Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4,
+redis 8.1.0 with fakeredis 2.39.0 (`memory://`), requests 2.34.2, user-agents 2.2.0
+and Playwright 1.63.0 (Chromium 153 headless shell), on the zero-Docker path (SQLite); the `docker compose`
+path has not been run for this lab. The shipped `tools/profiles/` come from real Chrome 145 and Firefox 155.
 
-| Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first block |
+Round 0 runs without the browsers (`–`). The Playwright actor's 12 requests per round are the two runs' navigations and
+catalog pages together.
+
+- **Shoppers hurt: 0/40 at every level**, and the replayed real-browser profiles score 0 at every level.
+- **`old_chrome`** (Chrome 138, below `MIN_CHROME_MAJOR`) averages score 20 from level 1 on: served, logged as
+  suspicious. Set `STALE_VERSION_POINTS = 40` in `policy.py` and watch it become a false positive.
+- **The gate's cost** is about 1–2 ms per request on a laptop, and level 0, with no check at all, already costs about 1 ms:
+  most of it is building the request context (the session lookup in Redis), not the header checks. With the UA parser's
+  cache warm, all five checks together cost about 0.1 ms (`Server-Timing` at level 4: `ua_inspector;dur=0.06,
+  header_inspector;dur=0.04, client_hints;dur=0.01, header_order;dur=0.00, accept_ch;dur=0.01`). Under the checkpoint's load (40 shoppers next to six
+  attacks in one Python process) the numbers move by a millisecond or two between runs.
+
+Reasons at the first block:
+
+| Attack | Stopped from | Signals |
+|---|---|---|
+| `round1_naive_requests` | L1 | `ua:red_flag` (Raw HTTP library) |
+| `round2_fake_ua` | L2 | `headers:missing_accept_language`, `headers:no_sec_fetch`, `headers:accept_any_on_navigation` (score 50) |
+| `round3_devtools_copy` | L3 | `client_hints:hints_absent`, `header_order:unlike_chromium` (score 45) |
+| `round3_playwright_ua_override` | L3 | `client_hints:headless_brand`; at L4 also `accept_ch:bad_platform_version` |
+| `… --no-override` | L1 | `ua:red_flag` (Headless Chrome) |
+| `round4_client_hints_spoof` | L4 | `accept_ch:ignored` (the navigation is served; every catalog page after it is not) |
+
+<!-- results:start -->
+| Attack ↓ / level → | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| `round1_naive_requests` | 120/120 | 0/120 | 0/120 | 0/120 | 0/120 |
+| `round2_fake_ua` | 120/120 | 120/120 | 0/120 | 0/120 | 0/120 |
+| `round3_devtools_copy` | 120/120 | 120/120 | 120/120 | 0/120 | 0/120 |
+| `round3_playwright_ua_override` | – | 120/120 | 120/120 | 0/120 | 0/120 |
+| `round3_playwright_ua_override --no-override` | – | 0/120 | 0/120 | 0/120 | 0/120 |
+| `round4_client_hints_spoof` | 120/120 | 120/120 | 120/120 | 120/120 | 0/120 |
+
+<details><summary>Round 0 scoreboard (recon: nothing is wired, every scraper gets the catalog, level 0: PASS)</summary>
+
+| actor | requests | served | purchased | stopped | avg score | gate ms |
 |---|---|---|---|---|---|---|
-| `round1_naive_requests` | 200 | **403** | 403 | 403 | 403 | `[L1] UA red flag: Raw HTTP library` |
-| `round2_fake_ua` | 200 | 200 | **403** | 403 | 403 | `[L2]` ×3, score 50 |
-| `round3_devtools_copy` | 200 | 200 | 200 | **403** | 403 | `[L3] Sec-CH-UA is absent` + order, score 45 |
-| `round4_client_hints_spoof` | 200 | 200 | 200 | 200 | **403** | `[L4] Accept-CH was offered but the client ignored it` |
-| `round5_…` (UA override) | 200 | 200 | 200 | **403** | 403 | `[L3] brand list contains HeadlessChrome` |
-| `round5_… --no-override` | 200 | **403** | 403 | 403 | 403 | `[L1] UA red flag: Headless Chrome` |
-| Real users (`legit_traffic.py`) | 200 | 200 | 200 | 200 | 200 | – (score 0) |
+| bot:devtools-copy | 5 | 5 | 0 | 0 | 0.0 | 1.31 |
+| bot:fake-ua | 5 | 5 | 0 | 0 | 0.0 | 1.39 |
+| bot:hints-spoof | 6 | 6 | 0 | 0 | 0.0 | 0.95 |
+| bot:naive-requests | 5 | 5 | 0 | 0 | 0.0 | 1.21 |
+| human:autofill | 6 | 6 | 1 | 0 | 0.0 | 1.45 |
+| human:consumer_vpn | 18 | 18 | 3 | 0 | 0.0 | 1.67 |
+| human:home | 144 | 144 | 24 | 0 | 0.0 | 1.71 |
+| human:mobile_cgnat | 48 | 48 | 8 | 0 | 0.0 | 1.66 |
+| human:no_js | 6 | 6 | 1 | 0 | 0.0 | 2.9 |
+| human:old_chrome | 6 | 6 | 1 | 0 | 0.0 | 2.12 |
+| human:private_relay | 12 | 12 | 2 | 0 | 0.0 | 1.64 |
+Bots stopped: **0/21** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+</details>
+
+<details><summary>Round 1 scoreboard (User-Agent parsing: the naive scraper and headless Chrome are stopped, level 1: PASS)</summary>
+
+| actor | requests | served | purchased | stopped | avg score | gate ms |
+|---|---|---|---|---|---|---|
+| bot:devtools-copy | 5 | 5 | 0 | 0 | 0.0 | 1.23 |
+| bot:fake-ua | 5 | 5 | 0 | 0 | 0.0 | 1.96 |
+| bot:headers-playwright | 12 | 6 | 0 | 6 | 20.0 | 0.85 |
+| bot:hints-spoof | 6 | 6 | 0 | 0 | 0.0 | 1.69 |
+| bot:naive-requests | 5 | 0 | 0 | 5 | 40.0 | 1.85 |
+| human:autofill | 6 | 6 | 1 | 0 | 0.0 | 2.08 |
+| human:consumer_vpn | 18 | 18 | 3 | 0 | 0.0 | 1.95 |
+| human:home | 144 | 144 | 24 | 0 | 0.0 | 1.9 |
+| human:mobile_cgnat | 48 | 48 | 8 | 0 | 0.0 | 2.08 |
+| human:no_js | 6 | 6 | 1 | 0 | 0.0 | 2.21 |
+| human:old_chrome | 6 | 6 | 1 | 0 | 20.0 | 1.99 |
+| human:private_relay | 12 | 12 | 2 | 0 | 0.0 | 2.08 |
+Bots stopped: **11/33** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+</details>
+
+<details><summary>Round 2 scoreboard (presence and Fetch Metadata: a Chrome UA on default headers is stopped, level 2: PASS)</summary>
+
+| actor | requests | served | purchased | stopped | avg score | gate ms |
+|---|---|---|---|---|---|---|
+| bot:devtools-copy | 5 | 5 | 0 | 0 | 0.0 | 1.55 |
+| bot:fake-ua | 5 | 0 | 0 | 5 | 50.0 | 1.71 |
+| bot:headers-playwright | 12 | 6 | 0 | 6 | 35.0 | 1.01 |
+| bot:hints-spoof | 6 | 6 | 0 | 0 | 0.0 | 1.36 |
+| bot:naive-requests | 5 | 0 | 0 | 5 | 65.0 | 0.83 |
+| human:autofill | 6 | 6 | 1 | 0 | 0.0 | 1.65 |
+| human:consumer_vpn | 18 | 18 | 3 | 0 | 0.0 | 1.84 |
+| human:home | 144 | 144 | 24 | 0 | 0.0 | 2.03 |
+| human:mobile_cgnat | 48 | 48 | 8 | 0 | 0.0 | 1.99 |
+| human:no_js | 6 | 6 | 1 | 0 | 0.0 | 1.99 |
+| human:old_chrome | 6 | 6 | 1 | 0 | 20.0 | 1.4 |
+| human:private_relay | 12 | 12 | 2 | 0 | 0.0 | 1.96 |
+Bots stopped: **16/33** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+</details>
+
+<details><summary>Round 3 scoreboard (Client Hints and header order: copied browser headers and a real browser with a UA override are stopped, level 3: PASS)</summary>
+
+| actor | requests | served | purchased | stopped | avg score | gate ms |
+|---|---|---|---|---|---|---|
+| bot:devtools-copy | 5 | 0 | 0 | 5 | 45.0 | 1.15 |
+| bot:fake-ua | 5 | 0 | 0 | 5 | 95.0 | 1.55 |
+| bot:headers-playwright | 12 | 0 | 0 | 12 | 75.0 | 1.19 |
+| bot:hints-spoof | 6 | 6 | 0 | 0 | 0.0 | 1.54 |
+| bot:naive-requests | 5 | 0 | 0 | 5 | 65.0 | 1.55 |
+| human:autofill | 6 | 6 | 1 | 0 | 0.0 | 2.23 |
+| human:consumer_vpn | 18 | 18 | 3 | 0 | 0.0 | 1.89 |
+| human:home | 144 | 144 | 24 | 0 | 0.0 | 1.92 |
+| human:mobile_cgnat | 48 | 48 | 8 | 0 | 0.0 | 1.97 |
+| human:no_js | 6 | 6 | 1 | 0 | 0.0 | 1.78 |
+| human:old_chrome | 6 | 6 | 1 | 0 | 20.0 | 2.13 |
+| human:private_relay | 12 | 12 | 2 | 0 | 0.0 | 2.16 |
+Bots stopped: **27/33** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+</details>
+
+<details><summary>Round 4 scoreboard (Accept-CH negotiation: consistent static hints are stopped, level 4: PASS)</summary>
+
+| actor | requests | served | purchased | stopped | avg score | gate ms |
+|---|---|---|---|---|---|---|
+| bot:devtools-copy | 5 | 0 | 0 | 5 | 45.0 | 1.8 |
+| bot:fake-ua | 5 | 0 | 0 | 5 | 95.0 | 1.61 |
+| bot:headers-playwright | 12 | 0 | 0 | 12 | 81.2 | 0.94 |
+| bot:hints-spoof | 6 | 1 | 0 | 5 | 33.3 | 0.84 |
+| bot:naive-requests | 5 | 0 | 0 | 5 | 65.0 | 0.91 |
+| human:autofill | 6 | 6 | 1 | 0 | 0.0 | 1.71 |
+| human:consumer_vpn | 18 | 18 | 3 | 0 | 0.0 | 1.86 |
+| human:home | 144 | 144 | 24 | 0 | 0.0 | 1.67 |
+| human:mobile_cgnat | 48 | 48 | 8 | 0 | 0.0 | 1.65 |
+| human:no_js | 6 | 6 | 1 | 0 | 0.0 | 1.66 |
+| human:old_chrome | 6 | 6 | 1 | 0 | 20.0 | 1.54 |
+| human:private_relay | 12 | 12 | 2 | 0 | 0.0 | 1.75 |
+Bots stopped: **32/33** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+</details>
+<!-- results:end -->
 
 Things to watch for:
 
-- **Version drift.** When Chrome or Playwright updates, re-run every checkpoint, re-capture `tools/profiles/`, and bump `MIN_CHROME_MAJOR` and the Chrome version in the attack scripts.
-- **WebKit capture on Linux** needs system libraries: `sudo playwright install-deps webkit`. The shipped profiles cover Chrome and Firefox only. Ask Mac users to add a Safari profile in Round 0.
+- **Version drift.** When Chrome or Playwright updates, re-run every checkpoint, re-capture `tools/profiles/`, and bump
+  `MIN_CHROME_MAJOR` and `CHROME_MAJOR` in `tools/headers_client.py`.
+- **WebKit capture on Linux** needs system libraries: `sudo playwright install-deps webkit`. The shipped profiles cover
+  Chrome and Firefox only. On a Mac, add a Safari profile in Round 0.
 
 ---
 
@@ -283,8 +474,8 @@ Things to watch for:
 
 1. **Accept-Language vs. locale.** Flag `Accept-Language: zh-CN` paired with a UA or IP geolocation that suggests `en-US`.
    Mind the false positives: travellers, expats and VPN users. Add a profile that shows the problem.
-2. **Firefox impersonation.** Write `round6_firefox_spoof.py`: a Firefox UA with Firefox's headers, so there are no hints to check.
-   Which of our rules still apply? Add a Firefox rule set to `header_order.py` and run the checkpoint.
-3. **Critical-CH.** Add `Critical-CH: Sec-CH-UA-Full-Version-List` to the responses.
-   Real Chrome then retries the *first* navigation with the hints, so you no longer need the cookie.
-   What does this change for cookie-less bots?
+2. **Firefox impersonation.** Write `attacks/bonus_firefox_spoof.py`: a Firefox UA with Firefox's headers, so there are no
+   hints to check. Which of our rules still apply? Add a Firefox rule set to `header_order.py` and run the checkpoint.
+3. **Critical-CH.** Set `CRITICAL_CH = True` in `defenses/policy.py`. Real Chrome (and the Chrome shoppers) then retry
+   the *first* navigation with the hints, so the check no longer needs the cookie. What does this change for cookie-less
+   bots?

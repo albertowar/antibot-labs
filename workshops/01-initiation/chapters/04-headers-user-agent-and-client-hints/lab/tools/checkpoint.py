@@ -4,7 +4,8 @@ to checkpoint_core.
 
     python tools/checkpoint.py --round 3              # set the level, run every scraper next to the 40 shoppers
     python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first
-    python tools/checkpoint.py --all --markdown       # every round (the expected-results table)
+    python tools/checkpoint.py --all --markdown       # every round (the expected-results table), then
+                                                      # the attack-by-level matrix the README shows
 
 Every round runs the same set of scrapers against that round's level, so you see the whole attack by defense
 matrix grow one diagonal at a time. A scraper is expected to get through (`full`) until the level that is
@@ -19,6 +20,8 @@ The two Playwright scrapers need `pip install -r requirements-browser.txt` and
 `python -m playwright install chromium`. No browser? `SKIP_BROWSER=1 python tools/checkpoint.py --round 3`.
 """
 
+import atexit
+import functools
 import os
 import statistics
 import sys
@@ -39,8 +42,8 @@ SCRAPERS = {                                    # name -> script, and the first 
     "spoof": ("attacks/round4_client_hints_spoof.py", 4),
 }
 BROWSERS = {
-    "headless": ("attacks/round5_playwright_ua_override.py --no-override", 1),
-    "override": ("attacks/round5_playwright_ua_override.py", 3),
+    "headless": ("attacks/round3_playwright_ua_override.py --no-override", 1),
+    "override": ("attacks/round3_playwright_ua_override.py", 3),
 }
 
 
@@ -80,10 +83,37 @@ def templates_agree(board, results):
     return not problems, "tools/browsers.py disagrees with tools/profiles:\n" + "\n".join(problems)
 
 
+MATRIX = {}                                     # level -> {attack name: products scraped}
+LABELS = {"naive": "round1_naive_requests", "fake_ua": "round2_fake_ua", "copied": "round3_devtools_copy",
+          "override": "round3_playwright_ua_override", "headless": "round3_playwright_ua_override --no-override",
+          "spoof": "round4_client_hints_spoof"}
+
+
+def record_matrix(level, board, results, attacks):
+    """Report only: remember what each attack scraped at this level, for the matrix printed at exit."""
+    MATRIX[level] = {name: (out or {}).get("products") for name, out in attacks.items()}
+    return True, ""
+
+
+def print_matrix():
+    """With --all --markdown: one row per attack, products scraped out of 120 at each level ('–' = not run)."""
+    if "--markdown" not in sys.argv or "--all" not in sys.argv or len(MATRIX) < len(ROUNDS):
+        return
+    levels = sorted(MATRIX)
+    print("\n| Attack ↓ / level → | " + " | ".join(str(n) for n in levels) + " |")
+    print("|---" * (len(levels) + 1) + "|")
+    for key, label in LABELS.items():
+        cells = [MATRIX[n].get(key) for n in levels]
+        print(f"| `{label}` | " + " | ".join("–" if c is None else f"{c}/120" for c in cells) + " |")
+
+
+atexit.register(print_matrix)
+
+
 def round_at(level, description, **kw):
     attacks, expect = attacks_at(level, kw.pop("scrapers", True), kw.pop("browsers", True))
     return Round(level=level, description=description, attacks=attacks, expect=expect, scenario="browse",
-                 extra_checks=[report_profiles, report_suspicious] + kw.pop("extra", []),
+                 extra_checks=[report_profiles, report_suspicious, functools.partial(record_matrix, level)] + kw.pop("extra", []),
                  solutions=("defenses/ladder.py",), **kw)
 
 
@@ -91,9 +121,8 @@ ROUNDS = {
     0: round_at(0, "recon: nothing is wired, every scraper gets the catalog", browsers=False, extra=[templates_agree]),
     1: round_at(1, "User-Agent parsing: the naive scraper and headless Chrome are stopped"),
     2: round_at(2, "presence and Fetch Metadata: a Chrome UA on default headers is stopped"),
-    3: round_at(3, "Client Hints and header order: copied browser headers and the UA override are stopped"),
+    3: round_at(3, "Client Hints and header order: copied browser headers and a real browser with a UA override are stopped"),
     4: round_at(4, "Accept-CH negotiation: consistent static hints are stopped"),
-    5: round_at(4, "a real browser with a UA override: already stopped, but only by what its brand list leaks", scrapers=False),
 }
 
 if __name__ == "__main__":
