@@ -1,6 +1,6 @@
 # Chapter 5 Lab: Replay, Harden, Detect
 
-Starts from: `workshops/01-initiation/starter/` (contract 1.4). Adds: a promo voucher whose "unlocked"
+Starts from: `workshops/01-initiation/starter/` (contract 1.5). Adds: a promo voucher whose "unlocked"
 flag rides in a signed client-side cookie, four session defenses (`promo_state`, `session_velocity`,
 `session_guard` with a binding check), four attack scripts on one shared helper, and the Chapter 5 shoppers.
 

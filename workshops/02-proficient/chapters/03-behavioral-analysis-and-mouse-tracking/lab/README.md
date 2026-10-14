@@ -1,6 +1,6 @@
 # Chapter 3 Lab: Behavioral Analysis & Mouse Tracking
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.4). Adds: a behavior collector on the drop page, five pre-written behavior layers on `POST /drop/<sku>`, `/lab/behavior/*` trace views, eight bots (Rounds 0–5) and behavior profiles for the 40 shoppers.
+Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a behavior collector on the drop page, five pre-written behavior layers on `POST /drop/<sku>`, `/lab/behavior/*` trace views, eight bots (Rounds 0–5) and behavior profiles for the 40 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

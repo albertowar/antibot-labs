@@ -1,6 +1,6 @@
 # Chapter 4 Lab: Headers, User-Agent & Client Hints
 
-Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: five header checks (`ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `accept_ch`) wired into the ladder, the `headers` feature module, the browser-profile capture and replay tools, five attack scripts and the Chapter 4 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: five header checks (`ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `accept_ch`) wired into the ladder, the `headers` feature module, the browser-profile capture and replay tools, five attack scripts and the Chapter 4 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

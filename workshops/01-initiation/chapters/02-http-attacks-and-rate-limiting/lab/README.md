@@ -1,6 +1,6 @@
 # Chapter 2 Lab: Make Volume Cost Something
 
-Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: seven rate-limiting checks (`flood_monitor`, `fixed_window`, `sliding_window`, `rate_limit`, `endpoint_limit`, `account_limit`, `trusted_proxy`, `prefix_limit`) wired one round at a time, a trusted-proxy client-IP helper shared byte-for-byte with Chapter 3, five attack scripts on one shared scraper and a login helper, an offline limiter comparator, and the Chapter 2 shoppers.
+Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: seven rate-limiting checks (`flood_monitor`, `fixed_window`, `sliding_window`, `rate_limit`, `endpoint_limit`, `account_limit`, `trusted_proxy`, `prefix_limit`) wired one round at a time, a trusted-proxy client-IP helper shared byte-for-byte with Chapter 3, five attack scripts on one shared scraper and a login helper, an offline limiter comparator, and the Chapter 2 shoppers.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):

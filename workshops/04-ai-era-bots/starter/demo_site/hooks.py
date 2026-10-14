@@ -22,10 +22,21 @@ SLOTS = defaultdict(list)
 ENRICHERS = []
 UNGATED = ["/static/", "/img/", "/lab/", "/whoami", "/health", "/favicon.ico"]
 ACTION_HOOKS = defaultdict(list)
+ROBOTS = []
 
 
 def slot(name, template):
     SLOTS[name].append(template)
+
+
+def robots(provider):
+    """Extra robots.txt lines: `provider` is a callable returning an iterable of lines.
+
+    Called on every GET /robots.txt, so a chapter can vary its lines with the current
+    DEFENSE_LEVEL (bait Disallow entries, crawl policy). The base policy is unchanged
+    when nothing registers.
+    """
+    ROBOTS.append(provider)
 
 
 def render_slot(name, **ctx):

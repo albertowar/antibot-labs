@@ -1,6 +1,6 @@
 # Kestrel Outfitters: the W4 starter
 
-**Contract:** `workshops/STORE_CONTRACT.md` (version 1.4). **Source:** the skeleton store
+**Contract:** `workshops/STORE_CONTRACT.md` (version 1.5). **Source:** the skeleton store
 (`workshops/01-initiation/starter/`) plus this workshop's baseline, built by `scripts/build_starter.py --workshop 4`
 from `workshops/04-ai-era-bots/starter.manifest.json`. Do not edit this folder by hand; change the manifest and rebuild.
 

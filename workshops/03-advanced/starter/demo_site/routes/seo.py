@@ -2,6 +2,7 @@
 
 from flask import Blueprint, Response, request, url_for
 
+from .. import hooks
 from ..images import svg
 from ..models import Product
 
@@ -10,8 +11,11 @@ bp = Blueprint("seo", __name__)
 
 @bp.route("/robots.txt")
 def robots():
-    body = "User-agent: *\nAllow: /\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\nDisallow: /lab/\n" \
-           f"Sitemap: {request.url_root}sitemap.xml\n"
+    lines = ["User-agent: *", "Allow: /", "Disallow: /cart", "Disallow: /checkout",
+             "Disallow: /account", "Disallow: /lab/"]
+    for provider in hooks.ROBOTS:          # chapter lines (hooks.robots), e.g. bait Disallow entries
+        lines += [str(line) for line in provider()]
+    body = "\n".join(lines) + f"\nSitemap: {request.url_root}sitemap.xml\n"
     return Response(body, mimetype="text/plain")
 
 

@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.4",
+  "contract_version": "1.5",
   "workshop": 3,
   "source": "skeleton+manifest",
   "skeleton": "workshops/01-initiation/starter",
   "manifest": "workshops/03-advanced/starter.manifest.json",
-  "built_from": "f2ec9e3",
+  "built_from": "9b57ba4",
   "default_level": 0,
   "baseline_checks": [],
   "pending_checks": [],
