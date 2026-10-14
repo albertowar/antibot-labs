@@ -1,7 +1,7 @@
 """
-W1 Ch9 — Header templates for real browsers, in wire order.
+Header templates for real browsers, in wire order.
 
-Built from the W1 Ch4 captures in tools/profiles/ (Chrome 145, Firefox 155)
+Built from the W1 Ch4 captures (Chrome 145, Firefox 155)
 and generalised to other versions and platforms. The shopper simulator uses
 them to look like the browsers real customers run.
 

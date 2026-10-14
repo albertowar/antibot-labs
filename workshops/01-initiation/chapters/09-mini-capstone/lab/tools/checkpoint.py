@@ -1,146 +1,155 @@
 """
-W1 Ch9 — Round checkpoint: are you where you should be?
+Round checkpoint for Chapter 9 (the Drop). Declares the rounds and hands over to checkpoint_core.
 
-1. Checks that the running store has the round's layers wired
-   (defenses/pipeline.py).
-2. Runs one drop per key wave: the wave this round must STOP, and the
-   wave that BEATS this round (the reason the next round exists).
-3. Checks the shoppers: only the expected personas may be stopped by a
-   defense. Anything else is a false positive you introduced.
+Every round is a drop: restock to 20 hoodies, release the 40 shoppers (tools/personas_ch9.py) and one
+scalper wave at the same moment, then read the SERVER's count (a trapped bot is told it bought, so its own
+number is what it believes). A round runs two waves, each in its own drop: the wave this round must STOP
+and the wave that BEATS this round (the reason the next round exists). Each also checks which shoppers a
+defense stopped: only the personas the round names may be hurt, anything else is a false positive.
 
-Fell behind? Install the reference pipeline for the round, restart the
-store, and run the checkpoint again:
-    python tools/checkpoint.py --round 3 --catch-up
-    (Ctrl+C the store, then: python demo_site/app.py)
-    python tools/checkpoint.py --round 3
+    python tools/checkpoint.py --round 3              # set level 3, run waves 2 and 3
+    python tools/checkpoint.py --round 3 --level 2    # the same waves against Round 2's defenses (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # a no-op here: the defenses are pre-written
+    python tools/checkpoint.py --restore              # puts back any .bak a lab edit left (none in this lab)
+    python tools/checkpoint.py --all --markdown       # every round, key waves only
+    python tools/checkpoint.py --all --full --markdown   # every round against EVERY wave up to the next one:
+                                                         # the wave-by-round matrix in the README (slow)
 
-Options:
-    --all            run every wave up to the next one, not just the two key waves
-    --skip-browser   skip waves 3 and 4 (no Chromium)
+Waves 3 and 4 drive Chromium (`pip install -r requirements-browser.txt`, `python -m playwright install
+chromium`). `--skip-browser` leaves them out of a round (their expectations are skipped too). Under
+tools/verify.py, which has its own flags, use the environment: CHECKPOINT_FULL=1, CHECKPOINT_SKIP_BROWSER=1.
 """
 
-import argparse
+import atexit
 import os
-import shutil
 import sys
 
-from drop import BROWSER_WAVES, FALSE_POSITIVE, print_scoreboard, run_drop
-from labclient import wait_for_store
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-BASE_LAYERS = ["rate_limit.check", "headers.check"]
+import drop  # noqa: E402
+import personas_ch9  # noqa: E402
+import population  # noqa: E402
+from checkpoint_core import Round, main  # noqa: E402
 
-EXPECTED = {
-    # round: (layers, challenge_enabled, purchases_per_session, {wave: expectation}, personas a defense may stop)
-    0: ([], False, None, {0: "wins"}, set()),
-    1: (BASE_LAYERS, False, None, {0: "stopped", 1: "wins"}, set()),
-    2: (BASE_LAYERS + ["ip_reputation.check"], False, None, {1: "stopped", 2: "wins"}, {"consumer_vpn"}),
-    3: (BASE_LAYERS + ["ip_reputation.check", "traps.check", "session_guard.check"], False, None,
-        {2: "stopped", 3: "wins"}, {"consumer_vpn"}),
-    4: (BASE_LAYERS + ["ip_reputation.check", "traps.check", "session_guard.check", "session_guard.check_binding"],
-        True, 1, {3: "capped", 4: "some"}, {"no_js"}),
+# Two switches checkpoint_core's argparse does not know. As flags here, as environment variables under
+# tools/verify.py (CHECKPOINT_FULL=1, CHECKPOINT_SKIP_BROWSER=1).
+FULL = "--full" in sys.argv or os.environ.get("CHECKPOINT_FULL") == "1"
+SKIP_BROWSER = "--skip-browser" in sys.argv or os.environ.get("CHECKPOINT_SKIP_BROWSER") == "1"
+sys.argv = [a for a in sys.argv if a not in ("--full", "--skip-browser")]
+
+# Bot share of the 20 hoodies that counts as each expectation.
+# "capped": wave 3 mints 6 sessions, and from Round 4 each one may buy at most one hoodie
+EXPECT = {
+    "wins": (lambda n: n >= 10, "takes >= 10 of 20"),
+    "stopped": (lambda n: n <= 4, "gets <= 4 of 20"),
+    "capped": (lambda n: n <= 6, "gets <= 6 of 20 (one per minted session)"),
+    "some": (lambda n: n >= 1, "still gets a few"),
 }
-# Bot share of the 20 hoodies that counts as each expectation
-# "capped": wave 3 mints 6 sessions, and from Round 4 each one buys at most one hoodie
-THRESHOLDS = {"wins": lambda n: n >= 10, "stopped": lambda n: n <= 4, "capped": lambda n: n <= 6,
-              "some": lambda n: n >= 1}
-DESCRIBE = {"wins": "takes ≥10 of 20", "stopped": "gets ≤4 of 20", "capped": "gets ≤6 of 20 (one per minted session)",
-            "some": "still gets a few"}
+RESULTS = {}        # (round, wave) -> the drop's numbers, for the matrix
+DROPS = {}          # wave -> the last full drop result (checkpoint_core only keeps the small dict below)
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
+def wave_attack(n):
+    """An attack for checkpoint_core: one full drop against wave n, judged by the server's count."""
+    def run():
+        result = drop.run_drop([n])
+        DROPS[n] = result
+        hurt = drop.hurt_personas(result)
+        slow = personas_ch9.slowed(result["humans"])
+        return {"attempted": drop.STOCK, "succeeded": drop.bot_sold(result, n), "believed": result["bots"][n].get("believed"),
+                "humans_bought": result["sold"].get("humans", 0), "hurt": hurt, "slowed": len(slow),
+                "gate_ms_median": result["gate_ms"]["median"]}
+    return run
 
 
-def catch_up(round_no):
-    """Install the reference solutions for rounds 1..round_no (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB, round_no)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print("Restart the store (Ctrl+C, then python demo_site/app.py), then run:")
-    print(f"    python tools/checkpoint.py --round {round_no}")
+def expect(n, wave, want, allowed):
+    """extra_check: wave `wave` meets `want` in round n, and no shopper outside `allowed` was hurt."""
+    def check(board, results, attacks):
+        out = attacks.get(f"wave{wave}")
+        if out is None:
+            return True, ""                                   # skipped (--skip-browser)
+        RESULTS[(n, wave)] = out
+        drop.print_scoreboard(DROPS[wave])
+        ok_fn, text = EXPECT[want]
+        problems = []
+        if not ok_fn(out["succeeded"]):
+            problems.append(f"wave {wave} should be {want} ({text}): the store sold it {out['succeeded']}")
+        extra = sorted(set(out["hurt"]) - set(allowed))
+        if extra:
+            problems.append(f"wave {wave} drop: shoppers stopped who should not be: {', '.join(extra)}")
+        return not problems, "; ".join(problems)
+    return check
 
 
-def check_config(round_no, config):
-    layers, challenge, cap, _, _ = EXPECTED[round_no]
-    problems = []
-    missing = set(layers) - set(config["layers"])
-    extra = set(config["layers"]) - set(layers)
-    if missing:
-        problems.append(f"missing layers: {', '.join(sorted(missing))}")
-    if extra:
-        problems.append(f"layers from a later round: {', '.join(sorted(extra))}")
-    if config["layers"] and config["layers"][0] != "rate_limit.check":
-        problems.append("rate_limit.check should run first (it is the cheapest)")
-    if config["challenge_enabled"] != challenge:
-        problems.append(f"CHALLENGE_ENABLED should be {challenge}")
-    if config["purchases_per_session"] != cap:
-        problems.append(f"PURCHASES_PER_SESSION should be {cap}")
-    return problems
+def noop(p, client, rng):
+    p.result.update(outcome="browsed")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Check a round of the W1 Ch9 lab.")
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(EXPECTED))
-    parser.add_argument("--catch-up", action="store_true", help="install the reference pipeline for this round")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    parser.add_argument("--all", action="store_true", help="run every wave up to the next one")
-    parser.add_argument("--skip-browser", action="store_true", help="skip waves 3 and 4")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-
-    if args.catch_up:
-        catch_up(args.round)
-        return 0
-
-    _, _, _, key_waves, allowed_fp = EXPECTED[args.round]
-    config = wait_for_store()["pipeline"]
-    print(f"=== Checkpoint: Round {args.round} ===\n")
-    problems = check_config(args.round, config)
-    if problems:
-        print("❌ defenses/pipeline.py doesn't match this round:")
-        for p in problems:
-            print(f"     - {p}")
-        print(f"\n   Fix it and restart the store, or: python tools/checkpoint.py --round {args.round} --catch-up")
-        return 1
-    print(f"✅ pipeline: {', '.join(config['layers']) or 'no layers'}"
-          f"{' + proof of work + 1 per session' if config['challenge_enabled'] else ''}\n")
-
-    waves = dict(key_waves)
-    if args.all:
-        for w in range(0, max(key_waves) + 1):
-            waves.setdefault(w, "stopped")
-    failures = 0
-    for wave, expectation in sorted(waves.items()):
-        if args.skip_browser and wave in BROWSER_WAVES:
-            print(f"⏭️  wave {wave}: skipped (--skip-browser)\n")
-            continue
-        result = run_drop([wave])
-        print_scoreboard(result)
-        bot_units = result["sold"].get(f"wave{wave}", 0)
-        hurt = {h["persona"] for h in result["humans"] if h["outcome"] in FALSE_POSITIVE or h["outcome"] == "error"}
-        ok_bots = THRESHOLDS[expectation](bot_units)
-        ok_humans = hurt <= allowed_fp
-        failures += (not ok_bots) + (not ok_humans)
-        print(f"{'✅' if ok_bots else '❌'} wave {wave} {DESCRIBE[expectation]}: got {bot_units}")
-        if ok_humans:
-            note = f" (expected: {', '.join(sorted(allowed_fp))})" if hurt else ""
-            print(f"✅ shoppers stopped by a defense: {', '.join(sorted(hurt)) or 'none'}{note}\n")
-        else:
-            print(f"❌ unexpected false positives: {', '.join(sorted(hurt - allowed_fp))}\n")
-
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. Compare with the "
-              f"reference: solutions/round{args.round}/defenses/pipeline.py and defenses/policy.py.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def waves_for(level, key, allowed, extra_waves=()):
+    """
+    The pieces of a Round that run waves: the attacks, the checks that judge them, the shoppers' scenario.
+    key: {wave: expectation} for the judged waves; extra_waves run too under --full (shown, not judged).
+    """
+    waves = dict(key)
+    if FULL:
+        for w in extra_waves:
+            waves.setdefault(w, None)
+    if SKIP_BROWSER:
+        waves = {w: e for w, e in waves.items() if w not in drop.BROWSER_WAVES}
+    return dict(attacks={f"wave{w}": wave_attack(w) for w in sorted(waves)},
+                extra_checks=[expect(level, w, e, allowed) if e else _show(level, w) for w, e in sorted(waves.items())],
+                scenario=noop, population_n=1)
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def _show(n, wave):
+    def check(board, results, attacks):
+        out = attacks[f"wave{wave}"]
+        RESULTS[(n, wave)] = out
+        drop.print_scoreboard(DROPS[wave])
+        return True, ""
+    return check
+
+
+def all_before(n):
+    return range(0, min(n + 1, 4) + 1)
+
+
+ROUNDS = {
+    0: Round(level=0, description="baseline: no defenses, the naive scalper takes the drop",
+             **waves_for(0, {0: "wins"}, (), all_before(0))),
+    1: Round(level=1, description="rate limits + headers: the naive scalper stopped, the cloud fleet walks in",
+             **waves_for(1, {0: "stopped", 1: "wins"}, (), all_before(1))),
+    2: Round(level=2, description="IP reputation: the fleet stopped (and the VPN shoppers with it), residential proxies walk in",
+             **waves_for(2, {1: "stopped", 2: "wins"}, ("consumer_vpn",), all_before(2))),
+    3: Round(level=3, description="session guard + traps: the filler is trapped, minted sessions walk in",
+             **waves_for(3, {2: "stopped", 3: "wins"}, ("consumer_vpn",), all_before(3))),
+    4: Round(level=4, description="proof of work + binding + one per customer: minted sessions capped, a browser per hoodie still buys",
+             **waves_for(4, {3: "capped", 4: "some"}, ("no_js",), all_before(4))),
+}
+
+
+def matrix():
+    """The wave-by-round table the README prints (only with --full)."""
+    if not RESULTS:
+        return
+    waves = sorted({w for _, w in RESULTS})
+    rounds = sorted({r for r, _ in RESULTS})
+    print("\n| Wave / end of round | " + " | ".join(str(r) for r in rounds) + " |")
+    print("|---|" + "---|" * len(rounds))
+    for w in waves:
+        cells = [str(RESULTS[(r, w)]["succeeded"]) if (r, w) in RESULTS else "-" for r in rounds]
+        print(f"| wave {w} ({drop.WAVES[w][1].split(':')[1]}) | " + " | ".join(cells) + " |")
+    for label, f in (("Shoppers stopped", lambda o: ",".join(o["hurt"]) or "0"), ("Shoppers slowed >= 1 s", lambda o: str(o["slowed"]))):
+        cells = []
+        for r in rounds:
+            seen = [f(RESULTS[(r, w)]) for w in waves if (r, w) in RESULTS]
+            cells.append(" / ".join(dict.fromkeys(seen)) if seen else "-")
+        print(f"| {label} | " + " | ".join(cells) + " |")
+
+
+if "--markdown" in sys.argv:                # also when imported by tools/verify.py
+    atexit.register(matrix)
+
+if __name__ == "__main__":
+    main(ROUNDS)

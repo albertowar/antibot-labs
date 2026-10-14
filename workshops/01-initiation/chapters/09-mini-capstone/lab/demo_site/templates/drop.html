@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block page %}drop{% endblock %}
+{% block title %}{{ p.name }} drop · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="pdp drop-page" data-sku="{{ p.sku }}">
+  <div class="pdp-img"><img src="/img/{{ p.sku }}.svg?w=640" alt="{{ p.name }}" width="640" height="640"></div>
+  <div class="pdp-info">
+    <span class="tag drop">Limited drop</span>
+    <h1>{{ p.name }}</h1>
+    <p class="lead">{{ p.blurb }}</p>
+    <p class="price big">${{ "%.2f"|format(p.price) }}</p>
+    <p class="stock" id="drop-stock" data-stock="{{ p.stock }}">{% if sold_out or p.stock <= 0 %}<strong>Sold out.</strong> That was fast.{% else %}<strong>{{ p.stock }}</strong> left{% if p.max_per_account %} · {{ p.max_per_account }} per account{% endif %}{% endif %}</p>
+    {% if not p.drop_open %}
+      <p class="countdown" data-drop-at="{{ p.drop_at.isoformat() }}Z">Opens {{ p.drop_at.strftime('%b %d %H:%M') }} UTC</p>
+    {% elif p.stock > 0 and not sold_out %}
+    <form class="buy" action="/drop/{{ p.sku }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if p.sizes %}<fieldset class="sizes"><legend>Size</legend>{% for s in p.sizes %}<label><input type="radio" name="size" value="{{ s }}" {% if loop.first %}checked{% endif %}><span>{{ s }}</span></label>{% endfor %}</fieldset>{% endif %}
+      {% if not user %}<label class="field"><span>Email for your order</span><input type="email" name="email" required autocomplete="email" placeholder="you@example.test"></label>
+      <p class="muted small">Have an account? <a href="/login?next=/drop/{{ p.sku }}">Log in</a> to use your saved details.</p>{% endif %}
+      {{ slot("form:drop", p=p) }}
+      <button id="drop-buy" class="btn big" type="submit" data-sku="{{ p.sku }}" {% if bought and p.max_per_account and bought >= p.max_per_account %}disabled{% endif %}>Buy now</button>
+    </form>
+    {% endif %}
+    <ul class="facts"><li>One checkout, one unit</li><li>Charged on order</li><li>No cancellations on drops</li></ul>
+  </div>
+</section>
+<section class="band"><div><h3>How drops work</h3><p class="muted">A numbered release goes live at a published time. Stock is final. Limits are per account where stated.</p></div>
+<div><h3>Fair play</h3><p class="muted">We cancel orders placed with automation. Humans first.</p></div></section>
+{% endblock %}

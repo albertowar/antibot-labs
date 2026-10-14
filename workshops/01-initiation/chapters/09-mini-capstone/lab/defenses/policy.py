@@ -1,89 +1,145 @@
 """
-W1 Ch9 — Policy: every number the defender tunes (Section 9.2).
+Policy: every number the defender tunes on Drop Day, and how a verdict becomes an HTTP answer.
 
-pipeline.py decides WHICH layers run. This file decides HOW MUCH each signal
-counts and WHERE the lines are. On Drop Day this is the only file you edit.
+ladder.py decides WHICH checks run at which level; this file decides HOW MUCH each signal counts
+and WHERE the lines are. Drop Day is a policy-only exercise: edit THIS file and nothing else.
 
-One scale for every layer: 0 (clean) to 100 (certain). The bands are the
-same ones W1 Ch3 introduced for IP reputation:
+One scale for every check: 0 (clean) to 100 (certain).
 
-    score >= 75   block       403 (or a fake success, for trap hits)
-    score >= 40   challenge   proof of work on checkout (Round 4); a block before that
-    score >= 20   monitor     logged; a cheaper proof of work on checkout (Round 4)
+    score >= 75   block       403 (a trap hit answers with a fake success instead)
+    score >= 40   challenge   a proof of work from Round 4; before that there is nothing to serve, so a block
+    score >= 20   monitor     logged, served
     otherwise     allow
 
-Trade-off to keep in mind while tuning: every point you add to a signal moves
-some real users up a band too. The checkpoint and the drop scoreboard report
-both sides; a change that catches one more bot and blocks two shoppers is a
-regression.
-"""
+Every point you add to a signal moves some real users up a band too. The scoreboard reports both
+sides (hoodies the bots got, shoppers stopped, shoppers slowed); a change that catches one more bot
+and stops two shoppers is a regression.
 
-# --- The decision ladder ------------------------------------------------------
+Each section names the chapter that introduced it. The modules that read these values are copies of
+the finished versions from those chapters (see shared.json); only the numbers are the capstone's.
+"""
 
 BANDS = {"monitor": 20, "challenge": 40, "block": 75}
 
-# --- Rate limits (token buckets, defenses/rate_limit.py) ----------------------
-# name: (capacity, refill tokens per second). Capacity is the burst you allow;
-# refill is the sustained rate. A shared IP (CGNAT, offices, universities)
-# spends ONE bucket for everyone behind it, so per-IP buckets must stay loose.
+# The challenge type a "challenge" verdict serves: the W1 Ch7 proof of work (demo_site/ext/pow.py).
+DEFAULT_CHALLENGE = "pow"
 
+# Rounds 1-3 have nothing to serve in the challenge band, so decide() enforces it as a block. That is
+# the cost Round 2 makes visible (a VPN shopper scores 40 and is stopped). From this level on, the
+# same score earns a proof of work instead.
+CHALLENGE_FROM_LEVEL = 4
+
+# Seconds one solved proof of work clears the session (pow_budget.py shortens and limits it).
+CLEARANCE_TTL = 10 * 60
+
+
+def _answering_a_challenge():
+    """True while the request in flight is a client delivering a challenge answer (or asking for one)."""
+    from flask import has_request_context, request
+    return has_request_context() and request.path.startswith("/api/challenge")
+
+
+def decide(score, signals, level):
+    """
+    Map a total score to a band.
+
+    Two capstone rules live here, because they are about what a verdict MEANS rather than how many
+    points it earned:
+      - until Round 4 nothing can be served in the challenge band, so it is a block;
+      - the challenge endpoints are never themselves challenged. A visitor whose address scores 40 on
+        EVERY page (a VPN) would otherwise be told to solve a puzzle and be refused when they deliver
+        the answer: a challenge band that is a block in disguise. (A block, 75+, still blocks.)
+    """
+    if score >= BANDS["block"]:
+        return "block"
+    if score >= BANDS["challenge"]:
+        if level < CHALLENGE_FROM_LEVEL:
+            return "block"
+        return "monitor" if _answering_a_challenge() else "challenge"
+    if score >= BANDS["monitor"]:
+        return "monitor"
+    return "allow"
+
+
+# --- Round 1 -- W1 Ch2 / Ch3: rate limits and "which IP?" ---------------------------------------------
+# name: (capacity, refill tokens per second). Capacity is the burst you allow; refill is the sustained
+# rate. A shared IP (carrier NAT, offices, universities) spends ONE bucket for everyone behind it, so
+# per-IP buckets must stay loose. `ip` is every request; `prefix` is every request from one IPv4 /24
+# (every home shopper sits in 192.0.2.0/24), `prefix6` one IPv6 /64 (one host's allocation: tight);
+# `checkout_ip` is POST /drop/<sku> (drop_guard.py spends it; Ch2's own rate_limit only meters /checkout).
 RATE_LIMITS = {
-    "ip": (60, 2.0),            # every request from one source IP
-    "prefix": (200, 8.0),       # every request from one /24 (IPv4) or /64 (IPv6)
-    "checkout_ip": (12, 0.2),   # POST /checkout from one source IP
+    "ip": (60, 2.0),
+    "prefix": (200, 8.0),
+    "prefix6": (15, 0.5),
+    "login_ip": (10, 0.1),
+    "checkout_ip": (12, 0.2),
 }
 
-# --- IP reputation points (defenses/ip_reputation.py, W1 Ch3 weights) ---------
+# A forged X-Forwarded-For is weak evidence: honest clients behind proxies send one too.
+XFF_POINTS = {"xff_mismatch": 10, "xff_internal_claim": 20}
 
+# --- Round 1 -- W1 Ch4: headers ---------------------------------------------------------------------------
+# A lone library User-Agent is 40, a missing Accept-Language 15, `Accept: */*` 10 (they live in the Ch4
+# modules). python-requests with its defaults: 40 + 15 + 10 = 65, a "challenge" that is a block until Round 4.
+MIN_CHROME_MAJOR = 140
+MIN_FIREFOX_MAJOR = 115          # the current Firefox ESR line
+STALE_VERSION_POINTS = 20        # exercise: set it to 40 and watch old_chrome get stopped
+
+# --- Round 2 -- W1 Ch3: IP reputation --------------------------------------------------------------------
 IP_POINTS = {
     "tor_exit": 40,
     "open_proxy": 40,
     "datacenter": 40,       # inside a published cloud range
     "hosting_asn": 25,      # the ASN is a hosting company
     "known_vpn": 40,        # commercial and corporate VPN egress ranges
-    "privacy_relay": 0,     # iCloud Private Relay: paying customers, not bots
+    "privacy_relay": 0,     # paying Safari customers, not bots
 }
-
-# W1 Ch3 lesson: Private Relay egresses from Akamai and Cloudflare datacenters.
-# Without this, every Safari user with Private Relay looks like a cloud VM.
+# Private Relay egresses from datacenter ranges that the community VPN list also carries. True lets a
+# relay hit cancel datacenter, hosting_asn and known_vpn (W1 Ch3's blue step); False stops both relay shoppers.
 TRUST_PRIVACY_RELAYS = True
 
-# --- Header points (defenses/headers.py) --------------------------------------
-# The W1 Ch4 modules already score on this 0-100 scale (a lone library UA is
-# 40). Multiply here instead of editing them.
-
-HEADER_WEIGHT = 1.0
-
-# --- Session points (defenses/session_guard.py, W1 Ch5) -----------------------
-
+# --- Round 3 -- W1 Ch5: the session as evidence (drop_guard.SESSION_CHECK) --------------------------------
+# no_landing        the session never loaded "/": nobody saw the store
+# no_js_cookie      the page script never ran here. 25 is "monitor": a no-JS human is logged, not stopped
+#                   (Ch5 ships 40 and makes you lower it; the capstone starts from the lowered value)
+# session_too_young the buy came sooner than MIN_SESSION_SECONDS after the session began
 SESSION_POINTS = {
-    "no_form_view": 40,     # POST /checkout from a session that never loaded /drop
-    "no_js_cookie": 20,     # the page's JavaScript never ran (or ran elsewhere)
-    "form_too_fast": 30,    # form submitted sooner than MIN_FORM_SECONDS after it was served
-    "asn_changed": 30,      # Round 4: the session moved to a different network (ASN)
+    "no_landing": 30,
+    "no_js_cookie": 25,
+    "session_too_young": 20,
+    "ua_changed": 50,       # Round 4 (binding): the browser identity changed since the session began
+    "asn_changed": 20,      # Round 4 (binding): the session moved to a different network (a phone leaving Wi-Fi)
 }
-MIN_FORM_SECONDS = 1.0      # autofill + a fast human finish a one-field form in ~1.5 s
+MIN_SESSION_SECONDS = 1.0   # autofill + a fast human finish a one-field form in ~1.5 s
 
-# --- Trap points (defenses/traps.py, W1 Ch8) ----------------------------------
+# --- Round 3 -- W1 Ch8: traps -------------------------------------------------------------------------------
+# A hit that answers with a hard verdict (a fake success) carries TRAP_HARD_POINTS; a logged-only hit
+# (the trap link, a sanctioned client's later requests) stays in the monitor band.
+TRAP_HARD_POINTS = 100
+TRAP_MONITOR_POINTS = 30
+MIN_FILL_SECONDS = 1.0       # a drop form submitted faster than this was not typed (below the autofill shopper's 1.2 s)
+MAX_FORM_AGE = 2 * 3600      # an older timing token is a tab someone left open: not a trap
+# What a client that tripped a trap gets from Round 4 on, and who the sanction is keyed on. "fake": the
+# bot is told it bought. "session" because "ip" would stop every person behind a carrier-NAT address.
+TRAP_RESPONSE_MODE = "fake"
+TRAP_SANCTION_KEY = "session"
+SANCTION_TTL = 15 * 60
 
-TRAP_POINTS = {
-    "honeypot_field": 100,  # filled a field no human can see
-    "trap_link": 100,       # followed a link no human can see (and robots.txt forbids)
-    "trap_path": 100,       # asked for /.env, /wp-login.php ...
-    "flagged_session": 100, # this session hit a trap earlier
-    "flagged_ip": 20,       # this IP hit a trap in the last TRAP_IP_TTL seconds
-}
-TRAP_IP_TTL = 600           # a shared IP must not stay "guilty" for long
-HONEYPOT_FIELD = "website"  # rename it on Drop Day and watch the autofill shopper
+# --- Round 4 -- W1 Ch7: proof of work ------------------------------------------------------------------------
+# Pages behind the gate: the drop page and the JSON buy. Everything else stays free (a wall in front of
+# the whole store prices people, not scalpers).
+POW_PROTECTED = ("/drop/", "/api/buy")
+POW_GATE_POINTS = 40         # lands in the challenge band by itself
+POW_BASE_BITS = 16           # expected work is 2**bits hashes: each bit doubles it, for every shopper too.
+                             # The price when nothing sets one; at level 4 pow_adaptive sets it from POW_ADAPTIVE below
+POW_PASS_BUDGET = 20         # one solve buys this many protected requests ...
+POW_PASS_TTL = 120           # ... or this many seconds, bound to the IP + User-Agent that solved it
+# Adaptive difficulty (pow_adaptive.py): (max gated requests per window from one IP, bits); the last row
+# catches the rest, and the FIRST row is the everyday price. Sized so a carrier-NAT address shared by
+# eight phones stays at the base price. Drop Day: every bit doubles the work for a budget phone first.
+POW_RATE_WINDOW_S = 60
+POW_ADAPTIVE = [(40, 16), (80, 20), (None, 22)]
 
-# --- Proof of work (defenses/proof_of_work.py, W1 Ch7) -------------------------
-# Leading zero bits required per band. Expected work doubles per bit. Measured
-# on the reference laptop: the page's WebCrypto solver in headless Chromium 153
-# does ~80k hashes/s, a plain Python loop ~400k/s (and native code far more).
-#   10 bits ~1k hashes    ~0.01 s in the browser
-#   14 bits ~16k hashes   ~0.2 s
-#   17 bits ~131k hashes  ~1.6 s in the browser, ~0.3 s in Python
-# Each extra bit doubles the wait for EVERY shopper in that band, phones first.
-
-POW_BITS = {"allow": 10, "monitor": 14, "challenge": 17}
-POW_TTL = 120               # seconds a challenge stays valid
+# --- Round 4 -- the capstone's own rule: one hoodie per customer ---------------------------------------------
+# A session that has bought this many may not buy again (drop_guard.CAP_CHECK). None = no cap.
+PURCHASES_PER_SESSION = 1

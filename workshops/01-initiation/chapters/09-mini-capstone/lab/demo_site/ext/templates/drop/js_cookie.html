@@ -1,0 +1,9 @@
+{# Proof-of-execution: a real browser runs this and sends js_ok back. A plain HTTP client never does. #}
+<script>
+(function () {
+  var n = "{{ (g.ctx.session.get('js_nonce', '') if g and g.ctx else '') }}";
+  if (n) {
+    document.cookie = "js_ok=" + n.split("").reverse().join("") + "; path=/; SameSite=Lax";
+  }
+})();
+</script>

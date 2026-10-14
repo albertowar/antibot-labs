@@ -1,0 +1,9 @@
+/* Chapter 8 traps. Loaded on every page through the `head` slot. */
+
+/* Out of the layout, the Tab order and the accessibility tree.
+   A bot that reads only the HTML sees an ordinary class name. */
+.hp { display: none !important; }
+
+/* Out of VIEW only. The field still takes keyboard focus, screen readers still announce it, and
+   autofill still sees it. This is the planted mistake of the Round 2 starting state. */
+.hp-offscreen { position: absolute; left: -9999px; }

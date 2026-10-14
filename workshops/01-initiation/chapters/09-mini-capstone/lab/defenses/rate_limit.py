@@ -1,93 +1,42 @@
 """
-W1 Ch9 — Layer: rate limiting with Redis token buckets (W1 Ch2).
+rate_limit: a per-IP token bucket on every request.
 
-Three buckets, checked in order of cost:
-    ip           every request from one source IP
-    prefix       every request from one /24 (IPv4) or /64 (IPv6)
-    checkout_ip  POST /checkout from one source IP
+    policy.RATE_LIMITS["ip"] = (capacity, refill/s)    20 burst, 0.5/s = 30 requests a minute
 
-A token bucket allows a burst (capacity) and then a sustained rate (refill
-per second). The check-and-take runs as one Lua script, so concurrent
-requests can't both spend the last token.
+A token bucket allows a burst (capacity), then a sustained rate (refill per second). The
+check-and-take is one Lua script (defenses/store.py), so concurrent requests can't both
+spend the last token. POST /checkout also spends from a tighter `checkout_ip` bucket.
 
-What it catches: volume from a few addresses (wave 0's hammering).
-What it misses: anything spread over many addresses (waves 1-4 send one or
-two requests per IP). It is the cheapest layer, so it runs first.
-False positives: shared IPs. Eight phones behind one carrier-grade NAT
-address spend one bucket. Tighten `checkout_ip` on Drop Day and watch the
-mobile_cgnat shoppers in the scoreboard.
+What it catches: volume from one address. A scraper on one cloud VM gets its burst, then
+one page every two seconds. Unlike a fixed window, there is no boundary to burst across:
+the bucket refills continuously.
+What it misses: anything spread over many addresses. A proxy list, a fleet of VMs, or a
+fresh IPv6 address for every request (one /64 holds 18 quintillion of them) each send a
+handful of requests per address and never touch the limit. So does a patient client that
+stays just under 30 a minute from one address.
+Who it hurts: people who share an address. Carrier-grade NAT puts a neighbourhood of phones
+behind one IPv4 address, and a limit sized for one person throttles all of them. The
+mobile_cgnat shoppers show it on the scoreboard.
 
-Run standalone to see a bucket drain:
-    REDIS_URL=fakeredis:// python defenses/rate_limit.py
+Keys on client_ip(ctx), so until `trusted_proxy` is wired a forged X-Forwarded-For picks
+the bucket. Internal addresses are not exempt: a client claiming to be 127.0.0.1 shares
+one bucket with every other client claiming the same.
 """
 
-import ipaddress
-import time
-
-import policy
-from ladder import Signal
-
-TOKEN_BUCKET_LUA = """
-local key      = KEYS[1]
-local capacity = tonumber(ARGV[1])
-local refill   = tonumber(ARGV[2])
-local now      = tonumber(ARGV[3])
-
-local state  = redis.call('HMGET', key, 'tokens', 'ts')
-local tokens = tonumber(state[1]) or capacity
-local ts     = tonumber(state[2]) or now
-
-tokens = math.min(capacity, tokens + (now - ts) * refill)
-local allowed = 0
-if tokens >= 1 then
-  tokens = tokens - 1
-  allowed = 1
-end
-redis.call('HSET', key, 'tokens', tokens, 'ts', now)
-redis.call('EXPIRE', key, math.ceil(capacity / refill) + 1)
-return allowed
-"""
-
-_scripts = {}
+from .client_ip import client_ip
+from .pipeline import Check, Signal, Verdict
 
 
-def take(redis, bucket, key):
-    """Take one token from `bucket` for `key`. Returns True if allowed."""
-    capacity, refill = policy.RATE_LIMITS[bucket]
-    script = _scripts.get(id(redis))
-    if script is None:
-        script = _scripts[id(redis)] = redis.register_script(TOKEN_BUCKET_LUA)
-    return bool(script(keys=[f"rl:{bucket}:{key}"], args=[capacity, refill, time.time()]))
-
-
-def prefix_of(ip):
-    """The /24 (IPv4) or /64 (IPv6) an address belongs to."""
-    addr = ipaddress.ip_address(ip)
-    bits = 24 if addr.version == 4 else 64
-    return str(ipaddress.ip_network(f"{ip}/{bits}", strict=False))
-
-
-def check(ctx):
-    """Layer entry point: one Signal named rate_limited, or nothing."""
-    buckets = [("ip", ctx.ip), ("prefix", prefix_of(ctx.ip))]
+def _check(ctx):
+    ip = client_ip(ctx)
+    buckets = [("ip", ip)]
     if ctx.method == "POST" and ctx.path == "/checkout":
-        buckets.append(("checkout_ip", ctx.ip))
+        buckets.append(("checkout_ip", ip))
     for bucket, key in buckets:
-        if not take(ctx.redis, bucket, key):
-            return [Signal("rate_limit", "rate_limited", 0, f"{bucket} bucket empty for {key}")]
-    return []
+        if not ctx.bucket(bucket, key):
+            return Verdict("rate_limit", retry_after=2,
+                           signals=(Signal("rate_limit", f"{bucket}_rate_limit", 0, key),))
+    return None
 
 
-if __name__ == '__main__':
-    import os
-    import sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from store import get_redis
-
-    r = get_redis()
-    capacity, refill = policy.RATE_LIMITS["checkout_ip"]
-    print(f"checkout_ip bucket: capacity {capacity}, refill {refill}/s")
-    r.delete("rl:checkout_ip:198.51.100.7")
-    results = [take(r, "checkout_ip", "198.51.100.7") for _ in range(capacity + 3)]
-    print("  " + " ".join("✅" if ok else "⛔" for ok in results))
-    print(f"  {sum(results)} allowed, {len(results) - sum(results)} refused in a burst of {len(results)}")
+CHECK = Check("rate_limit", _check)

@@ -1,123 +1,74 @@
 """
-W1 Ch9 — Layer: session guard (W1 Ch5).
+W1 Ch5 — Rounds 3 & 4: read the session as evidence.
 
-The store keeps a server-side session in Redis for every visitor (the
-session itself exists from Round 0; this layer only READS it). Because the
-state lives on the server, a bot can drop its cookie but cannot edit what
-we remember about it.
+Once the session is trustworthy (server-side, consumed once, rate-limited at birth),
+it is a record of how this visitor behaved. No single fact is proof, so each is a
+weighted signal and policy.decide() adds them up (monitor 20, challenge 40, block 75).
 
-Signals, on POST /checkout only (points in policy.SESSION_POINTS):
-    no_form_view    the session never loaded /drop, so nobody saw the form
-    no_js_cookie    the page's tiny script never ran: js_ok is missing or wrong
-    form_too_fast   submitted < MIN_FORM_SECONDS after the form was served
+CHECK (Round 3), on the redeem action:
+    no_landing          the session never loaded "/", so nobody saw the store
+    no_js_cookie        the page's one-line script never ran: js_ok is missing or wrong
+    session_too_young   the session is younger than a human visit (MIN_SESSION_SECONDS)
 
-Round 4 adds `check_binding`, on every request:
-    asn_changed     the session was created on one network (ASN) and is now
-                    used from another. Session minting does exactly this: a
-                    browser on IP A creates the session, cheap workers on
-                    IPs B, C, D... spend it.
+BINDING_CHECK (Round 4), on the redeem action:
+    ua_changed          the User-Agent / Client-Hints hash differs from session creation.
+                        Browsers do not change identity mid-visit; a handed-off session does.
+    asn_changed         the session was created on one network and is used from another.
 
-What it catches: form fillers that never render the page (wave 2), and
-handoffs across a rotating proxy pool (wave 3, Round 4).
-What it misses: anything that drives a real browser on one IP (wave 4).
-False positives:
-    - no-JS shoppers (NoScript, some accessibility setups) always score
-      no_js_cookie. That is 20 points, "monitor", on purpose.
-    - power users with autofill submit in ~1.5 s. Raise MIN_FORM_SECONDS to
-      3 and watch the autofill shopper on the scoreboard.
-    - phones that move from home Wi-Fi to cellular change ASN mid-session.
-      asn_changed is 30 points: friction (a harder proof of work), not a block.
+What CHECK catches: a script that goes straight for the voucher without rendering the page.
+What it misses: a script that re-implements the one-line JS and waits (the red step does this).
+What BINDING_CHECK catches: session minting — a browser mints a clean session, then a cheap
+    HTTP client spends it. The client forgets the Client Hints; the hash moves.
+What it misses: minting that copies every identity header (the red step), and a real browser
+    driven end to end.
+
+False positives (why the weights are what they are):
+    - no-JS shoppers (NoScript, some accessibility setups) always miss js_ok. That is why the
+      shipped weight (40) is wrong: it blocks them. The README's Round 3 fails on purpose, then
+      drops it to 25 ("monitor"), so a no-JS human is logged, not blocked.
+    - a phone that moves from Wi-Fi to cellular changes ASN mid-session. `asn_changed` is 20
+      (monitor), not a block, for exactly this reason. An exact-IP change is not a signal at all.
 """
 
-import json
-import secrets
-import time
+import hashlib
 
-import policy
-from ladder import Signal
-
-COOKIE = "sid"
-TTL = 1800  # seconds
+from . import policy
+from .pipeline import Check, Signal
 
 
-class Session:
-    """A Redis hash behind an opaque random cookie. Never trust the client to hold state."""
-
-    def __init__(self, redis, sid, data, new):
-        self.redis, self.sid, self.data, self.new = redis, sid, data, new
-
-    @classmethod
-    def load_or_create(cls, redis, sid, network):
-        if sid:
-            data = redis.hgetall(f"sess:{sid}")
-            if data:
-                return cls(redis, sid, data, new=False)
-        sid = secrets.token_urlsafe(24)
-        data = {
-            "created_at": f"{time.time():.3f}",
-            "asn": str(network.get("asn")),
-            "js_nonce": secrets.token_hex(8),
-            "csrf": secrets.token_urlsafe(16),
-            "purchases": "0",
-            "flags": "[]",
-        }
-        redis.hset(f"sess:{sid}", mapping=data)
-        redis.expire(f"sess:{sid}", TTL)
-        return cls(redis, sid, data, new=True)
-
-    def get(self, key, default=None):
-        return self.data.get(key, default)
-
-    def set(self, key, value):
-        self.data[key] = str(value)
-        self.redis.hset(f"sess:{self.sid}", key, str(value))
-        self.redis.expire(f"sess:{self.sid}", TTL)
-
-    def incr(self, key):
-        value = self.redis.hincrby(f"sess:{self.sid}", key, 1)
-        self.data[key] = str(value)
-        return value
-
-    def flags(self):
-        return json.loads(self.data.get("flags", "[]"))
-
-    def add_flag(self, flag):
-        flags = self.flags()
-        if flag not in flags:
-            self.set("flags", json.dumps(flags + [flag]))
-
-    def expected_js_cookie(self):
-        """What the page script writes: the nonce, reversed (W1 Ch5)."""
-        return self.get("js_nonce", "")[::-1]
+def _ua_hash(ctx):
+    ua = ctx.header("User-Agent", "") or ""
+    ch = ctx.header("Sec-CH-UA", "") or ""
+    return hashlib.sha256(f"{ua}|{ch}".encode()).hexdigest()[:16]
 
 
-def check(ctx):
-    """Layer entry point (Round 3): only the protected action is judged."""
-    if not (ctx.method == "POST" and ctx.path == "/checkout"):
-        return []
-    s, points, signals = ctx.session, policy.SESSION_POINTS, []
-
-    served = s.get("form_served_at")
-    if not served:
-        signals.append(Signal("session", "no_form_view", points["no_form_view"],
-                              "checkout from a session that never loaded /drop"))
-    else:
-        elapsed = time.time() - float(served)
-        if elapsed < policy.MIN_FORM_SECONDS:
-            signals.append(Signal("session", "form_too_fast", points["form_too_fast"],
-                                  f"form submitted {elapsed:.2f}s after it was served"))
-
-    if ctx.cookies.get("js_ok") != s.expected_js_cookie():
-        signals.append(Signal("session", "no_js_cookie", points["no_js_cookie"],
-                              "js_ok cookie missing or wrong: the page script never ran here"))
-    return signals
+def _signals(ctx):
+    s, pts, out = ctx.session, policy.SESSION_POINTS, []
+    if not s.get("landing"):
+        out.append(Signal("session", "no_landing", pts["no_landing"],
+                          "redeem from a session that never loaded the store's home page"))
+    if ctx.cookies.get("js_ok") != (s.get("js_nonce", "") or "")[::-1]:
+        out.append(Signal("session", "no_js_cookie", pts["no_js_cookie"],
+                          "js_ok cookie missing or wrong: the page script never ran here"))
+    if s.age_seconds < policy.MIN_SESSION_SECONDS:
+        out.append(Signal("session", "session_too_young", pts["session_too_young"],
+                          f"session is {s.age_seconds:.1f}s old"))
+    return out
 
 
-def check_binding(ctx):
-    """Layer entry point (Round 4): the session must stay on the network that created it."""
-    born_on = ctx.session.get("asn")
-    now_on = str(ctx.network.get("asn"))
-    if ctx.session.new or born_on in (None, "None") or born_on == now_on:
-        return []
-    return [Signal("session", "asn_changed", policy.SESSION_POINTS["asn_changed"],
-                   f"session created on AS{born_on}, now used from AS{now_on}")]
+def _binding(ctx):
+    s, pts, out = ctx.session, policy.SESSION_POINTS, []
+    born_ua = s.get("ua_hash")
+    if born_ua and born_ua != _ua_hash(ctx):
+        out.append(Signal("session", "ua_changed", pts["ua_changed"],
+                          "User-Agent / Client-Hints changed since this session was created"))
+    born_asn = s.get("created_asn")
+    now_asn = str(ctx.edge.asn)
+    if not s.new and born_asn not in (None, "", "0", "None") and born_asn != now_asn:
+        out.append(Signal("session", "asn_changed", pts["asn_changed"],
+                          f"session created on AS{born_asn}, now used from AS{now_asn}"))
+    return out
+
+
+CHECK = Check("session_guard", _signals, phases=("action:promo_redeem",))
+BINDING_CHECK = Check("session_binding", _binding, phases=("action:promo_redeem",))
