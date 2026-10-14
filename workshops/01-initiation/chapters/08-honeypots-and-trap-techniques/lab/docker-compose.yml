@@ -1,24 +1,20 @@
-# Chapter 8 lab: Redis for trap events, sanctions, accounts and reviews.
-#
-#   docker compose up -d --wait   # start
-#   docker compose down -v        # stop and wipe everything
-#
-# The Flask app runs on the host (python demo_site/app.py) and connects with
-# REDIS_URL=redis://localhost:6379/0 (the default). No Docker? Start the app
-# with REDIS_URL=memory:// instead and it uses an in-process fakeredis.
-#
-# Redis 8 is licensed AGPLv3 (among other options). Valkey (BSD) is a drop-in
-# replacement: swap the image for valkey/valkey and nothing else changes.
-
-name: w1-ch08-honeypots
-
+# Optional. The store runs without Docker (SQLite + an in-process Redis). Bring these up to
+# run the production-shaped stack the series uses everywhere else:
+#   docker compose up -d --wait
+#   REDIS_URL=redis://127.0.0.1:6379/0 \
+#   DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
+name: kestrel-starter
 services:
   redis:
     image: redis:8.10.2-alpine
-    ports:
-      - "127.0.0.1:6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 3s
-      retries: 15
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 2s, timeout: 2s, retries: 15}
+  postgres:
+    image: postgres:18.6-alpine
+    environment: {POSTGRES_USER: workshop, POSTGRES_PASSWORD: workshop, POSTGRES_DB: shop}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql"]   # the 18 image keeps PGDATA under this mount
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U workshop -d shop"], interval: 2s, timeout: 2s, retries: 15}
+volumes:
+  pgdata: {}

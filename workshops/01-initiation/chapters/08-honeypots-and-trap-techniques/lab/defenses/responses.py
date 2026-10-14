@@ -1,65 +1,129 @@
 """
-Chapter 8 — Responding to a Trap Hit (Section 8.4)
+responses (Round 4): what you do when a trap fires, and what happens to the client afterwards.
 
-Detecting a bot is half the job. What you do next decides what the attacker
-learns, and who else gets hurt.
+Detecting a bot is half the job. What you do next decides what the attacker learns, and who else
+gets hurt. Two settings in policy.py control it:
 
-Levels 1-3 only DETECT. A trapped signup gets a fake success page and is not
-saved, and a trapped crawl gets a plausible page. Nothing happens to the
-client afterwards.
+TRAP_RESPONSE_MODE
+  block       403 on the hit and on everything after it. Cheap and clear, and a free oracle: the bot
+              knows at once which request tripped it (here the X-Lab-Signals header even names the
+              trap; with LAB_HEADERS=0 it only sees the 403).
+  fake        A signup or review is answered like a real one and thrown away. A bot that checks its
+              work (logs in with the new account) sees that nothing exists.
+  quarantine  Accept and contain. The account is created but flagged, and its reviews are shown only
+              to their author (a shadow ban). The bot cannot easily tell it failed. You pay for
+              storage, moderation tooling, and the risk of quarantining a real person.
 
-Level 4 adds a SANCTION: after a hit, the client's later requests are treated
-differently for SANCTION_TTL (trap_store.py). Two settings control it:
+  Not here: tarpitting. `time.sleep()` in a synchronous worker ties up YOUR thread for every second
+  the bot waits. Do it at the edge or in an async server, or not at all.
 
-RESPONSE_MODE
-  block       403 on the hit and on everything after it. Cheap and clear, and
-              a free oracle: the bot knows instantly which request tripped it.
-  fake        Fake success. Nothing is saved. The bot reports success, but a
-              bot that checks its work (logging in with the new account) sees
-              that the account doesn't exist.
-  quarantine  Accept and contain. The account is created but flagged. Login
-              works, and its reviews are shown only to their author (a shadow
-              ban). The bot can't easily tell it failed. You pay for storage,
-              moderation tooling and the risk of quarantining a real person.
+TRAP_SANCTION_KEY
+  ip          Sanction the whole address. Hits every human behind the same CGNAT, office NAT or VPN
+              exit (Chapter 3).
+  session     Sanction the session cookie. Real users on the same IP are untouched, but a bot that
+              drops its cookies starts clean. That is acceptable: it still has to get past every
+              trap again.
 
-  Not here: tarpitting (delaying responses). `time.sleep()` in a sync worker
-  ties up YOUR thread for every second the bot waits. Do it at the edge or in
-  an async server, or not at all.
+Below level 4 nothing is sanctioned: `on_hit` only answers the hit itself (a fake success for a form
+trap, a plain monitor signal for a crawl trap) and no state is kept. At level 4 a hit also writes a
+sanction (a Redis key with a TTL, `policy.SANCTION_TTL`), and this module's check applies the mode to
+the client's LATER requests.
 
-SANCTION_KEY
-  ip          Sanction the whole IP. Hits every human behind the same CGNAT,
-              office NAT or VPN exit (W1 Ch3).
-  session     Sanction the session cookie. Real users behind the same IP are
-              untouched, but a bot that drops its cookies starts clean. That
-              is acceptable: it still has to get past every trap again.
+Trade-offs:
+  - Sanctions expire. A permanent block list grows forever, and the addresses on it get reassigned to
+    real customers. Fifteen minutes is enough to make a bot start over, and short enough that a false
+    positive heals itself. A new hit re-arms the key; ordinary requests do not extend it.
+  - `block` and `fake` are visible to the person caught. `quarantine` is not, which is exactly what
+    makes it the worst kind of false positive: nobody complains. Sample what you quarantine.
+  - The sanction lookup is one Redis GET per request. Compare the level 3 and level 4 gate times.
 """
 
-import os
+from . import policy
+from .pipeline import Check, Signal, Verdict
 
-RESPONSE_MODES = ("block", "fake", "quarantine")
-SANCTION_KEYS = ("ip", "session")
+MODES = ("block", "fake", "quarantine")
+KEYS = ("ip", "session")
 
-RESPONSE_MODE = os.environ.get("RESPONSE_MODE", "block")
-SANCTION_KEY = os.environ.get("SANCTION_KEY", "ip")
-
-if RESPONSE_MODE not in RESPONSE_MODES:
-    raise SystemExit(f"RESPONSE_MODE must be one of {RESPONSE_MODES}")
-if SANCTION_KEY not in SANCTION_KEYS:
-    raise SystemExit(f"SANCTION_KEY must be one of {SANCTION_KEYS}")
+# Requests whose answer a "fake" sanction can forge: the two writes a bot abuses.
+FAKEABLE = ("/register", "/review/")
 
 
 def mode(level):
     """What a trapped or sanctioned request gets at this level."""
-    return RESPONSE_MODE if level >= 4 else "detect"
+    return policy.TRAP_RESPONSE_MODE if level >= 4 else "detect"
 
 
-def sanction_target(ip, sid):
-    """The (key type, value) a sanction is stored under."""
-    return ("ip", ip) if SANCTION_KEY == "ip" else ("sid", sid)
+def _key(ctx):
+    """The (kind, value) a sanction is stored under."""
+    if policy.TRAP_SANCTION_KEY == "ip":
+        return "ip", ctx.ip
+    return "sid", ctx.session.sid
+
+
+def _redis_key(kind, value):
+    return f"lab:traps:sanction:{kind}:{value}"        # lab: prefix, so /lab/reset wipes it
+
+
+def sanction(ctx, trap):
+    """Sanction the client for SANCTION_TTL seconds. Re-armed by every new hit."""
+    ctx.redis.set(_redis_key(*_key(ctx)), trap, ex=policy.SANCTION_TTL)
+
+
+def sanctioned(ctx):
+    """The trap that earned the sanction, or None."""
+    return ctx.redis.get(_redis_key(*_key(ctx)))
+
+
+def _fakeable(ctx):
+    return ctx.method == "POST" and ctx.path.startswith(FAKEABLE)
+
+
+def _monitor(ctx, signal):
+    """A logged-and-served signal. Points add up across checks, so only the first one in a request counts:
+    two traps at 30 points each would otherwise add up to a block."""
+    if ctx.attrs.get("trap_scored"):
+        return None
+    ctx.attrs["trap_scored"] = True
+    return [signal]
+
+
+def on_hit(ctx, layer, trap, detail="", form=False):
+    """
+    Called by a trap check the moment it fires. Returns what the check should return.
+
+    `form` says the trap sits on a write (signup): there a hit is answered with a fake success. A
+    crawl trap is only logged, so the crawler still gets a plausible page (detection is not
+    prevention). At level 4 the hit also sanctions the client and the mode applies to the hit itself.
+    """
+    ctx.note(trap=trap)
+    m = mode(ctx.level)
+    if ctx.level >= 4:
+        sanction(ctx, trap)
+    if m == "block":
+        return Verdict("block", signals=(Signal(layer, trap, policy.TRAP_HARD_POINTS, detail),))
+    if form and m in ("detect", "fake"):
+        return Verdict("deceive", signals=(Signal(layer, trap, policy.TRAP_HARD_POINTS, detail),))
+    if form and m == "quarantine":
+        ctx.attrs["quarantine"] = trap                  # the ext flags the account and parks its reviews
+    return _monitor(ctx, Signal(layer, trap, policy.TRAP_MONITOR_POINTS, detail))
+
+
+def _check(ctx):
+    # TODO (Round 4): on_hit() above already answered the HIT itself and wrote the sanction. This check
+    # answers the client's LATER requests. sanctioned(ctx) returns the trap that earned the sanction, or
+    # None. Then apply policy.TRAP_RESPONSE_MODE:
+    #   block       return Verdict("block", ...)
+    #   fake        a Verdict("deceive", ...) for POST /register and POST /review/* (see _fakeable)
+    #   quarantine  set ctx.attrs["quarantine"] so the ext parks the account and its reviews
+    # and return one monitor Signal through _monitor() for the requests that are served. Until you write
+    # it, the hit is answered but the next request from the same client is not.
+    return None
+
+
+CHECK = Check("responses", _check)
 
 
 if __name__ == "__main__":
-    print(f"RESPONSE_MODE={RESPONSE_MODE} SANCTION_KEY={SANCTION_KEY}")
+    print(f"TRAP_RESPONSE_MODE={policy.TRAP_RESPONSE_MODE} TRAP_SANCTION_KEY={policy.TRAP_SANCTION_KEY}")
     for level in range(5):
         print(f"  level {level}: {mode(level)}")
-    print("  sanction stored under:", sanction_target("203.0.113.77", "a1b2c3d4"))

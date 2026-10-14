@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block page %}archive{% endblock %}{% block title %}Archived products, page {{ n }} · {{ store_name }}{% endblock %}
+{% block content %}
+<div class="section-head"><h1>Archived products, page {{ n }}</h1></div>
+<p class="muted">Discontinued gear. Pages are kept for reference only.</p>
+<ul>{% for k in range(n + 1, n + 4) %}<li><a href="/catalog/archive/{{ k }}">Archive page {{ k }}</a></li>{% endfor %}</ul>
+{% endblock %}

@@ -1,201 +1,155 @@
 """
-Chapter 8 — Round Checkpoint (Section 8.5)
+Round checkpoint for Chapter 8 (Honeypots & Trap Techniques). Declares the rounds and hands over to
+checkpoint_core.
 
-Run at the end of every round. It wipes the store, replays every attack
-introduced so far and every legitimate persona, then measures BOTH sides:
+    python tools/checkpoint.py --round 2              # set level 2, run the round's attacks next to the shoppers
+    python tools/checkpoint.py --round 2 --level 1    # the same attacks against Round 1's defenses (the "before")
+    python tools/checkpoint.py --round 2 --catch-up   # install solutions/round1..2 first
+    python tools/checkpoint.py --restore              # put your own files back (the .bak copies)
+    python tools/checkpoint.py --all --markdown       # every round (the reference table)
 
-  - bot traffic:   trapped or not, compared with the expected result
-  - real users:    any trap hit, block, dropped signup or hidden review is a
-                   false positive
-  - defender cost: trap-check time per request (Server-Timing)
-
-Fell behind? `--catch-up` copies the reference fixes for the TODO rounds up
-to N (solutions/roundN/*.py) into defenses/, keeping a .bak of your file. The
-demo site reloads by itself. Then restart it with the round's level:
-    cd demo_site && DEFENSE_LEVEL=<N> python app.py
-
-Run:
-    python tools/checkpoint.py --round 2
-    python tools/checkpoint.py --round 2 --catch-up
-    python tools/checkpoint.py --round 3 --skip-browser    # no Playwright scripts
+Every round measures two things: what each bot really got, and which of the 40 shoppers the traps
+caught by mistake. The first needs the server's word. A trapped signup gets a fake success, so a bot's
+own count ("10/10 succeeded") is what it BELIEVES; `truth()` below replaces it with what the decision
+log says the store really did (accounts created, reviews published). The shoppers run the `signup`
+scenario (tools/personas_ch8.py): a shopper is hurt if a trap or sanction signal touched anything they
+did, even when the page looked fine. A round's `allowed_fp` names the personas it may hurt: empty here,
+so a Round 2 or Round 3 left unfixed FAILS on purpose.
 """
 
-import argparse
-import importlib.util
-import json
 import os
-import shutil
 import sys
-import time
-import urllib.request
 
-import legit_traffic
-import scoreboard
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-sys.path.insert(0, os.path.join(LAB, "attacks"))
-
-from _lab import BASE_URL, require_local  # noqa: E402
-
-# script, first round it runs in, needs a browser, first level that traps it (None = never)
-ATTACKS = [
-    ("round0_recon", 0, False, 1),          # fills every field, like round 1
-    ("round1_form_spammer", 1, False, 1),
-    ("round1b_markup_aware", 1, False, 2),
-    ("round2_playwright_form", 2, True, None),
-    ("round3_crawler", 3, False, 3),
-    ("round3b_polite_crawler", 3, True, None),
-    ("round4_verify_signup", 4, False, 1),
-]
-CATALOG_SIZE = 12
-SOLUTIONS = {2: ["form_traps.py"], 3: ["crawl_traps.py"]}
+import personas_ch8  # noqa: E402,F401  (registers the `signup` scenario and the relabelled shoppers)
+from checkpoint_core import Round, main, run_attack  # noqa: E402
+from labclient import admin  # noqa: E402
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
+# --- What the store really did, from the decision log --------------------------------------------------
+
+def rows(actor):
+    return admin("GET", "/lab/decisions", params={"actor": actor, "limit": 5000})["items"]
 
 
-def get(path):
-    with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=5) as r:
-        return json.loads(r.read())
+def accounts_created(decisions):
+    """Signups that made a real, active account (a quarantined or faked one does not count)."""
+    return sum(1 for d in decisions if d["method"] == "POST" and d["path"] == "/register"
+               and d["extra"].get("account") == "created")
 
 
-def post(path):
-    request = urllib.request.Request(f"{BASE_URL}{path}", method="POST")
-    with urllib.request.urlopen(request, timeout=5) as r:
-        return json.loads(r.read())
+def reviews_published(decisions):
+    return sum(1 for d in decisions if d["path"].startswith("/review/") and d["extra"].get("review") == "published")
 
 
-def load_attack(name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(LAB, "attacks", f"{name}.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def hits(decisions, layer):
+    """Requests the store flagged with a signal from this check (form_traps, crawl_traps, responses)."""
+    return sum(1 for d in decisions if f"{layer}:" in (d.get("signals") or ""))
 
 
-def catch_up(round_no):
-    """Install the reference solutions for rounds 1..round_no (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB, round_no)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    if installed:
-        time.sleep(3)                                # let Flask's reloader restart the app
-        for _ in range(20):
-            try:
-                return get("/trap-check")
-            except OSError:
-                time.sleep(0.5)
-    return None
+def truth(script, actor, count):
+    """Run an attack script, then replace its `succeeded` (what the bot believes) with the store's count."""
+    def run():
+        out = run_attack(script)
+        decisions = rows(actor)
+        out.update(believed=out["succeeded"], succeeded=count(decisions),
+                   deceived=sum(1 for d in decisions if d["outcome"] == "deceived"),
+                   quarantined=sum(1 for d in decisions if d["extra"].get("account") == "quarantined"))
+        return out
+    return run
 
 
-def judge_attack(name, first_trapped, level, result, counters):
-    """Return (ok, what happened, what should have happened) for one attack script."""
-    hits = sum(scoreboard.trap_hits(counters).values())
-    should_trap = first_trapped is not None and level >= first_trapped
-    expectation = "trapped" if should_trap else "gets through"
-
-    if "products" in result:                                    # a crawler
-        got = len([p for p in result["products"] if p <= CATALOG_SIZE])
-        honey = " + honey product" if any(p > CATALOG_SIZE for p in result["products"]) else ""
-        text = f"{hits} trap hits, scraped {got}/{CATALOG_SIZE}{honey}"
-        trapped, evaded = hits > 0, hits == 0 and got == CATALOG_SIZE
-    else:                                                       # a form bot
-        attempts = counters.get("signup_attempts", 0)
-        created = counters.get("signup_created", 0)
-        trapped = attempts > 0 and created == 0
-        evaded = attempts > 0 and created == attempts and hits == 0
-        if "conclusions" in result:                             # round 4
-            published = counters.get("review_published", 0)
-            text = (f"bot concludes {result['conclusions']}, reviews published {published}, "
-                    f"accounts active {created}/{attempts}")
-            fooled = set(result["conclusions"]) == {"success"}
-            return trapped and published == 0 and fooled, text, "trapped, and it can't tell"
-        text = (f"{created}/{attempts} signups created "
-                f"(bot believes {result['reported_ok']}/{result['attempts']})")
-    return (trapped if should_trap else evaded), text, expectation
+def watched(script, actor):
+    """Run a crawler script, then add what the traps saw of it: requests flagged by a crawl trap, by kind."""
+    def run():
+        out = run_attack(script)
+        flagged = [d for d in rows(actor) if "crawl_traps:" in (d.get("signals") or "")]
+        out["trap_hits"] = len(flagged)
+        out["traps"] = sorted({s.split(":")[1] for d in flagged for s in d["signals"].split(",") if s.startswith("crawl_traps:")})
+        return out
+    return run
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
-    parser.add_argument("--skip-browser", action="store_true", help="skip the Playwright scripts")
-    parser.add_argument("--catch-up", action="store_true",
-                        help="apply the reference fixes for rounds <= N first")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-    require_local()
+RECON = truth("attacks/round0_recon.py", "bot:r0_recon", accounts_created)
+SPAMMER = truth("attacks/round1_form_spammer.py", "bot:r1_spammer", accounts_created)
+MARKUP = truth("attacks/round1b_markup_aware.py", "bot:r1b_markup_aware", accounts_created)
+PLAYWRIGHT = truth("attacks/round2_playwright_form.py", "bot:r2_playwright", accounts_created)
+VERIFY = truth("attacks/round4_verify_signup.py", "bot:r4_verify", reviews_published)
+CRAWLER = watched("attacks/round3_crawler.py", "bot:r3_crawler")
+POLITE = watched("attacks/round3b_polite_crawler.py", "bot:r3b_polite_crawler")
 
-    if args.catch_up:
-        catch_up(args.round)
-    try:
-        check = get("/trap-check")
-    except OSError:
-        print(f"❌ Demo site not reachable on {BASE_URL}. Is it running?")
-        return 1
-    level = check["level"]
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={level}) ===\n")
-    if level != args.round:
-        print(f"❌ Expected DEFENSE_LEVEL={args.round}. Restart the demo site with:")
-        print(f"     cd demo_site && DEFENSE_LEVEL={args.round} python app.py")
-        return 1
-    if level == 4 and (check["response_mode"], check["sanction_key"]) != ("quarantine", "session"):
-        print(f"❌ The Round 4 checkpoint expects the final configuration. You are on "
-              f"RESPONSE_MODE={check['response_mode']} SANCTION_KEY={check['sanction_key']}.")
-        print("     cd demo_site && DEFENSE_LEVEL=4 RESPONSE_MODE=quarantine SANCTION_KEY=session python app.py")
-        return 1
-    if level >= 2 and check["honeypot"]["hide"] == "offscreen":
-        print("⚠️  The Round 2 TODO in defenses/form_traps.py is not fixed yet: expect false positives.\n")
-    if level >= 3 and not check["robots_disallow"]:
-        print("⚠️  The Round 3 TODO in defenses/crawl_traps.py is not fixed yet: expect false positives.\n")
 
-    post("/lab/reset")
-    failures = 0
+# --- Checks beyond expect ------------------------------------------------------------------------------
 
-    print("Bot traffic")
-    results = {}
-    for name, first_round, needs_browser, first_trapped in ATTACKS:
-        if first_round > args.round:
-            continue
-        if needs_browser and args.skip_browser:
-            print(f"  ⏭️  {name:<24} skipped (--skip-browser)")
-            continue
-        results[name] = (load_attack(name).run(), first_trapped)
+def spammer_fooled(board, results, attacks):
+    """Round 1's lesson: the bot reports success on every signup the store dropped."""
+    a = attacks["spammer"]
+    return a["believed"] == a["attempted"] and a["succeeded"] == 0 and a["deceived"] >= a["attempted"], (
+        f"expected the spammer to believe {a['attempted']}/{a['attempted']} while the store created 0 "
+        f"and answered {a['attempted']} with a fake success; believed {a['believed']}, created {a['succeeded']}, "
+        f"deceived {a['deceived']}")
 
-    print_rows = []
-    legit = legit_traffic.run(skip_browser=args.skip_browser)
-    actors = get("/lab/summary")["actors"]
-    for name, (result, first_trapped) in results.items():
-        ok, text, expectation = judge_attack(name, first_trapped, level, result, actors.get(name, {}))
-        failures += not ok
-        print_rows.append(f"  {'✅' if ok else '❌'} {name:<24} {text} (expected: {expectation})")
-    print("\n".join(print_rows))
 
-    print("\nReal users (simulated personas)")
-    hurt = 0
-    for r in legit:
-        found = legit_traffic.problems(r, actors.get(r["persona"], {}))
-        hurt += bool(found)
-        print(f"  {'❌' if found else '✅'} {r['persona']:<22} " + ("; ".join(found) or "ok"))
-    failures += bool(hurt)
-    print(f"  → {hurt}/{len(legit)} personas hurt")
+def crawler_trapped(board, results, attacks):
+    """Round 3's lesson: all three crawl traps fire, and the crawler still gets the catalog (plus a canary)."""
+    seen = {t: sum(1 for d in rows("bot:r3_crawler") if f"crawl_traps:{t}" in (d.get("signals") or ""))
+            for t in ("trap_link", "honey_record", "decoy_endpoint")}
+    canary = "p121" in attacks["crawler"].get("unlisted", [])
+    return all(seen.values()) and canary, f"expected every crawl trap to fire and the honey SKU to be scraped: {seen}, honey={canary}"
 
-    print("\nDefender cost")
-    print(scoreboard.cost_line(get("/lab/summary")["timings_ms"]))
 
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. "
-              "Read the notes above, or compare with the expected-results table in the README.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def polite_clean(board, results, attacks):
+    n = hits(rows("bot:r3b_polite_crawler"), "crawl_traps")
+    return n == 0, f"the polite crawler should never touch a trap, but {n} requests were flagged"
 
+
+def final_config(board, results, attacks):
+    """Round 4's checkpoint is the recommended configuration; the four-way comparison is tools/round4_probe.py."""
+    cfg = admin("GET", "/lab/traps")
+    ok = (cfg["response_mode"], cfg["sanction_key"]) == ("quarantine", "session")
+    return ok, (f"this checkpoint expects TRAP_RESPONSE_MODE='quarantine' and TRAP_SANCTION_KEY='session' in "
+                f"defenses/policy.py; the store runs {cfg['response_mode']!r} / {cfg['sanction_key']!r}")
+
+
+def verify_fooled(board, results, attacks):
+    c = attacks["verify"]["conclusions"]
+    return c == {"success": attacks["verify"]["attempted"]}, f"expected the verifying bot to conclude success every time, got {c}"
+
+
+def spammers_contained(board, results, attacks):
+    """Quarantine accepts the signup and parks it: trapped bots are still trapped, with the account quarantined."""
+    n = sum(1 for d in rows("bot:r1_spammer") if d["extra"].get("account") == "quarantined")
+    return n == attacks["spammer"]["attempted"], f"expected {attacks['spammer']['attempted']} quarantined signups from the spammer, saw {n}"
+
+
+SOL = ("defenses/ladder.py",)
+FORMS_L1 = {"recon": RECON, "spammer": SPAMMER, "markup": MARKUP}
+EXPECT_L1 = {"recon": "blocked", "spammer": "blocked", "markup": "full"}
+FORMS_L2 = {**FORMS_L1, "playwright": PLAYWRIGHT}
+EXPECT_L2 = {"recon": "blocked", "spammer": "blocked", "markup": "blocked", "playwright": "full"}
+CRAWL = {"crawler": CRAWLER, "polite": POLITE}
+
+ROUNDS = {
+    0: Round(level=0, description="recon against the open store", scenario="signup",
+             attacks={"recon": RECON}, expect={"recon": "full"}),
+    1: Round(level=1, description="a naive spammer vs the textbook honeypot", scenario="signup",
+             attacks=FORMS_L1, expect=EXPECT_L1, extra_checks=[spammer_fooled],
+             solutions=SOL + ("defenses/form_traps.py",)),
+    2: Round(level=2, description="a rendering browser vs a CSS honeypot and a timing token", scenario="signup",
+             attacks=FORMS_L2, expect=EXPECT_L2, extra_checks=[spammer_fooled],
+             solutions=SOL + ("defenses/form_traps.py",)),
+    3: Round(level=3, description="a polite crawler vs crawl traps and robots.txt", scenario="signup",
+             attacks={**FORMS_L2, **CRAWL}, expect={**EXPECT_L2, "crawler": "full", "polite": "full"},
+             extra_checks=[spammer_fooled, crawler_trapped, polite_clean],
+             solutions=SOL + ("defenses/crawl_traps.py",)),
+    4: Round(level=4, description="a bot that checks its work vs quarantine keyed on the session", scenario="signup",
+             attacks={**FORMS_L2, **CRAWL, "verify": VERIFY},
+             expect={**EXPECT_L2, "crawler": "full", "polite": "full", "verify": "blocked"},
+             extra_checks=[final_config, spammers_contained, crawler_trapped, polite_clean, verify_fooled],
+             solutions=SOL + ("defenses/responses.py", "defenses/policy.py")),
+}
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main(ROUNDS)

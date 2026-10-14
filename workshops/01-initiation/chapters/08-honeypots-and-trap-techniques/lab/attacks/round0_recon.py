@@ -1,49 +1,50 @@
 """
-Chapter 8 — Round 0: Recon (Section 8.5)
+Chapter 8, Round 0 attack: recon.
 
-Objective: look at the store the way a bot does. What does the signup form
-contain? What does robots.txt say? Then create one account, to confirm the
-form works for scripts at DEFENSE_LEVEL=0.
+Look at the store the way a bot does. What does the signup form contain? What does robots.txt say?
+Then create one account, to confirm the form works for scripts at DEFENSE_LEVEL=0.
 
-Expected results:
-  - level 0: three inputs (username, email, password), one account created
-  - level 1+: an extra input appears. Run this again each round and compare.
-
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=0 python app.py
-Then run:
     python attacks/round0_recon.py
+
+Expected:   level 0: three inputs (name, email, password), one account created.
+            level 1+: an extra input appears. Run this again each round and compare. At level 1 the
+            recon bot fills it like any other input and the signup is silently dropped.
 """
 
-from _lab import fill_value, http_client, outcome, parse_form, tag
+import json
+import os
+import secrets
+import sys
 
-ACTOR, IP = "round0_recon", "203.0.113.9"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+import trapkit  # noqa: E402  (labclient runs the localhost guard on import)
+from trapkit import BASE_URL, LabClient, world_pool  # noqa: E402
+
+ACTOR = "bot:r0_recon"
 
 
 def run(verbose=False):
-    with http_client(ACTOR, IP) as client:
-        robots = client.get("/robots.txt").text
-        html = client.get("/register").text
-        fields = parse_form(html)
-        user = f"recon-{tag()}"
-        data = {f["name"]: f.get("value", "") if f.get("type") == "hidden"
-                else fill_value(f, 0, user) for f in fields if f.get("name")}
-        response = client.post("/register", data=data)
-        result = outcome(response.text)
-
+    bot = LabClient(ACTOR, ip=world_pool("cloud_vm")[0])
+    robots = bot.get("/robots.txt", trapkit.headers("typed")).text
+    page = bot.get("/register", trapkit.headers("link", BASE_URL + "/"))
+    fields = trapkit.parse_form(page.text)
+    user = f"recon-{secrets.token_hex(3)}"
+    data = {f["name"]: f.get("value", "") if f.get("type") == "hidden" else trapkit.fill_value(f, user)
+            for f in fields if f.get("name") and f.get("type") not in ("submit", "button")}
+    reply = trapkit.follow(bot, bot.post("/register", data, trapkit.headers("post", BASE_URL + "/register")),
+                           trapkit.headers("link", BASE_URL + "/register"))
+    ok = trapkit.signed_up(reply)
     if verbose:
-        print("=== Round 0: Recon ===\n")
         print("robots.txt:\n  " + robots.strip().replace("\n", "\n  "))
         print("\nSignup form inputs, as the raw HTML shows them:")
         for f in fields:
-            wrappers = [a for a in f["_ancestors"] if a.get("style") or a.get("class")]
-            hint = ", ".join(f"{k}={v!r}" for a in wrappers for k, v in a.items()
-                             if k in ("style", "class", "aria-hidden"))
-            print(f"  name={f.get('name')!r:<16} type={f.get('type', 'text'):<9} "
-                  f"label={f['_label']!r:<26} {hint}")
-        print(f"\nSignup as {user!r}: {response.status_code} data-outcome={result!r}")
-    return {"actor": ACTOR, "attempts": 1, "reported_ok": int(result == "created")}
+            hints = ", ".join(f"{k}={v!r}" for e in [f, *f["_ancestors"]] for k, v in e.items()
+                              if k in ("style", "class", "aria-hidden", "tabindex") and not k.startswith("_"))
+            print(f"  name={f.get('name')!r:<16} type={f.get('type', 'text'):<9} label={f['_label']!r:<26} {hints}")
+        print(f"\nSignup as {user!r}: landed on {reply.url.replace(BASE_URL, '')} ({reply.status_code}); "
+              f"the bot believes it {'succeeded' if ok else 'failed'}.")
+    return {"attempted": 1, "succeeded": int(ok), "inputs": len(fields)}
 
 
 if __name__ == "__main__":
-    run(verbose=True)
+    print(json.dumps(run(verbose=True)))

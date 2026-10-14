@@ -1,34 +1,35 @@
 """
-Chapter 8 — Round 1 Attack, part b: Markup-Aware Spammer (Section 8.5)
+Chapter 8, Round 1 attack, part b: the markup-aware spammer.
 
-Objective: beat the textbook honeypot without a browser. Before filling a
-field, read the markup around it and skip anything that LOOKS hidden:
+Objective: beat the textbook honeypot without a browser. Before filling a field, read the markup
+around it and skip anything that LOOKS hidden:
 
-  - an inline style with display:none or visibility:hidden, on the input or
-    on any element around it
+  - an inline style with display:none or visibility:hidden, on the input or on any element around it
   - the `hidden` attribute, or aria-hidden="true" on any ancestor
   - a name from the usual honeypot list (website, url, homepage, ...)
 
-All of that is visible in the HTML, so the bot needs about 15 extra lines.
-It still submits instantly, and it still can't see what CSS does.
+All of that is visible in the HTML, so the bot needs about 15 extra lines. It still submits instantly,
+and it still cannot see what the stylesheet does.
 
-Expected results:
-  - level 1: every signup is created (the inline display:none gave it away)
-  - level 2+: trapped. The honeypot is hidden by a class in store.css and has
-    an opaque name, and the instant submit trips the timing token.
-    Ask yourself: what would it take to beat level 2 without a browser?
-
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=1 python app.py
-Then run:
     python attacks/round1b_markup_aware.py
+
+Expected:   level 1: every signup is created (the inline display:none gave the honeypot away).
+            level 2+: trapped. The honeypot is hidden by a class in traps.css and has an opaque name,
+            and the instant submit trips the timing token. Ask yourself: what would it take to beat
+            level 2 without a browser?
 """
 
+import json
+import os
 import re
+import secrets
+import sys
 
-from _lab import TEXT_TYPES, fill_value, http_client, outcome, parse_form, tag
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+import trapkit  # noqa: E402  (labclient runs the localhost guard on import)
+from trapkit import BASE_URL, LabClient, world_pool  # noqa: E402
 
-ACTOR, IP = "round1b_markup_aware", "203.0.113.11"
+ACTOR = "bot:r1b_markup_aware"
 HONEYPOT_NAMES = {"website", "url", "homepage", "hp", "honeypot", "fax", "address2"}
 HIDDEN_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
 
@@ -44,7 +45,7 @@ def looks_hidden(field):
     return None
 
 
-def build_form(fields, i, user, verbose=False):
+def build_form(fields, user, verbose=False):
     data = {}
     for f in fields:
         if not f.get("name") or f.get("type") in ("submit", "button"):
@@ -57,29 +58,30 @@ def build_form(fields, i, user, verbose=False):
             if verbose:
                 print(f"    skipping {f['name']!r}: {why}")
             continue
-        if f.get("type", "text") in TEXT_TYPES:
-            data[f["name"]] = fill_value(f, i, user)
+        if f.get("type", "text") in trapkit.TEXT_TYPES:
+            data[f["name"]] = trapkit.fill_value(f, user)
     return data
 
 
 def run(attempts=10, verbose=False):
-    ok = 0
+    ip, believed = world_pool("cloud_vm")[2], 0
     for i in range(attempts):
-        with http_client(ACTOR, IP) as client:
-            fields = parse_form(client.get("/register").text)
-            user = f"aware{i}-{tag()}"
-            response = client.post("/register",
-                                   data=build_form(fields, i, user, verbose and i == 0))
-            result = outcome(response.text)
-            ok += result == "created"
-            if verbose:
-                print(f"  signup {user:<17} {response.status_code} data-outcome={result}")
+        bot = LabClient(ACTOR, ip=ip)
+        page = bot.get("/register", trapkit.headers("link", BASE_URL + "/"))
+        user = f"aware{i}-{secrets.token_hex(3)}"
+        data = build_form(trapkit.parse_form(page.text), user, verbose and i == 0)
+        reply = trapkit.follow(bot, bot.post("/register", data, trapkit.headers("post", BASE_URL + "/register")),
+                               trapkit.headers("link", BASE_URL + "/register"))
+        ok = trapkit.signed_up(reply)
+        believed += ok
+        if verbose:
+            print(f"  signup {user:<17} -> {reply.status_code} {reply.url.replace(BASE_URL, '')}")
     if verbose:
-        print(f"\nBot's view: {ok}/{attempts} signups succeeded.")
+        print(f"\nBot's view: {believed}/{attempts} signups succeeded.")
         print("Server's view: python tools/scoreboard.py")
-    return {"actor": ACTOR, "attempts": attempts, "reported_ok": ok}
+    return {"attempted": attempts, "succeeded": believed}
 
 
 if __name__ == "__main__":
     print("=== Round 1b: markup-aware spammer ===")
-    run(verbose=True)
+    print(json.dumps(run(verbose=True)))

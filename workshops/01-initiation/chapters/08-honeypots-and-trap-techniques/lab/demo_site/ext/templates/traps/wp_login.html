@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block page %}wp-login{% endblock %}{% block title %}Log In · {{ store_name }}{% endblock %}
+{% block content %}
+<form class="card narrow" action="/wp-login.php" method="post">
+  <h1>Log In</h1>
+  {% if tried %}<p class="muted">Error: the username or password you entered is incorrect.</p>{% endif %}
+  <label class="field"><span>Username or Email Address</span><input name="log"></label>
+  <label class="field"><span>Password</span><input type="password" name="pwd"></label>
+  <button class="btn" type="submit">Log In</button>
+</form>
+{% endblock %}
