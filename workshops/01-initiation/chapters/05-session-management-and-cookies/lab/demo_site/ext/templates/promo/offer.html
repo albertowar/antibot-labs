@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Promo · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="promo">
+  <h1>Unlock 10% off</h1>
+  <p class="muted">Answer one question to unlock a one-time voucher for this visit.</p>
+
+  <form id="promo-unlock" method="post" action="/promo/unlock">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="promo-answer">{{ question }}</label>
+    <input id="promo-answer" name="answer" inputmode="numeric" required>
+    <button type="submit" class="btn">Unlock</button>
+  </form>
+
+  <form id="promo-redeem" method="post" action="/promo/redeem">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn">Redeem voucher</button>
+  </form>
+</section>
+<script src="/static/js/promo.js" defer></script>
+{% endblock %}
