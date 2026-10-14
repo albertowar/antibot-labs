@@ -1,107 +1,83 @@
 """
-Chapter 9 — Environment check (run this first)
+Doctor: is this machine ready for the lab? Checks Python, dependencies, the
+database and Redis URLs you configured, Docker if you plan to use it, and that
+DEMO_URL points at this machine.
 
-Confirms the pieces are in place before you start: Python version, the lab
-packages, the browser downloads, the TLS certificate, and that Redis,
-PostgreSQL and the store answer. With --tls it also prints the JA4 and TLS
-stack of each HTTP client, which is the Round 0 / Round 5 teaching aid.
-
-Run:
     python tools/doctor.py
-    python tools/doctor.py --tls      # also probe JA4 per client (store must be up)
 """
 
-import argparse
 import importlib
 import os
+import shutil
+import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import labnet  # noqa: E402  (stdlib only, so it imports before the dependencies are checked)
 
-OK, BAD = "✅", "❌"
-PACKAGES = ["flask", "redis", "psycopg", "curl_cffi", "playwright", "patchright", "camoufox",
-            "sklearn", "numpy", "cryptography"]
+ok = True
 
 
-def check(label, ok, detail=""):
-    print(f"  {OK if ok else BAD} {label}{(' — ' + detail) if detail else ''}")
-    return ok
+def say(good, msg):
+    global ok
+    ok = ok and good
+    print(("  ok   " if good else "  FAIL ") + msg)
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--tls", action="store_true")
-    args = parser.parse_args()
-    ok = True
-
-    print("Python & packages")
-    ok &= check(f"Python {sys.version_info.major}.{sys.version_info.minor}",
-                sys.version_info >= (3, 12), "need 3.12+")
-    for name in PACKAGES:
+    print("Python")
+    say(sys.version_info >= (3, 12), f"Python {sys.version.split()[0]} (need 3.12+)")
+    say(sys.prefix != sys.base_prefix, "running inside a virtualenv (python -m venv .venv)")
+    print("Dependencies")
+    for mod in ("flask", "flask_sqlalchemy", "sqlalchemy", "redis", "fakeredis", "requests", "httpx"):
         try:
-            importlib.import_module(name)
-            check(name, True)
+            importlib.import_module(mod)
+            say(True, mod)
         except ImportError:
-            ok &= check(name, False, "pip install -r requirements.txt")
-
-    print("\nBrowsers")
+            say(False, f"{mod} missing: pip install -r requirements.txt")
+    print("Configuration")
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            check("Playwright Chromium", bool(p.chromium.executable_path))
-    except Exception as exc:
-        ok &= check("Playwright Chromium", False, f"playwright install chromium ({exc})")
-    cfx = os.path.expanduser("~/.cache/camoufox")
-    ok &= check("Camoufox browser", os.path.isdir(cfx) and bool(os.listdir(cfx)),
-                "python -m camoufox fetch")
-
-    print("\nCertificate")
-    ok &= check("instance/cert.pem", os.path.exists(os.path.join(LAB_DIR, "instance", "cert.pem")),
-                "python tools/make_cert.py")
-
-    print("\nServices")
+        say(True, f"DEMO_URL={labnet.target()} is this machine")
+        labnet.require_local_env()
+        say(True, "every side-service URL that is set (REDIS_URL, DATABASE_URL, ...) is this machine")
+    except SystemExit as e:
+        say(False, str(e))
+    redis_url = os.environ.get("REDIS_URL", "memory://")
+    db_url = os.environ.get("DATABASE_URL", "sqlite:///instance/shop.db")
+    print(f"       REDIS_URL={redis_url}  DATABASE_URL={db_url.split('@')[-1] if '@' in db_url else db_url}")
+    if redis_url.startswith("redis://"):
+        try:
+            import redis
+            redis.Redis.from_url(redis_url, socket_connect_timeout=2).ping()
+            say(True, "Redis answers")
+        except Exception as e:
+            say(False, f"Redis: {e!r}  (docker compose up -d --wait, or unset REDIS_URL)")
+    else:
+        say(True, "in-process Redis (fakeredis): single process only, state lost on restart")
+    if db_url.startswith("postgres"):
+        try:
+            import sqlalchemy
+            sqlalchemy.create_engine(db_url).connect().close()
+            say(True, "PostgreSQL answers")
+        except Exception as e:
+            say(False, f"PostgreSQL: {e!r}")
+    else:
+        say(True, "SQLite (WAL mode)")
+    print("Optional")
+    docker = shutil.which("docker")
+    if docker:
+        r = subprocess.run([docker, "compose", "version"], capture_output=True, text=True)
+        say(r.returncode == 0, "docker compose available")
+    else:
+        print("  --   docker not found (fine: the no-Docker path is the default)")
     try:
-        import redis
-        from lab import BASE_URL
-        r = redis.Redis.from_url(os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0"))
-        ok &= check("Redis", r.ping())
-    except Exception as exc:
-        ok &= check("Redis", False, str(exc))
-    try:
-        from lab import server_status
-        status = server_status()
-        check(f"Demo store ({BASE_URL})", True, f"DEFENSE_LEVEL={status['level']}, "
-              f"model {'loaded' if status['model_loaded'] else 'not loaded'}")
-    except Exception as exc:
-        print(f"  … store not running yet (fine before you start it): {exc}")
-
-    if args.tls:
-        print("\nTLS fingerprints per client (store must be up)")
-        probe_tls()
-
-    print("\n" + ("✅ Ready." if ok else "❌ Fix the ❌ lines above, then re-run."))
+        importlib.import_module("playwright")
+        print("  ok   playwright installed (python -m playwright install chromium if a lab needs a browser)")
+    except ImportError:
+        print("  --   playwright not installed (only browser labs need it)")
+    print("\nREADY" if ok else "\nFix the FAIL lines above.")
     return 0 if ok else 1
 
 
-def probe_tls():
-    import json
-    import warnings
-    warnings.filterwarnings("ignore")
-    from lab import BASE_URL, ensure_local
-    ensure_local()
-    url = f"{BASE_URL}/whoami"
-    rows = []
-    import requests
-    rows.append(("requests", requests.get(url, verify=False).json()))
-    from curl_cffi import requests as cffi
-    for t in ("chrome", "firefox", "safari260"):
-        rows.append((f"curl_cffi:{t}", cffi.get(url, impersonate=t, verify=False).json()))
-    for name, d in rows:
-        print(f"  {name:18} {d['tls_family']:9} {d['ja4']}")
-    print("  (a browser's JA4 appears in the store's /whoami page too)")
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

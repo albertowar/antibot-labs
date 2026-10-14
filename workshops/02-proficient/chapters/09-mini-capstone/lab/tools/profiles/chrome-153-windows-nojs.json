@@ -1,0 +1,218 @@
+{
+ "name": "chrome-153-windows-nojs",
+ "description": "Google Chrome 153 with JavaScript disabled (NoScript-style users, some locked-down corporate desktops, text-mode readers). The sensor never runs.",
+ "source": "synthetic: header order and native-code strings from a real Chromium 153 capture, identity values edited to match this browser",
+ "expected_cost": "Blocked from Level 1: without JavaScript there is no sensor verdict. An accepted, measured cost.",
+ "navigation_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "Upgrade-Insecure-Requests",
+   "1"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Accept",
+   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "none"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "navigate"
+  ],
+  [
+   "Sec-Fetch-User",
+   "?1"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "document"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ]
+ ],
+ "fetch_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Google Chrome\";v=\"153.0.8010.92\", \"Chromium\";v=\"153.0.8010.92\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"19.0.0\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "post_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ],
+  [
+   "Content-Length",
+   "0"
+  ],
+  [
+   "Sec-Ch-Ua-Full-Version-List",
+   "\"Google Chrome\";v=\"153.0.8010.92\", \"Chromium\";v=\"153.0.8010.92\", \"Not_A Brand\";v=\"8.0.0.0\""
+  ],
+  [
+   "Sec-Ch-Ua-Platform",
+   "\"Windows\""
+  ],
+  [
+   "Sec-Ch-Ua",
+   "\"Google Chrome\";v=\"153\", \"Chromium\";v=\"153\", \"Not_A Brand\";v=\"8\""
+  ],
+  [
+   "Sec-Ch-Ua-Mobile",
+   "?0"
+  ],
+  [
+   "Sec-Ch-Ua-Arch",
+   "\"x86\""
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  ],
+  [
+   "Content-Type",
+   "application/json"
+  ],
+  [
+   "Sec-Ch-Ua-Platform-Version",
+   "\"19.0.0\""
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Origin",
+   "http://localhost:5000"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate, br, zstd"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED; ch_offered=1"
+  ]
+ ],
+ "signals": null,
+ "interaction": null
+}

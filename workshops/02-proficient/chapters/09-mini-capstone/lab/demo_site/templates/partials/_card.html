@@ -1,0 +1,9 @@
+<article class="product-card" data-sku="{{ p.sku }}">
+  <a href="{{ p.to_dict().url }}" class="card-img"><img src="/img/{{ p.sku }}.svg" alt="{{ p.name }}" loading="lazy" width="320" height="320"></a>
+  <div class="card-body">
+    <a class="card-title" href="{{ p.to_dict().url }}">{{ p.name }}</a>
+    <div class="card-meta"><span class="muted">{{ p.category|capitalize }} · {{ p.colorway }}</span>{% include "partials/_stars.html" %}</div>
+    <div class="card-row"><span class="price">${{ "%.2f"|format(p.price) }}</span>
+      {% if p.is_drop %}<span class="tag drop">Drop</span>{% elif p.stock <= 0 %}<span class="tag">Sold out</span>{% endif %}</div>
+  </div>
+</article>

@@ -1,0 +1,9 @@
+# W2 Ch9 lab: the stealth browsers. After installing:
+#   python -m playwright install chromium     # the stock-Playwright baseline (Round 0)
+#   python -m patchright install chromium     # Round 1
+#   python -m camoufox fetch                  # Rounds 2 and 3 (anti-detect Firefox, ~160 MB)
+# Documented exception to the baseline (AGENTS.md "Dependency baseline"): camoufox 0.5.8 requires
+# playwright<1.63, so this chapter pins 1.62.0 while the other labs use 1.63.0.
+playwright==1.62.0
+patchright==1.63.0
+camoufox==0.5.8

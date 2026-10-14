@@ -1,8 +1,7 @@
-venv/
 .venv/
-__pycache__/
 instance/
+logs/
+__pycache__/
 *.pyc
 *.bak
-tools/profiles/mine.json
-attacks/data/combo_list.txt
+.env

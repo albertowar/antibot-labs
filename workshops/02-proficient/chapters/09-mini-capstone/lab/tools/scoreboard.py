@@ -1,56 +1,55 @@
 """
-Chapter 9 — Scoreboard (Section 9.7, final debrief)
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Reads the decisions table and prints the capstone scoreboard: for each
-action, how the store split traffic across allow / challenge / block, the
-top reasons, and the median scoring cost. Run it after a round, or at the
-end, to review where points came from and which layer did the work.
-
-Run:
-    python tools/scoreboard.py
-    python tools/scoreboard.py --action buy
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
 import argparse
-import collections
-import os
-import statistics
-import sys
+import json
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lab import admin, ensure_local  # noqa: E402
+from labclient import scoreboard
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=["buy", "login", "register", "request"], default=None)
-    parser.add_argument("--limit", type=int, default=100000)
-    args = parser.parse_args()
-    ensure_local()
-    query = f"/admin/decisions?limit={args.limit}" + (f"&action={args.action}" if args.action else "")
-    rows = admin("GET", query)
-    if not rows:
-        print("No decisions recorded yet. Run a round first.")
-        return 0
-
-    by_action = collections.defaultdict(list)
-    for r in rows:
-        by_action[r["action"]].append(r)
-
-    print(f"=== Scoreboard ({len(rows)} decisions, DEFENSE_LEVEL={rows[0]['level']}) ===\n")
-    for action, group in sorted(by_action.items()):
-        outcomes = collections.Counter(r["outcome"] for r in group)
-        reasons = collections.Counter(reason for r in group for reason in r["reasons"])
-        timings = [r["score_ms"] for r in group if r["score_ms"] is not None]
-        print(f"{action}  ({len(group)})")
-        print("   " + "  ".join(f"{k}={v}" for k, v in sorted(outcomes.items())))
-        for reason, n in reasons.most_common(4):
-            print(f"     {n:>4}×  {reason}")
-        if timings:
-            print(f"     cost: median {statistics.median(timings):.1f} ms")
-        print()
-    return 0
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
+            continue
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

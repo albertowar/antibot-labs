@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Trace {{ sid }}</title>
+<style>body{font-family:system-ui;margin:1rem;background:#fafafa;color:#111}canvas{border:1px solid #ccc;background:#fff;max-width:100%}
+pre{font-size:12px;background:#f4f4f4;padding:.5rem;max-width:1280px;overflow:auto}</style></head>
+<body>
+  <h2>Trace <code>{{ sid }}</code> <small id="meta"></small></h2>
+  <p><a href="/lab/behavior/sessions">all sessions (JSON)</a> · <a href="/lab/behavior/trace/{{ sid }}">this trace (JSON)</a></p>
+  <canvas id="path" width="1280" height="720"></canvas>
+  <h3>Closing speed of each approach to a click (px/ms over time)</h3>
+  <canvas id="speed" width="1280" height="260"></canvas>
+  <h3>Keystrokes (bar = key held down)</h3>
+  <canvas id="keys" width="1280" height="120"></canvas>
+  <h3>Features</h3><pre id="feats"></pre>
+  <script src="/static/js/behavior_viewer.js"></script>
+  <script>drawTrace({{ sid|tojson }});</script>
+</body></html>
