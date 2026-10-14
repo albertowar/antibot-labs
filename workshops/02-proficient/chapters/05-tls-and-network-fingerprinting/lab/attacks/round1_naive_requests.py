@@ -1,37 +1,32 @@
 """
-Chapter 5 — Round 1 Attack: every Chrome header, Python's TLS (Section 5.8)
+Round 1 attack (part 1): every Chrome header, Python's TLS.
 
-Objective: the W1 Ch4 graduate. Every header is copied from Chrome DevTools,
-in Chrome's order, with matching Client Hints. Nothing at the HTTP layer
-gives it away. The ClientHello still comes from OpenSSL via urllib3: 18
-ciphers, no GREASE, ALPN http/1.1 only.
+Objective: the W1 Ch4 graduate. Every header is copied from Chrome DevTools, in Chrome's order,
+with matching Client Hints. Nothing at the HTTP layer gives it away. The ClientHello still comes
+from OpenSSL via urllib3: 18 ciphers, no GREASE, ALPN http/1.1 only.
 
 Expected results:
-  - DEFENSE_LEVEL=0 → 200, scraped
-  - DEFENSE_LEVEL=1 → 403, [L1] JA4 on library denylist: python-requests …
+  - DEFENSE_LEVEL=0 -> 200, scraped
+  - DEFENSE_LEVEL>=1 -> 403, ja4_denylist:library_ja4
 
-Run the demo site and the edge first (see README), then:
+Run the store and the edge first (README), then:
     python attacks/round1_naive_requests.py
 """
 
 import requests
 
-from _lab import BASE_URL, CA_FILE, CHROME_HEADERS, report, to_result
-
-PATH = "/api/products"
-REQUESTS = 10
+from _common import CA_FILE, CHROME_HEADERS, EDGE_URL, PATH, REQUESTS, finish, lab_headers, result
 
 
 def run():
-    """Scrape REQUESTS times; return one result per request (used by tools/checkpoint.py)."""
-    results = []
+    out = []
     with requests.Session() as s:
         for _ in range(REQUESTS):
-            r = s.get(BASE_URL + PATH, headers=CHROME_HEADERS, verify=CA_FILE, timeout=10)
-            results.append(to_result(PATH, r.status_code, r.json()))
-    return results
+            r = s.get(EDGE_URL + PATH, headers={**CHROME_HEADERS, **lab_headers("naive_requests")}, verify=CA_FILE, timeout=15)
+            out.append(result(r.status_code, r.headers, r.json() if r.ok else None))
+    return out
 
 
 if __name__ == "__main__":
     print("=== Round 1: copied Chrome headers on python-requests ===")
-    report(run())
+    finish(run())

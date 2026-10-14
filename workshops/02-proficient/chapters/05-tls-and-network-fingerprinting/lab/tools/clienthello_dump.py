@@ -1,5 +1,5 @@
 """
-Chapter 5 — Round 0 tool: capture raw ClientHello bytes (no root, no tshark)
+W2 Ch5 — Round 0 tool: capture raw ClientHello bytes (no root, no tshark)
 
 A tiny HTTPS server on https://localhost:9443 that *peeks* at the first TLS
 record of each connection before handing the socket to Python's `ssl` module.
@@ -20,7 +20,7 @@ Usage:
     python tools/clienthello_dump.py                     # terminal 1
     curl -sk "https://localhost:9443/?label=curl"         # terminal 2
     python attacks/round0_recon.py --dump                 # all lab clients at once
-    python defenses/ja4.py captures/curl.hex              # then compute JA4 yourself
+    python -m defenses.ja4 captures/curl.hex              # then compute JA4 yourself
 """
 
 import json
@@ -33,9 +33,9 @@ from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB, "defenses"))
+sys.path.insert(0, LAB)
 
-import ja4  # noqa: E402
+from defenses import ja4  # noqa: E402
 
 PORT = int(os.environ.get("DUMP_PORT", "9443"))
 CERT = os.path.join(LAB, "certs", "tls.crt")

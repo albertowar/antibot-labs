@@ -1,7 +1,11 @@
-venv/
-__pycache__/
+.venv/
 instance/
-*.db
+logs/
+__pycache__/
+*.pyc
+*.bak
+.env
+# W2 Ch5: the pinned fingerproxy binary, the self-signed certificate, raw ClientHello captures and this machine's library JA4s
 bin/
 certs/
 captures/

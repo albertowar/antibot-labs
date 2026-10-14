@@ -1,126 +1,51 @@
 """
-Chapter 5 — Defense Layer 4: a browser claim needs browser proof (Section 5.7)
+browser_proof (Round 4): a browser claim needs browser proof.
 
-After Round 3, the network layer has nothing left to catch: curl_cffi sends
-Chrome's exact ClientHello and HTTP/2 preface. What it doesn't have is a
-JavaScript engine. So when the TLS family says "browser", the protected
-endpoints also require a cookie that only a JS engine of *that* family could
-have earned:
+After Round 3 the network layer has nothing left to catch: curl_cffi sends Chrome's exact
+ClientHello and HTTP/2 preface. What it does not have is a JavaScript engine. So when the TLS family
+says "browser", the protected paths (policy.PROOF_PATHS) also require evidence that a JS engine of
+that family ran in this session and posted its signals (defenses/engine_signals.py explains how
+the proof is earned: a TypeError message and eval's source length, per engine).
 
-1. GET /  embeds a signed nonce and a tiny script.
-2. The script provokes a TypeError and reads `eval.toString().length`. Both
-   differ by engine:
-       V8 (Chromium)        "Cannot read properties of null (reading 'f')"   33
-       SpiderMonkey (Gecko) "can't access property \"f\" of null"            37
-       JavaScriptCore       "null is not an object (evaluating 'null.f')"    33
-3. POST /api/engine → the server classifies the engine and sets
-   `engine_proof = <engine>.<ja4_b>.<expiry>.<hmac>`, bound to the cipher
-   list (JA4 part b) of the connection that earned it. Part b survives
-   session resumption; part a doesn't (the extension count changes).
-4. Protected paths check: cookie valid, not expired, engine == TLS family,
-   ja4_b == this connection's ja4_b.
+The proof is bound twice: to the engine (the JS engine must be the TLS family) and to the cipher
+list (JA4 part b) of the connection that earned it. Part b survives session resumption; part a does
+not. A pass earned in a real browser and replayed from another TLS stack fails the second binding.
 
-Why it fails:
-- A real browser passes by definition (Round 4: Playwright Chromium). That's
-  fine: the attacker now pays for a full browser. In our measurement a
-  headless Chromium worker used ~600 MB RSS against ~40 MB for curl_cffi,
-  and scraped ~5× slower. The W2 Ch1 automation and W2 Ch3 behavioral
-  signals also come into play.
-- These signals are public. An attacker who reads the script can forge the
-  POST from curl_cffi (Bonus 2). W2 Ch2 is about making that expensive
-  (obfuscation, rotating challenges); this layer is the minimal version.
+What it misses: a real browser passes by definition (Round 4's attack). That is fine: the attacker
+now pays for a full browser (about 600 MB of RAM per worker against about 40 MB for curl_cffi, and
+several times slower). The signals are public, so a plain HTTP client can forge the POST (Bonus 1);
+W2 Ch2 is about making that expensive. W2 Ch1's automation artifacts and W2 Ch3's behavior come
+into play against the browser itself.
 
-False-positive profile:
-- JavaScript disabled (NoScript, Tor Browser "Safest", some accessibility
-  setups) → blocked. Offer a non-JS fallback (W1 Ch6 CAPTCHA, login) rather
-  than a hard 403.
-- Cookie blocking, and first visits that go straight to a deep link before
-  any page sets the cookie.
-- Cost: one HMAC per request plus one extra POST per session.
-
-Enabled when DEFENSE_LEVEL >= 4. Catches: Round 3 (curl_cffi impersonation).
+Who it hurts: JavaScript disabled (NoScript, Tor Browser "Safest", some accessibility setups): the
+`no_js` shopper. Offer a non-JS fallback (W1 Ch6 CAPTCHA, a login) rather than a hard 403. Cookie
+blocking, and first visits that go straight to a catalogue deep link before any page ran the
+script. Cost: one session read per protected request, one extra POST per session.
 """
 
-import hashlib
-import hmac
-import os
-import sys
-import time
-
-SECRET = os.environ.get("PROOF_SECRET", "").encode() or os.urandom(32)
-COOKIE = "engine_proof"
-TTL_SECONDS = 3600
-PROTECTED_PATHS = {"/api/products", "/products", "/login"}
+from . import engine_signals, ja4, policy
+from .pipeline import Check, Signal
 
 
-def _sign(msg: str) -> str:
-    return hmac.new(SECRET, msg.encode(), hashlib.sha256).hexdigest()[:32]
+def _protected(ctx):
+    return ctx.method == "GET" and any(ctx.path.startswith(p) for p in policy.PROOF_PATHS)
 
 
-def issue_nonce() -> str:
-    ts = str(int(time.time()))
-    return f"{ts}.{_sign('nonce|' + ts)}"
-
-
-def nonce_valid(nonce: str, max_age: int = 300) -> bool:
-    try:
-        ts, sig = nonce.split(".")
-        return hmac.compare_digest(sig, _sign("nonce|" + ts)) and time.time() - int(ts) < max_age
-    except (ValueError, AttributeError):
-        return False
-
-
-def classify_engine(error_message: str, eval_length: int):
-    """Map the JS signals to an engine. None if they match nothing we know."""
-    msg = error_message or ""
-    if msg.startswith("Cannot read properties of null") and eval_length == 33:
-        return "chromium"
-    if msg.startswith("can't access property") and eval_length == 37:
-        return "gecko"
-    if msg.startswith("null is not an object") and eval_length == 33:
-        return "webkit"
+def _check(ctx):
+    if not _protected(ctx):
+        return None
+    fp = ja4.fingerprint(ctx)
+    engine = ja4.tls_engine(fp, ja4.claimed_engine(ctx.ua.raw))
+    if engine is None:
+        return None
+    proof = engine_signals.read_proof(ctx)
+    if proof is None:
+        return [Signal("browser_proof", "no_proof", policy.TLS_POINTS, f"{engine} TLS but no engine proof in this session")]
+    if proof[0] != engine:
+        return [Signal("browser_proof", "engine_mismatch", policy.TLS_POINTS, f"JS engine {proof[0]} and TLS stack {engine} disagree")]
+    if proof[1] != fp.ja4_b:
+        return [Signal("browser_proof", "other_tls_stack", policy.TLS_POINTS, "proof earned on another TLS stack")]
     return None
 
 
-def make_cookie(engine: str, ja4_b: str) -> str:
-    expiry = str(int(time.time()) + TTL_SECONDS)
-    body = f"{engine}.{ja4_b}.{expiry}"
-    return f"{body}.{_sign(body)}"
-
-
-def parse_cookie(value: str):
-    """Return (engine, ja4_b) if the signature and expiry check out, else None."""
-    try:
-        engine, ja4_b, expiry, sig = value.rsplit(".", 3)
-    except (ValueError, AttributeError):
-        return None
-    body = f"{engine}.{ja4_b}.{expiry}"
-    if not hmac.compare_digest(sig, _sign(body)) or int(expiry) < time.time():
-        return None
-    return engine, ja4_b
-
-
-def score_browser_proof(fp, tls_engine, cookies, path):
-    """Only applies to protected paths, and only to browser TLS families."""
-    if tls_engine is None or path not in PROTECTED_PATHS:
-        return 0, []
-    # Round 4 solution (the student file has a TODO here)
-    proof = parse_cookie(cookies.get(COOKIE, ""))
-    if proof is None:
-        return 50, [f"{tls_engine} TLS but no valid {COOKIE} cookie (no JS engine proof)"]
-    engine, ja4_b = proof
-    if engine != tls_engine:
-        return 50, [f"JS engine proof says {engine} but TLS is {tls_engine}"]
-    if ja4_b != fp.ja4_b:
-        return 50, [f"{COOKIE} was earned on a different TLS stack ({ja4_b})"]
-    return 0, []
-
-
-if __name__ == "__main__":
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from edge_headers import EdgeFingerprint
-    fp = EdgeFingerprint("t13d1516h2_8daaf6152771_806a8c22fdea", None, "x")
-    good = make_cookie("chromium", fp.ja4_b)
-    print("no cookie:", score_browser_proof(fp, "chromium", {}, "/api/products"))
-    print("valid:    ", score_browser_proof(fp, "chromium", {COOKIE: good}, "/api/products"))
-    print("wrong eng:", score_browser_proof(fp, "chromium", {COOKIE: make_cookie("gecko", fp.ja4_b)}, "/api/products"))
+CHECK = Check("browser_proof", _check)

@@ -1,7 +1,11 @@
 {
-  "_provenance": "Captured 2026-10-10 through fingerproxy v1.2.3 on Linux x86_64: Python 3.10 + OpenSSL 3.0.2, Playwright 1.63 (Chromium 153.0.8010.12, Firefox 155.0), curl_cffi 0.16.3 targets. Fingerprints of HTTP libraries depend on YOUR OpenSSL build: run tools/capture_fingerprints.py to add the ones from your machine (written to local_fingerprints.json). Browser entries marked 'unverified' come from curl_cffi impersonation targets, not from a real install.",
+  "_provenance": "Captured 2026-10-14 through fingerproxy v1.2.3 on Linux x86_64: Python 3.12.15 + OpenSSL 3.5.9, Playwright 1.63 (Chromium 153, Firefox 155.0), curl_cffi 0.16.3 and impit 0.14.1 targets, curl 7.81 + OpenSSL 3.0.2. Fingerprints of HTTP libraries depend on YOUR OpenSSL build (3.5 added the ML-KEM key share, which moved every Python library): run tools/capture_fingerprints.py to add the ones from your machine (written to local_fingerprints.json). Browser entries marked 'unverified' come from curl_cffi impersonation targets, not from a real install.",
   "_collision": "JA4 a+b is not unique: a RESUMED Chrome connection adds pre_shared_key (17 extensions) and becomes t13d1517h2_8daaf6152771, the same a+b as a FRESH Firefox 155 connection. Both families list it; tls_family.py resolves the tie with the engine the User-Agent claims.",
   "library_ja4": {
+    "t13d1712h1_ab0a1bf427ad_882d495ac381": "python-requests 2.34 / urllib3 (OpenSSL 3.5)",
+    "t13d1712h1_ab0a1bf427ad_8e6e362c5eac": "httpx 0.28 / Python ssl (OpenSSL 3.5)",
+    "t13d171100_ab0a1bf427ad_8e6e362c5eac": "urllib.request / stdlib (OpenSSL 3.5, no ALPN)",
+    "t13d521100_b262b3658495_8e6e362c5eac": "Node.js (Playwright page.request, not the browser's network stack)",
     "t13d1812h1_85036bcba153_b26ce05bbdd6": "python-requests 2.34 / urllib3 (OpenSSL 3.0)",
     "t13d1812h1_85036bcba153_d41ae481755e": "httpx 0.28 / Python ssl (OpenSSL 3.0)",
     "t13d181100_85036bcba153_d41ae481755e": "urllib.request / stdlib (OpenSSL 3.0, no ALPN)",

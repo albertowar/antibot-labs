@@ -1,0 +1,4 @@
+# Real browsers: Round 0 recon, the Round 4 attacker and the real-browser shoppers.
+# After installing:   python -m playwright install chromium firefox
+# (WebKit is optional: python -m playwright install webkit, plus `sudo python -m playwright install-deps webkit` on Linux.)
+playwright==1.63.0

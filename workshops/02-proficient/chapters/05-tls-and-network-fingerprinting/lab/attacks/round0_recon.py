@@ -1,27 +1,28 @@
 """
-Chapter 5 — Round 0: Recon. What does each client look like below HTTP? (Section 5.8)
+Round 0: recon. What does each client look like below HTTP?
 
-Sends one request from every client in this lab and prints what the edge saw:
-JA4, HTTP version, HTTP/2 fingerprint and the TLS family Layer 2 would assign.
+Sends one request from every client in this lab and prints what the TLS edge measured: JA4, HTTP
+version, the HTTP/2 fingerprint and the browser family tls_family would assign.
 
-    python attacks/round0_recon.py                  # through the edge → /tls-check
-    python attacks/round0_recon.py --skip-browser   # HTTP libraries only
-    python attacks/round0_recon.py --dump           # to tools/clienthello_dump.py instead
+    python attacks/round0_recon.py                  # through the edge -> /lab/tls/check
+    python attacks/round0_recon.py --skip-browser   # HTTP libraries and impersonators only
+    python attacks/round0_recon.py --dump           # to tools/clienthello_dump.py instead (raw bytes)
 
 Things to look for:
-  1. Same User-Agent, different stacks: requests, httpx and urllib all get
-     their own JA4 even though they share OpenSSL.
-  2. Run it twice. Chromium's JA4 part c changes between runs while
-     curl_cffi's doesn't. Then use --dump and `python defenses/ja4.py` to find
-     out why (hint: look at the first signature algorithm).
-  3. `playwright page.request` is not the browser: Node's TLS, no ALPN.
+  1. Same User-Agent, different stacks: requests, httpx and urllib all get their own JA4 even
+     though they share OpenSSL.
+  2. Run it twice. Chromium's JA4 part c changes between runs while curl_cffi's does not. Then use
+     --dump and `python -m defenses.ja4 captures/<name>.hex` to find out why (hint: look at the
+     first signature algorithm).
+  3. `playwright page.request` is not the browser: Node's TLS, no h2 ALPN match.
   4. The HTTP/2 column: who sends which SETTINGS, in which order?
-  5. In --dump mode each browser visits twice; the second visit resumes the
-     TLS session. Compare its JA4 part a with the fresh one, and with Firefox's.
+  5. In --dump mode each browser visits twice; the second visit resumes the TLS session. Compare
+     its JA4 part a with the fresh one, and with Firefox's.
 """
 
 import argparse
 import json
+import os
 import ssl
 import sys
 import urllib.request
@@ -29,56 +30,58 @@ import urllib.request
 import httpx
 import requests
 
-from _lab import BASE_URL, CA_FILE
+from _common import CA_FILE, EDGE_URL, bot_ip, lab_headers, labclient, labnet
 
-DUMP_URL = "https://localhost:9443"
+DUMP_URL = labnet.target("DUMP_URL", f"https://localhost:{os.environ.get('DUMP_PORT', '9443')}")
+CHECK = "/lab/tls/check?format=json"
 
 
 def _ctx():
     return ssl.create_default_context(cafile=CA_FILE)
 
 
-def via_requests(url):
-    return requests.get(url, verify=CA_FILE, timeout=10).json()
+def via_requests(url, actor):
+    return requests.get(url, headers=lab_headers(actor), verify=CA_FILE, timeout=15).json()
 
 
-def via_httpx(url):
-    return httpx.get(url, verify=_ctx(), timeout=10).json()
+def via_httpx(url, actor):
+    return httpx.get(url, headers=lab_headers(actor), verify=_ctx(), timeout=15).json()
 
 
-def via_urllib(url):
-    with urllib.request.urlopen(url, context=_ctx(), timeout=10) as r:
+def via_urllib(url, actor):
+    req = urllib.request.Request(url, headers=lab_headers(actor))
+    with urllib.request.urlopen(req, context=_ctx(), timeout=15) as r:
         return json.loads(r.read())
 
 
 def via_curl_cffi(target):
-    def fetch(url):
+    def fetch(url, actor):
         from curl_cffi import requests as cffi_requests
-        return cffi_requests.get(url, impersonate=target, verify=CA_FILE, timeout=10).json()
+        return cffi_requests.get(url, impersonate=target, verify=CA_FILE, timeout=15, headers=lab_headers(actor)).json()
     return fetch
 
 
-def via_impit(url):
+def via_impit(url, actor):
     import impit
     with impit.Client(browser="chrome", verify=False, http3=False) as client:
-        return client.get(url).json()
+        return client.get(url, headers=lab_headers(actor)).json()
 
 
 def via_playwright(browser_name, api_request=False):
-    def fetch(url):
+    def fetch(url, actor):
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = getattr(p, browser_name).launch()
-            context = browser.new_context(ignore_https_errors=True)
+            context = labclient.browser_context(browser, f"bot:{actor}", ip=bot_ip(), ignore_https_errors=True)
             if api_request:
-                data = context.request.get(url).json()
+                data = context.request.get(url, headers=lab_headers(actor)).json()
             else:
                 page = context.new_page()
                 page.goto(url)
                 data = json.loads(page.evaluate("document.body.innerText"))
                 if "label=" in url:
-                    # The dump server closes every connection, so a second visit
-                    # makes the browser open a new one and resume the TLS session.
+                    # The dump server closes every connection, so a second visit makes the browser
+                    # open a new one and resume the TLS session.
                     page.goto(url + "-resumed")
                     data["resumed"] = json.loads(page.evaluate("document.body.innerText"))
             browser.close()
@@ -108,10 +111,10 @@ def collect(clients, dump=False):
     rows = []
     for name, fetch in clients.items():
         label = name.replace(" ", "-").replace("(", "").replace(")", "")
-        url = f"{DUMP_URL}/?label={label}" if dump else f"{BASE_URL}/tls-check"
+        url = f"{DUMP_URL}/?label={label}" if dump else f"{EDGE_URL}{CHECK}"
         try:
-            data = fetch(url)
-        except Exception as exc:  # a missing browser shouldn't kill the whole table
+            data = fetch(url, "recon")
+        except Exception as exc:  # a missing browser should not kill the whole table
             data = {"error": f"{type(exc).__name__}: {str(exc).splitlines()[0][:60]}"}
         rows.append((name, data))
     return rows
@@ -123,8 +126,8 @@ def print_table(rows, dump=False):
         for name, d in rows:
             print(f"{name:<26} {d.get('ja4') or d.get('error', '?'):<38} {d.get('bytes', '')}")
             if "resumed" in d:
-                print(f"{'  … resumed session':<26} {d['resumed'].get('ja4'):<38} {d['resumed'].get('bytes', '')}")
-        print("\nSaved to captures/*.hex. Next: python defenses/ja4.py captures/<client>.hex")
+                print(f"{'  ... resumed session':<26} {d['resumed'].get('ja4'):<38} {d['resumed'].get('bytes', '')}")
+        print("\nSaved to captures/*.hex. Next: python -m defenses.ja4 captures/<client>.hex")
         return
     print(f"{'client':<26} {'JA4':<38} {'http':<9} {'family':<9} HTTP/2 fingerprint")
     for name, d in rows:
@@ -141,8 +144,11 @@ def main():
     parser.add_argument("--skip-browser", action="store_true", help="skip Playwright clients")
     args = parser.parse_args()
     clients = {**LIBRARY_CLIENTS, **IMPERSONATORS, **({} if args.skip_browser else BROWSERS)}
-    print(f"=== Round 0: recon via {'ClientHello dump :9443' if args.dump else BASE_URL + '/tls-check'} ===\n")
-    print_table(collect(clients, args.dump), args.dump)
+    print(f"=== Round 0: recon via {'ClientHello dump :9443' if args.dump else EDGE_URL + CHECK} ===\n")
+    rows = collect(clients, args.dump)
+    print_table(rows, args.dump)
+    seen = sum("error" not in d for _, d in rows)
+    print(json.dumps({"attempted": len(rows), "succeeded": seen}))
     return 0
 
 

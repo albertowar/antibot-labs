@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block page %}tls-check{% endblock %}{% block title %}Your TLS fingerprint · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow" style="max-width: 760px">
+  <p class="eyebrow">Lab · W2 Ch5</p>
+  <h1>What the TLS edge saw</h1>
+  <p class="muted">This is the connection you used to load this page, measured before the store saw a single HTTP header.</p>
+  <table>
+    <tr><th align="left">JA4</th><td><code>{{ ja4 or "none: this request did not come through the TLS edge" }}</code> ({{ ja4_source or "unknown source" }})</td></tr>
+    <tr><th align="left">JA4 a+b</th><td><code>{{ ja4_ab or "-" }}</code></td></tr>
+    <tr><th align="left">HTTP/2</th><td><code>{{ http2 or "none (HTTP/1.1)" }}</code></td></tr>
+    <tr><th align="left">Families</th><td>{{ families|join(", ") or "none" }} (your UA claims <code>{{ claimed_engine or "no browser" }}</code>)</td></tr>
+  </table>
+  <p class="muted small">Same data as JSON: <a href="?format=json">?format=json</a>. Defense level {{ level }}.</p>
+</section>
+{% endblock %}

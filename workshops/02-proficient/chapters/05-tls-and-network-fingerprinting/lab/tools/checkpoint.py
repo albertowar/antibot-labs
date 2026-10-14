@@ -1,167 +1,167 @@
 """
-Chapter 5 — Round Checkpoint (Section 5.8)
+Round checkpoint for W2 Ch5 (TLS & Network Fingerprinting). Declares the rounds and hands over to
+checkpoint_core.
 
-Run at the end of every round to check you are where you should be, and to
-measure BOTH sides of the defense:
+    python tools/checkpoint.py --round 3              # set level 3, run every bot next to the shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same bots against Round 2's defenses (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first (your files kept as .bak)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-  - bot traffic:   every attack script vs. the expected result, plus the
-                   attacker's throughput (requests/second, incl. start-up)
-  - real users:    tools/legit_traffic.py personas, with the documented
-                   false positives reported as cost, not hidden
-  - defender cost: scoring time per request (Server-Timing)
+Round N runs at DEFENSE_LEVEL N: level 0 is the bare store (every request is fingerprinted and
+logged, nothing is refused) and each level adds one TLS layer (defenses/ladder.py). Every round
+runs EVERY attacker, so you see what the current layers stop and what still gets through:
 
-Fell behind? --catch-up installs the reference solutions for rounds 1..N over
-your defenses/ files (yours are kept as .bak; --restore puts them back):
-    python tools/checkpoint.py --round <round> --catch-up
+    attacker                      first level that stops it
+    round1_naive_requests         1  (ja4_denylist: python-requests is on the list)
+    round1_cipher_tweak           2  (tls_family: a Chrome UA on a ClientHello no browser sends)
+    round2_impit_chrome           3  (h2_fingerprint: Chrome's TLS on Rust's HTTP/2)
+    round3_curl_cffi_chrome       4  (browser_proof: no JavaScript engine ever ran)
+    round4_playwright_chromium    never (a real browser; the next chapters' problem)
 
-Run:
-    python tools/checkpoint.py --round 2
-    python tools/checkpoint.py --round 2 --skip-browser   # no Playwright (faster, no FP data for browsers)
+Each attacker makes 10 requests to /api/products through the TLS edge (fingerproxy), and the
+expectation is "full" (>= 90 % served) or "blocked" (<= 10 %).
+
+Next to the attackers, two groups of shoppers measure what each layer costs real people:
+  - the store's 40 shoppers (tools/personas_ch5.py, `tls_browse`) present the claimed fingerprint of
+    their browser; a refused shopper fails the round, except `no_js` from Round 4 on (it can never
+    earn the engine proof: an accepted, measured cost);
+  - the real clients, with real handshakes through the edge: partner_api, corporate_proxy, a real
+    Chromium and a real Firefox (and WebKit when installed). Any refusal fails the round except
+    corporate_proxy from Round 2 on, which must show as the layer's documented cost.
+
+Defender cost: the gate time per request from the decision log (Ctx build, enrichers, every check).
+
+This checkpoint starts its own TLS edge on a free port (tools/tls_edge.py), so it never collides with
+the one you may have running in another terminal. Set TLS_EDGE_URL to use yours instead.
+Needs: python tools/get_fingerproxy.py once, and for the browsers
+python -m playwright install chromium firefox
 """
 
-import argparse
-import importlib.util
 import os
 import statistics
 import sys
 import time
 
-import requests
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-import legit_traffic
-from legit_traffic import EXPECTED_FALSE_POSITIVE_FROM, INFORMATIONAL
+import personas_ch5  # noqa: E402  (registers the `tls_browse` scenario and the engine PAGE_HOOK)
+import tls_edge  # noqa: E402
+from checkpoint_core import LAB, Round, main, run_attack  # noqa: E402
+import labclient  # noqa: E402
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "attacks"))
-from _lab import BASE_URL, CA_FILE  # noqa: E402
-
-ATTACKS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "attacks")
-
-# attack script -> first DEFENSE_LEVEL that blocks it (None: nothing in this chapter does)
-FIRST_BLOCKED_AT = {
-    "round1_naive_requests": 1,
-    "round1_cipher_tweak": 2,
-    "round2_impit_chrome": 3,
-    "round3_curl_cffi_chrome": 4,
-    "round4_playwright_chromium": None,
+# name -> (script, the first level that stops it; None = never)
+BOTS = {
+    "round1_naive_requests": ("attacks/round1_naive_requests.py", 1),
+    "round1_cipher_tweak": ("attacks/round1_cipher_tweak.py", 2),
+    "round2_impit_chrome": ("attacks/round2_impit_chrome.py", 3),
+    "round3_curl_cffi_chrome": ("attacks/round3_curl_cffi_chrome.py", 4),
+    "round4_playwright_chromium": ("attacks/round4_playwright_chromium.py", None),
 }
-BROWSER_ATTACKS = {"round4_playwright_chromium"}
+CA_FILE = os.path.join(LAB, "certs", "tls.crt")
+GATE_MEDIAN_MAX_MS = 10.0       # the defender-cost threshold: median gate time per request
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
-
-LAB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-
-
-def load_attack(name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(ATTACKS_DIR, f"{name}.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def timed_attack(script):
+    """An attack through the TLS edge: start the edge on first use, run the script, add its wall time."""
+    def go():
+        tls_edge.ensure()
+        t0 = time.perf_counter()
+        out = run_attack(script) or {}
+        out["seconds"] = round(time.perf_counter() - t0, 1)
+        return out
+    return go
 
 
-def server_level():
-    return requests.get(f"{BASE_URL}/tls-check", verify=CA_FILE, timeout=5).json()["level"]
+def real_clients(with_browsers=True):
+    def go():
+        edge = tls_edge.ensure()
+        rows = personas_ch5.run_real_clients(edge, CA_FILE, with_browsers)
+        ran = [r for r in rows if r["status"] is not None]
+        return {"attempted": len(ran), "succeeded": sum(r["status"] == 200 for r in ran), "rows": rows}
+    return go
 
 
-def check_bots(level, skip_browser):
-    failures = 0
-    print("Bot traffic                         blocked   expected        attacker req/s")
-    for name, first_blocked in FIRST_BLOCKED_AT.items():
-        if name in BROWSER_ATTACKS and skip_browser:
-            print(f"  ⏭️  {name:<30} skipped (--skip-browser)")
-            continue
-        started = time.perf_counter()
-        results = load_attack(name).run()
-        elapsed = time.perf_counter() - started
-        blocked = sum(r["status"] == 403 for r in results)
-        should_block = first_blocked is not None and level >= first_blocked
-        ok = blocked == (len(results) if should_block else 0)
-        failures += not ok
-        expectation = "blocked" if should_block else "gets through"
-        print(f"  {'✅' if ok else '❌'} {name:<30} {blocked:>2}/{len(results):<5} {expectation:<15} "
-              f"{len(results) / elapsed:7.1f}")
-        if not ok and results and results[0]["reasons"]:
-            print(f"       {results[0]['reasons']}")
-    return failures
+def expectation(name, level):
+    first = BOTS[name][1]
+    return "full" if first is None or level < first else "blocked"
 
 
-def check_users(level, skip_browser):
-    failures = 0
-    rows = legit_traffic.run(browsers=not skip_browser)
-    print("\nReal users                          blocked")
-    for persona in dict.fromkeys(r["persona"] for r in rows):
-        mine = [r for r in rows if r["persona"] == persona]
-        if mine[0]["status"] is None:
-            print(f"  ⏭️  {persona:<30} {mine[0]['reasons'][0]}")
-            continue
-        blocked = [r for r in mine if r["status"] == 403]
-        if not blocked:
-            print(f"  ✅ {persona:<30} 0/{len(mine)}")
-            continue
-        why = blocked[0]["reasons"]
-        if persona in INFORMATIONAL:
-            print(f"  ⚠️  {persona:<30} {len(blocked)}/{len(mine)}  informational: {why}")
-        elif level >= EXPECTED_FALSE_POSITIVE_FROM.get(persona, 99):
-            print(f"  ⚠️  {persona:<30} {len(blocked)}/{len(mine)}  documented false positive: {why}")
-        else:
-            failures += 1
-            print(f"  ❌ {persona:<30} {len(blocked)}/{len(mine)}  unexpected: {why}")
-    counted = [r for r in rows if r["status"] is not None and r["persona"] not in INFORMATIONAL]
-    total_fp = sum(r["status"] == 403 for r in counted)
-    print(f"  → real-user requests blocked: {total_fp}/{len(counted)}")
-
-    timings = [r["score_ms"] for r in rows if r["score_ms"] is not None]
-    if len(timings) >= 2:
-        p95 = statistics.quantiles(timings, n=20)[-1]
-        print(f"\nDefender cost\n  TLS scoring: median {statistics.median(timings):.2f} ms, p95 {p95:.2f} ms per request")
-    return failures
+def p95(values):
+    return statistics.quantiles(values, n=20)[-1] if len(values) >= 2 else values[0]
 
 
-def catch_up(rnd):
-    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB_DIR, rnd)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print("   The demo site reloads on save; if it did not, restart it.\n")
+def bots_as_expected(level):
+    """Every attacker lands exactly where the ladder says (the checkpoint's `expect` also judges it)."""
+    def check(board, results, attacks):
+        print("\nattackers                       served   first block")
+        bad = []
+        for name in BOTS:
+            out = attacks.get(name) or {}
+            print(f"  {name:<28}{out.get('succeeded', '?'):>4}/{out.get('attempted', '?'):<5} {out.get('first_block') or '-'}"
+                  f"   ({out.get('seconds', '?')} s)")
+            want = expectation(name, level)
+            got = out.get("succeeded", 0) / out["attempted"] if out.get("attempted") else None
+            if got is None or (want == "full") != (got >= 0.9) or (want == "blocked" and got > 0.1):
+                hint = (" (is this machine's python-requests JA4 known? run python tools/capture_fingerprints.py)"
+                        if name == "round1_naive_requests" and want == "blocked" else "")
+                bad.append(f"{name}: expected {want}, served {out.get('succeeded')}/{out.get('attempted')}{hint}")
+        return (not bad, "; ".join(bad))
+    return check
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Chapter 5 round checkpoint")
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=range(0, 5))
-    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    parser.add_argument("--skip-browser", action="store_true", help="skip Playwright attack and personas")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-    if args.catch_up:
-        catch_up(args.round)
+def shoppers(level):
+    def check(board, results, attacks):
+        print("\n40 shoppers (claimed fingerprint)    people  refused")
+        for persona, (users, refused) in sorted(personas_ch5.summarize(results).items()):
+            print(f"  {persona:<32}{users:>7}{refused:>9}")
+        nojs = [r for r in results if r["persona"] == personas_ch5.NO_JS]
+        want = "blocked" if level >= 4 else "bought"
+        wrong = [r for r in nojs if r.get("outcome") != want]
+        return (not wrong, f"the no-JavaScript shopper should be {want} at level {level}, got {[r.get('outcome') for r in wrong]}")
+    return check
 
-    try:
-        level = server_level()
-    except requests.RequestException:
-        print(f"❌ Edge not reachable on {BASE_URL}. Are tools/edge.py and demo_site/app.py running?")
-        return 1
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={level}) ===\n")
-    if level != args.round:
-        print(f"❌ Expected DEFENSE_LEVEL={args.round}. Restart the demo site with:")
-        print(f"     DEFENSE_LEVEL={args.round} python demo_site/app.py")
-        return 1
 
-    failures = check_bots(level, args.skip_browser) + check_users(level, args.skip_browser)
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results.")
-        print(f"   Fell behind? python tools/checkpoint.py --round {args.round} --catch-up")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
+def real_client_accounting(level):
+    def check(board, results, attacks):
+        problems, report = personas_ch5.judge((attacks.get("real_clients") or {}).get("rows", []), level)
+        print("\nreal clients (measured handshakes)")
+        for persona, line, signals in report:
+            print(f"  {persona:<18}{line}" + (f"   {signals}" if signals else ""))
+        ran = [r for r in (attacks.get("real_clients") or {}).get("rows", []) if r["status"] is not None]
+        if not any(r["persona"] == "chromium_user" for r in ran):
+            problems.append("chromium_user did not run: python -m playwright install chromium")
+        return (not problems, "; ".join(problems))
+    return check
 
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000})["items"]
+    ms = [d["ms"] for d in rows if d["phase"] == "request"]
+    if not ms:
+        return (False, "no decisions in the log")
+    median = statistics.median(ms)
+    print(f"\ndefender cost\n  gate per request: median {median:.2f} ms, p95 {p95(ms):.2f} ms over {len(ms)} requests")
+    return (median < GATE_MEDIAN_MAX_MS, f"gate median {median:.2f} ms > {GATE_MEDIAN_MAX_MS} ms")
+
+
+def make_round(n, description, solutions):
+    return Round(level=n, description=description, scenario="tls_browse",
+                 attacks={**{name: timed_attack(script) for name, (script, _) in BOTS.items()}, "real_clients": real_clients()},
+                 expect={name: expectation(name, n) for name in BOTS},
+                 allowed_fp=(personas_ch5.NO_JS,) if n >= 4 else (), bot_success_max=1.0,
+                 extra_checks=[bots_as_expected(n), shoppers(n), real_client_accounting(n), gate_cost],
+                 solutions=solutions)
+
+
+ROUNDS = {
+    0: make_round(0, "instrument: every request is fingerprinted and logged, nobody is refused", ()),
+    1: make_round(1, "L1 JA4 denylist of HTTP libraries", ("defenses/ladder.py", "defenses/ja4_denylist.py")),
+    2: make_round(2, "L2 the UA's browser must match the TLS family", ("defenses/ladder.py", "defenses/tls_family.py")),
+    3: make_round(3, "L3 the HTTP/2 preface must match the TLS family", ("defenses/ladder.py", "defenses/h2_fingerprint.py")),
+    4: make_round(4, "L4 browser TLS needs a JavaScript engine of the same family", ("defenses/ladder.py", "defenses/browser_proof.py")),
+}
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main(ROUNDS)

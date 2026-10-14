@@ -1,5 +1,5 @@
 """
-Chapter 5 — Setup: download the pinned fingerproxy release
+W2 Ch5 — Setup: download the pinned fingerproxy release
 
 fingerproxy (github.com/wi1dcard/fingerproxy, Apache-2.0) is a Go reverse
 proxy that terminates TLS and forwards JA3, JA4 and HTTP/2 fingerprints to

@@ -1,12 +1,17 @@
 # W2 Ch5 lab. Python 3.12+. Pins verified October 2026.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-psycopg[binary]==3.3.6
-cryptography==50.0.2
-# Clients: HTTP libraries (Round 0/1) and impersonators (Rounds 2/3)
+SQLAlchemy==2.1.4
+redis==8.1.0
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+fakeredis[lua]==2.39.0
 requests==2.34.2
 httpx==0.28.1
+# tools/make_cert.py: the self-signed certificate for the TLS edge
+cryptography==50.0.2
+# The attackers that change what the ClientHello looks like (Rounds 2 and 3)
 impit==0.14.1
 curl_cffi==0.16.3
-# Real browsers (Round 0/4 and the legitimate-traffic personas)
-playwright==1.63.0
+# Docker-backed PostgreSQL path only (docker-compose.yml):
+psycopg[binary]==3.3.6

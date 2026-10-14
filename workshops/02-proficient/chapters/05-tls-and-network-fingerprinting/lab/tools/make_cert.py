@@ -1,5 +1,5 @@
 """
-Chapter 5 — Setup: self-signed certificate for https://localhost
+W2 Ch5 — Setup: self-signed certificate for https://localhost
 
 Writes certs/tls.crt and certs/tls.key (ECDSA P-256, valid 30 days, SAN
 localhost + 127.0.0.1). The edge (fingerproxy) and tools/clienthello_dump.py
