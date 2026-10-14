@@ -30,7 +30,7 @@ That is why Round 4 switches from exact matching to fuzzy matching.
 import hashlib
 import json
 
-from fields import gpu_model, os_from_ua, renderer
+from .fields import gpu_model, os_from_ua, renderer
 
 
 def _hash(obj):

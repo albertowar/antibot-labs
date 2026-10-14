@@ -1,26 +1,59 @@
 <!doctype html>
-<html lang="en" data-fp-nonce="{{ nonce }}">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{% block title %}Antibot Demo Store{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #1d2433; }
-    header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #ddd; }
-    .level { font-size: .85rem; color: #666; }
-    form { display: grid; gap: .6rem; max-width: 340px; }
-    input, button { font: inherit; padding: .5rem; }
-    button { background: #1d4ed8; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
-    pre { background: #f5f5f7; padding: 1rem; overflow-x: auto; font-size: .8rem; }
-    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-    td, th { border-bottom: 1px solid #eee; padding: .35rem .5rem; text-align: left; vertical-align: top; }
-    .bot { color: #b91c1c; font-weight: 600; } .suspicious { color: #b45309; font-weight: 600; } .clean { color: #15803d; font-weight: 600; }
-  </style>
+  <title>{% block title %}{{ store_name }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ store_tagline }}{% endblock %}">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/store.css">
+  {{ slot("head") }}
 </head>
-<body>
-  <header><h1>🛒 Antibot Demo Store</h1><span class="level">DEFENSE_LEVEL={{ level }}</span></header>
+<body data-page="{% block page %}default{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>{{ store_name }}</a>
+    <form class="search" action="/search" method="get" role="search">
+      <input type="search" name="q" placeholder="Search gear" value="{{ q or '' }}" aria-label="Search">
+      <button type="submit" aria-label="Search">⌕</button>
+    </form>
+    <nav class="nav" aria-label="Primary">
+      <a href="/products">Shop</a>
+      <a href="/drop/lab-runner-9" class="nav-drop">Drops</a>
+      <a href="/gift-cards">Gift cards</a>
+      {% if user %}<a href="/account">{{ user.name.split()[0] if user.name else 'Account' }}</a>{% else %}<a href="/login">Log in</a>{% endif %}
+      <a href="/cart" class="cart-link" aria-label="Cart">Cart <span id="cart-count" class="pill">{{ cart_count }}</span></a>
+      {{ slot("nav") }}
+    </nav>
+  </div>
+  <div class="wrap cats">
+    {% for c in categories %}<a href="/products?category={{ c }}" {% if category == c %}class="on"{% endif %}>{{ c|capitalize }}</a>{% endfor %}
+  </div>
+</header>
+<main id="main" class="wrap">
+  {% if flash %}<div class="flash {{ flash.kind }}" role="status">{{ flash.msg }}</div>{% endif %}
   {% block content %}{% endblock %}
-  <script src="{{ url_for('static', filename='fp_collector.js') }}"></script>
-  {% block scripts %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <div class="wrap foot">
+    <div>
+      <strong>{{ store_name }}</strong><br><span class="muted">{{ store_tagline }}</span>
+      <p class="muted small">A lab store for the Antibot Workshop Series. Nothing here is real: products, people, prices, payments.</p>
+    </div>
+    <form class="newsletter" action="/newsletter" method="post">
+      <label for="nl-email">Drop alerts</label>
+      <div class="row">
+        <input id="nl-email" type="email" name="email" placeholder="you@example.test" required>
+        <button type="submit" class="btn small">Notify me</button>
+      </div>
+    </form>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="/products">All gear</a><a href="/orders">Orders</a><a href="/robots.txt">robots.txt</a><a href="/feed.xml">RSS</a><a href="/whoami">whoami</a>
+    </nav>
+  </div>
+</footer>
+<script src="/static/js/store.js" defer></script>
+{{ slot("body_end") }}
 </body>
 </html>

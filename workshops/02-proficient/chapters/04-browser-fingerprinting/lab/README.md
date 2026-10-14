@@ -1,93 +1,147 @@
 # Chapter 4 Lab: Browser Fingerprinting
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_04_content.md`, §4.8.
+Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a fingerprint collector on the sign-up page (telemetry kind `fp`), five pre-written layers on the sign-up action, `/lab/fp/*` pages, four sign-up farms (Rounds 1–4) and nine real-browser profiles for the 40 shoppers.
 
-The demo store gives every new account a €10 welcome credit, so a bot wants hundreds of accounts. You play both sides:
+<!-- lab-diff:start -->
+**Adds** (files not in the starter):
 
-- The attacker runs a sign-up farm. It uses a fresh browser context and a new simulated IP for every account.
-- The defender turns on the next fingerprinting layer. They measure what it stops and what it costs: real users refused, and milliseconds spent.
+- `defenses/fields.py`
+- `defenses/fingerprint.py`
+- `defenses/fp_gate.py`
+- `defenses/fuzzy_cluster.py`
+- `defenses/lie_detector.py`
+- `defenses/linking.py`
+- `defenses/population_sample.json`
+- `defenses/rarity.py`
+- `defenses/render_stack.py`
+- `defenses/stable_id.py`
+- `demo_site/ext/fp.py`
+- `demo_site/ext/templates/fp/check.html`
+- `demo_site/ext/templates/fp/script.html`
+- `demo_site/static/js/fp.js`
+- `tools/personas_ch4.py`
+- `tools/profiles/brave.json`
+- `tools/profiles/chrome-mac.json`
+- `tools/profiles/chrome-windows.json`
+- `tools/profiles/corporate-fleet.json`
+- `tools/profiles/firefox-fpp.json`
+- `tools/profiles/iphone.json`
+- `tools/profiles/privacy-extension.json`
+- `tools/profiles/safari-mac.json`
+- `tools/profiles/vdi.json`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
+- `tools/checkpoint.py`
+<!-- lab-diff:end -->
+
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_04_content.md`, §4.7–4.8. **Style: pre-written.** Every layer ships complete in `defenses/`: you read it, switch the level, and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`; catching up means running at the round's level (the checkpoint does it, and `--catch-up` installs those two files).
+
+The store's sign-up page (`/register`) is what a farm wants: every account earns loyalty points and early access to drops, so a bot wants hundreds of them. You play both sides:
+
+- The attacker runs a sign-up farm. Each account uses a fresh browser context and a different rented source address.
+- The defender turns on the next fingerprinting layer and measures what it stops and what it costs: real users refused, and milliseconds spent.
 
 ## Rules of engagement
 
-- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. Do not remove that check.
-- The "rotating IPs" are RFC 5737 documentation addresses sent in `X-Lab-Client-IP`, a lab-only header the store trusts only from loopback. No proxy is involved, and every account and e-mail address is synthetic.
-- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- **Local only, enforced in code.** Every attack script and tool reaches the store through `tools/labclient.py`, which asks `labnet.py` at the lab root for `DEMO_URL` and refuses anything that is not this machine (side-service URLs such as `REDIS_URL` too). Browsers get the same guard: `labclient.browser_context` aborts every request that is not local. Do not remove that check.
+- The farm's "rotating residential proxies" are addresses rented from `data/world.json` (documentation ranges) and sent in `X-Lab-Client-IP`, which the store's edge trusts only from loopback. No proxy is involved. Every account, e-mail address and fingerprint is synthetic, apart from the browser you capture yourself in Round 0.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, the browser and container images.
 - Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
-  docker-compose.yml       PostgreSQL 18 for fingerprints and sign-ups
-  demo_site/app.py         Flask store; DEFENSE_LEVEL=0..4 picks the layers
-  demo_site/static/fp_collector.js   the collector (reports raw observations, judges nothing)
-  defenses/                render_stack · lie_detector · stable_id · population · linking · fuzzy_cluster · scoring
-  attacks/                 round0_recon … round4_noise_signup, data/ (stealth patch, harvested fingerprint)
-  tools/                   checkpoint.py · legit_traffic.py · profiles/*.json (40 simulated shoppers)
+  demo_site/ext/fp.py                the feature: collector slot, telemetry kind "fp", sign-up history, /lab/fp/*
+  demo_site/ext/templates/fp/        script.html (the collector, with the session's nonce) · check.html
+  demo_site/static/js/fp.js          the collector (plain JS, no build step): reports raw observations, judges nothing
+  defenses/                          fingerprint (glue) · fields · fp_gate · render_stack · lie_detector
+                                     stable_id · rarity (+ population_sample.json) · linking · fuzzy_cluster
+                                     ladder.py · policy.py
+  solutions/round1..4/               reference ladder.py and policy.py per round (the catch-up files)
+  attacks/                           round0_recon … round4_noise_signup · _common.py · data/ (stealth patch, two harvested PCs)
+  tools/                             checkpoint.py · personas_ch4.py (the shoppers) · profiles/*.json (the 9 cohorts)
 ```
+
+The rest of the store (catalog, cart, checkout, drops, accounts, the simulated edge, the decision log) is the W2 starter, unchanged. Its contract is `workshops/STORE_CONTRACT.md`. The one visible change is the sign-up page: it loads the collector.
 
 **Why Python only?** The collector is one plain JavaScript file, served as-is with no build step. It only *reports* what it observes. Every decision happens in the Python modules in `defenses/`, which are the files you read and edit, for two reasons:
 
 - The collector runs on the attacker's machine, so anything it decides can be patched out.
 - Keeping the judging server-side means you need no Node toolchain.
 
-**Why Docker?** The demo store keeps its fingerprints and sign-ups in PostgreSQL, like the rest of the series. Docker is optional: the SQLite fallback below works the same.
-
 ---
 
 ## Setup
 
+Work through `onboarding/setup/PREWORK.md` first. This lab adds a browser:
+
 ```bash
 cd lab
-docker compose up -d --wait                 # PostgreSQL on 127.0.0.1:5432
-python -m venv .venv && source .venv/bin/activate      # one venv per chapter, see the root README
-pip install -r requirements.txt
-playwright install chromium                 # every attack drives Chromium
+python3.12 -m venv .venv && . .venv/bin/activate        # one venv per chapter, see the root README
+pip install -r requirements.txt -r requirements-browser.txt
+python -m playwright install chromium                    # every attack drives Chromium
+python tools/doctor.py
+python demo_site/app.py                                   # http://127.0.0.1:5000/register
 ```
 
-Start the demo site, and restart it with a new `DEFENSE_LEVEL` each round:
+Docker is optional: the default is SQLite plus an in-process Redis. To run the production-shaped stack (Redis 8.10 holds the sign-up history L3 and L4 read; PostgreSQL 18 holds the store):
 
 ```bash
-cd demo_site
-DEFENSE_LEVEL=0 python app.py               # http://localhost:5000
+docker compose up -d --wait
+REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
+docker compose down -v                                    # when you are done
 ```
 
-| Level | Adds | Module |
+Switch levels without a restart (the checkpoint does it for you). A shell helper keeps the commands short:
+
+```bash
+level() { curl -s -X POST localhost:5000/lab/level -H 'Content-Type: application/json' -d "{\"level\": $1}"; }
+level 2
+```
+
+| Level | Round | Adds | Module you read |
+|---|---|---|---|
+| 0 | 0 | Nothing: every sign-up is recorded with its fingerprint, none are refused | – |
+| 1 | 1 | A fingerprint is required, and the render stack must be plausible | `defenses/fp_gate.py`, `defenses/render_stack.py` |
+| 2 | 2 | Lie detection: page vs. worker vs. headers | `defenses/lie_detector.py` |
+| 3 | 3 | Exact-ID linking, rarity-weighted | `defenses/stable_id.py`, `defenses/rarity.py`, `defenses/linking.py` |
+| 4 | 4 | Fuzzy clustering on noise-resistant components | `defenses/fuzzy_cluster.py` |
+
+Round N runs at level N. Each level includes every level below it. Every layer runs only on the **sign-up action** (`POST /register` and `POST /api/register`); the page that serves the collector stays open. `defenses/policy.py` (this lab's bands) turns the points into a verdict:
+
+| Score | Verdict | What the client gets |
 |---|---|---|
-| 0 | Nothing. Every sign-up is scored and logged, none are refused | – |
-| 1 | Render-stack plausibility, and a fingerprint is required | `defenses/render_stack.py` |
-| 2 | Lie detection: page vs. worker vs. headers | `defenses/lie_detector.py` |
-| 3 | Exact-ID linking, rarity-weighted | `defenses/stable_id.py`, `population.py`, `linking.py` |
-| 4 | Fuzzy clustering on noise-resistant components | `defenses/fuzzy_cluster.py` |
+| ≥ 40 | `block` | 403, no account |
+| ≥ 20 | `monitor` ("suspicious") | the account is created; the sign-up is logged |
+| < 20 | `allow` ("clean") | the account is created |
 
-Each level includes every level below it, and `defenses/scoring.py` adds up the points:
+`LINK_MODE` (in `defenses/policy.py`, or `LINK_MODE=naive` in the store's environment) turns off rarity weighting in L3 and L4. You use it once, in Round 3. Edit, save, and the store reloads `defenses/` on the next request.
 
-| Score | Verdict | What happens |
-|---|---|---|
-| ≥ 40 | `bot` | Sign-up refused with a 403 |
-| ≥ 20 | `suspicious` | Logged, account created |
-| < 20 | `clean` | Account created |
-
-`LINK_MODE=naive` turns off rarity weighting in L3 and L4. You'll use it once, in Round 3.
-
-The debug endpoints are never blocked:
+Lab pages (loopback only, never scored):
 
 | Endpoint | What it does |
 |---|---|
-| `/fp-check` | Shows your fingerprint and how every level judges it |
-| `/fp-profile` | Downloads your fingerprint as a real-user profile |
-| `/fp-dashboard` | Sign-ups by verdict, and the most-reused fingerprints |
+| `/lab/fp/check` | Collects your browser's fingerprint and shows how every level judges it |
+| `/lab/fp/profile` | Downloads your fingerprint as a real-user profile |
+| `/lab/fp/dashboard` | Sign-ups by level and verdict, and the most-reused devices |
+| `/lab/fp/logs` | The last sign-up decisions with the reasons the layers gave |
+| `/lab/decisions` | The store's decision log: every request, with its signals |
 
-> The 403 body lists the reasons it fired. That is for teaching only.
+> Every response carries `X-Lab-Verdict`, `X-Lab-Score` and `X-Lab-Signals`, and the bots print them. The reasons are in `/lab/fp/logs`. That is for teaching only.
 > In production, never tell a client which rule caught it.
 
 **Troubleshooting**
 
 | Problem | Fix |
 |---|---|
-| Port 5000 already in use (macOS: the AirPlay Receiver uses it) | `PORT=5050 DEFENSE_LEVEL=… python app.py`, then `export DEMO_URL=http://localhost:5050` in the shell you run attacks and tools from |
-| No Docker | `export DATABASE_URL=sqlite:///fp_lab.db` before starting the app. Everything else works the same |
-| Port 5432 taken (e.g. by the W1 Ch4 lab's database) | `docker compose -p w1-ch04-headers down`, or stop your local PostgreSQL |
-| `Executable doesn't exist` from Playwright | `playwright install chromium` inside the venv |
-| The checkpoint is slow | Each run drives 40 browser sessions, which takes about 45 s. `--signups 5` halves it |
+| Port 5000 is already in use (on macOS, the AirPlay Receiver takes it) | `PORT=5050 python demo_site/app.py`, then `export DEMO_URL=http://127.0.0.1:5050` in every shell you run attacks and tools from |
+| `Executable doesn't exist` from Playwright | `python -m playwright install chromium` inside this lab's venv |
+| An attack reports `refused 403` at level 0 | The store is at another level: `level 0` |
+| A second attack run gets fewer accounts than the table says | Accounts from the earlier run count toward linking. The attack scripts reset the store when you run them by hand; if you passed `--no-reset`, run `python tools/reset.py` |
+| Port 5432 or 6379 taken (another lab's containers) | `docker compose ls`, then `docker compose -p <name> down`, or stop your local PostgreSQL / Redis |
+| The checkpoint is slow | Each run drives 40 browser sign-ups, about 20 s. `--signups` on an attack script shortens a hand run |
 
 ---
 
@@ -96,39 +150,37 @@ The debug endpoints are never blocked:
 Finish every round with a **checkpoint**:
 
 ```bash
-python tools/checkpoint.py --round <N>
+python tools/checkpoint.py --round <N>              # set level N, run every farm next to the 40 shoppers
+python tools/checkpoint.py --round <N> --level <N-1>   # the same farms against the level before
+python tools/checkpoint.py --round <N> --catch-up   # install solutions/round1..N (ladder.py, policy.py) first
+python tools/checkpoint.py --restore                # put your own files back (*.bak)
 ```
 
-```
-=== Checkpoint: Round 4 (server at DEFENSE_LEVEL=4, LINK_MODE=rarity) ===
+It runs **every** farm of the chapter at the round's level, so you see both what the current layers stop and what still gets through (the next round's problem). At the same time the store's 40 shoppers (`tools/population.py`, with `tools/personas_ch4.py`) each sign up as one real-browser profile. It reports:
 
-Bot traffic (10 sign-ups per attack, fresh store each)
-  ✅ round1_headless_signup      0/10 accounts created (expected 0)
-  ✅ round2_patched_signup       0/10 accounts created (expected 0)
-  ✅ round3_replay_signup        3/10 accounts created (expected 3)
-  ✅ round4_noise_signup         3/10 accounts created (expected 3)
+- **Bots.** Every farm, compared with what should happen at this level: accounts created out of 10. Each farm uses a fresh browser and a new address per attempt.
+- **Real users.** A table per cohort. **Refused** is a false positive, and the checkpoint fails on it. **Flagged** means the gate scored the user 20–39 and still served them: friction you would take to a challenge in production. The cohorts are chosen to hurt:
 
-Real users (40 simulated shoppers, fresh store)
-  ✅ 0/40 refused
-       privacy-extension  0/2 refused, 2 suspicious
+| Cohort | n | Who | Why it is hard |
+|---|---|---|---|
+| chrome-windows | 7 | different Windows PCs | the easy majority |
+| chrome-mac | 4 | identical MacBook Air M2s | one rare-looking class, many people |
+| corporate-fleet | 4 | an office of identical laptops behind **one** address | identical fingerprint *and* one IP |
+| iphone | 8 | identical iPhones behind carrier NAT (Safari 26, AFP noise) | the most common fingerprint on the web |
+| safari-mac | 4 | Safari 26 with canvas noise | noise on by default |
+| firefox-fpp | 4 | Firefox, canvas randomised per session | noise on by default |
+| brave | 4 | Brave, canvas/audio farbled per session | noise on by default |
+| vdi | 2 | Citrix desktops with a software renderer | look like a headless server |
+| privacy-extension | 2 | Chrome + a canvas-noise extension | patched natives |
+| no JavaScript | 1 | the `no_js` shopper | no fingerprint at all |
 
-Defender cost
-  collector (headless Chromium): median 214 ms, payload 3.9 KB
-  server scoring:  median 0.76 ms, p95 2.97 ms
-  linking queries: median 3.56 ms, p95 10.32 ms
+- **The no-JavaScript shopper** is refused from Round 1 on: with no fingerprint there is nothing to judge, and the gate treats "no fingerprint" as 40 points. The checkpoint counts that as an accepted, measured cost (`allowed_fp`) and fails if it is *not* refused. In production you send those users to a challenge (W1 Ch6).
+- **Your own profiles** (`tools/profiles/you-*.json`, from Round 0) sign up as one more real user. The checkpoint fails if one is refused.
+- **Defender cost.** The collector's run time and payload in a real Chromium, and for each check the milliseconds the gate spent on the sign-up (`Server-Timing`).
 
-✅ Round 4 checkpoint passed.
-```
+**The synthetic shoppers are a stand-in, not ground truth.** Every shipped profile is marked `synthesized`: built from real Chromium and Firefox captures plus each browser's documented behaviour, *not* captured on that exact device. Safari, Brave and a phone are the weakest. That is why Round 0 adds **your** browser, and why any refusal of a captured profile is a bug in the defense.
 
-What it reports:
-
-- **Bot traffic:** every attack, compared with what should happen at this level. Each attack starts from an empty store (`POST /lab/reset`), so the numbers don't depend on what you ran before.
-- **Real users:** `tools/legit_traffic.py` signs up 40 simulated shoppers. Each one has a fingerprint and headers that match it. Any 403 here is a **false positive**. The cohorts are chosen to hurt: identical iPhones, an office of identical laptops behind one IP, privacy browsers that add noise, and Citrix desktops with no GPU.
-- **Defender cost:**
-  - collector run time and payload size, measured in a real Chromium;
-  - the server's scoring time and linking time, read from the `Server-Timing` header.
-
-**Fell behind?** Every defense is already written, so catching up just means restarting the demo site with `DEFENSE_LEVEL=<N>`. The checkpoint tells you if you're on the wrong level.
+**Fell behind?** Every defense is already written, so catching up means running at the round's level: the checkpoint does it, and `--catch-up` installs that round's `ladder.py` and `policy.py`.
 
 ---
 
@@ -140,7 +192,7 @@ What it reports:
 python attacks/round0_recon.py              # what does the store see from headless Chromium?
 ```
 
-**🛡️ Defend (look):** open `http://localhost:5000/fp-check` in your own browser, and in a second browser if you have one. Then fill in this table:
+**🛡️ Defend (look):** open `http://127.0.0.1:5000/lab/fp/check` in your own browser, and in a second browser if you have one. Then fill in this table:
 
 | | Headless Chromium | Your browser | Second browser |
 |---|---|---|---|
@@ -152,11 +204,11 @@ python attacks/round0_recon.py              # what does the store see from headl
 | `userAgentData` brands | | | |
 | Collector time | | | |
 
-Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox with fingerprinting protection will surprise you.)
+Reload `/lab/fp/check` twice. Which values change? (Brave, Safari 26 and Firefox with fingerprinting protection will surprise you.)
 
 **Add yourself to the real-user set:** click **Download as a real-user profile** and save the file as `tools/profiles/you-<browser>.json`. From now on, every checkpoint checks that *your* browser can still sign up.
 
-**Checkpoint:** `python tools/checkpoint.py --round 0`. Every attack should succeed.
+**Checkpoint:** `python tools/checkpoint.py --round 0`. Every farm succeeds (10/10), every shopper registers, nobody is flagged.
 
 ---
 
@@ -164,16 +216,16 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round1_headless_signup.py` (level 0) | 20/20 accounts created |
-| 🛡️ Defend | Read `defenses/render_stack.py`, then restart with `DEFENSE_LEVEL=1` | – |
-| 🗡️ Re-run | `python attacks/round1_headless_signup.py` | 0/20: `[L1] SwiftShader WebGL renderer` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | round 1 stopped · 0/40 real users refused |
+| 🗡️ Attack | `level 0`, then `python attacks/round1_headless_signup.py` | 20/20 accounts created |
+| 🛡️ Defend | Read `defenses/fp_gate.py` and `defenses/render_stack.py`, then `level 1` | – |
+| 🗡️ Re-run | `python attacks/round1_headless_signup.py` | 0/20: `fp:render_stack` (SwiftShader WebGL renderer) |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | farm 1 stopped · 0 refused of 39 · the no-JavaScript shopper refused |
 
 **Exercises:**
 
-1. Run `python defenses/render_stack.py`. Why does the Citrix user score 15, but the headless browser 40?
+1. Run `python -m defenses.render_stack`. Why does the Citrix user score 15, but the headless browser 40?
 2. Why is a missing voice list worth nothing on Linux?
-3. `TODO (Round 1)` in `render_stack.py`: Android.
+3. `TODO (Round 1)` in `render_stack.py` (optional tuning): Android.
 
 ---
 
@@ -181,16 +233,16 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | Read `attacks/data/stealth_patch.js`, then `python attacks/round2_patched_signup.py` (level 1) | 20/20: L1 now sees an NVIDIA GPU and three voices |
-| 🛡️ Defend | Read `defenses/lie_detector.py`, then restart with `DEFENSE_LEVEL=2` | – |
+| 🗡️ Attack | Read `attacks/data/stealth_patch.js`, then `level 1` and `python attacks/round2_patched_signup.py` | 20/20: L1 now sees an NVIDIA GPU and three voices |
+| 🛡️ Defend | Read `defenses/lie_detector.py`, then `level 2` | – |
 | 🗡️ Re-run | `python attacks/round2_patched_signup.py` | 0/20, score 90: page vs. worker (platform, cores, memory), `MAX_TEXTURE_SIZE=8192` on an "RTX 3060", `userAgentData` brands vs. `Sec-CH-UA` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | rounds 1–2 stopped · 0/40 refused · 2 privacy-extension users `suspicious` |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | farms 1–2 stopped · 0 refused of 39 · the 2 privacy-extension users flagged (25) |
 
 **Exercises:**
 
-1. None of the patched natives was flagged as patched. Why? (Look at `nativeShape()` in the collector, then at `spoofGetter` in the patch.)
+1. None of the patched natives was flagged as patched. Why? (Look at `nativeShape()` in `demo_site/static/js/fp.js`, then at `spoofGetter` in the patch.)
 2. The two privacy-extension users *were* flagged as patched, and only scored 25. Should tampering alone ever be worth 40?
-3. `TODO (Round 2)` in `lie_detector.py`: compare `languages` and `timeZone` across contexts too. Then check that the checkpoint still passes.
+3. `TODO (Round 2)` in `lie_detector.py` (optional tuning): compare `languages` and `timeZone` across contexts too. Then check that the checkpoint still passes.
 
 ---
 
@@ -198,19 +250,19 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round3_replay_signup.py` (level 2) | 20/20: L1 and L2 see an honest Windows PC |
-| 🛡️ Defend (naive) | Read `defenses/stable_id.py` and `defenses/linking.py`. Restart with `DEFENSE_LEVEL=3 LINK_MODE=naive`, then run `python tools/legit_traffic.py` | **2/40 real users refused**: the 4th identical MacBook and the 4th office laptop |
-| 🛡️ Defend | Read `defenses/population.py`, then restart with `DEFENSE_LEVEL=3` (rarity is the default) | – |
-| 🗡️ Re-run | `python attacks/round3_replay_signup.py` | 3/20, then `[L3] fingerprint_linked: 3 accounts today from device …` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | rounds 1–3 stopped (round 3 after 3 accounts) · round 4 gets through · 0/40 refused |
+| 🗡️ Attack | `level 2`, then `python attacks/round3_replay_signup.py` | 20/20: L1 and L2 see an honest Windows PC |
+| 🛡️ Defend (naive) | Read `defenses/stable_id.py` and `defenses/linking.py`. Set `LINK_MODE = "naive"` in `defenses/policy.py`, `level 3`, then `python tools/reset.py && python tools/personas_ch4.py` | **2 real users refused** (plus the no-JavaScript shopper): the 4th identical MacBook and the 4th office laptop |
+| 🛡️ Defend | Read `defenses/rarity.py`, then set `LINK_MODE` back to `"rarity"` | – |
+| 🗡️ Re-run | `python attacks/round3_replay_signup.py` | 3/20, then `fp:fingerprint_linked` (3 accounts today from device …) |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | farms 1–3 stopped (farm 3 after 3 accounts) · farm 4 gets through · 0 refused of 39 |
 
 **Exercises:**
 
-1. Why does linking ignore the iPhones entirely? What does `python defenses/population.py` print for their class?
+1. Why does linking ignore the iPhones entirely? What does `python -m defenses.rarity` print for their class?
 2. Replay *your own* fingerprint: `python attacks/round3_replay_signup.py --payload tools/profiles/you-<browser>.json`. How many accounts does it get, and why?
-3. `TODO (Round 3)` in `linking.py`: one family, one laptop, three accounts.
+3. `TODO (Round 3)` in `linking.py` (optional tuning): one family, one laptop, three accounts. Count distinct source addresses.
 
-**Discuss:** the attacker read `population_sample.json`. Which fingerprint will they replay next?
+**Discuss:** the attacker read `defenses/population_sample.json`. Which fingerprint will they replay next?
 
 ---
 
@@ -218,34 +270,35 @@ Reload `/fp-check` twice. Which values change? (Brave, Safari 26 and Firefox wit
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round4_noise_signup.py` (level 3) | 20/20: every `stable_id` is new |
-| 🛡️ Defend | Read `defenses/fuzzy_cluster.py`, run it, then restart with `DEFENSE_LEVEL=4` | – |
-| 🗡️ Re-run | `python attacks/round4_noise_signup.py` | 3/20, then `[L4] fingerprint_cluster: 3 accounts today from near-identical devices` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | rounds 1–4 stopped · 0/40 refused |
+| 🗡️ Attack | `level 3`, then `python attacks/round4_noise_signup.py` | 20/20: every `stable_id` is new |
+| 🛡️ Defend | Read `defenses/fuzzy_cluster.py`, run `python -m defenses.fuzzy_cluster`, then `level 4` | – |
+| 🗡️ Re-run | `python attacks/round4_noise_signup.py` | 3/20, then `fp:fingerprint_cluster` (3 accounts today from near-identical devices) |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | farms 1–4 stopped (farms 3 and 4 after 3 accounts) · 0 refused of 39 |
 
-**False-positive check:** restart with `DEFENSE_LEVEL=4 LINK_MODE=naive` and run `python tools/legit_traffic.py`.
+**False-positive check:** set `LINK_MODE = "naive"`, keep `level 4`, and run `python tools/reset.py && python tools/personas_ch4.py`.
 
-- Who gets refused now? About 10/40: identical iPhones, the office fleet together with lookalike Windows PCs, and a privacy-extension user.
+- Who gets refused now? 9 of the 39 shoppers with JavaScript: five identical iPhones, two office laptops, a MacBook and a Brave user.
 - Why is fuzzy matching *more* dangerous to real users than exact matching?
 
 **Exercises:**
 
 1. `TODO (Round 4, attacker)` in `round4_noise_signup.py`: jitter the screen size as well. Does L4 still catch it?
-2. `TODO (Round 4)` in `fuzzy_cluster.py`: weight the components instead of counting them, and re-run both the attack and `legit_traffic.py`.
+2. `TODO (Round 4)` in `fuzzy_cluster.py` (optional tuning): weight the components instead of counting them, and re-run both the attack and `personas_ch4.py`.
+
+**Why the checkpoint replays a second PC in Round 4.** It runs every farm against one store, and Round 3's three accounts (the first harvested PC) would count toward Round 4's cluster. The checkpoint passes `--payload attacks/data/harvested_fp_b.json`. By hand, with a reset between the two attacks, the first PC gives the same 3.
 
 ---
 
 ## Wrap-up: false positives and cost
 
 ```bash
-python tools/legit_traffic.py               # per-cohort verdicts and reasons
-curl -s localhost:5000/fp-dashboard | python -m json.tool
-docker compose exec postgres psql -U workshop -d shop \
-  -c "SELECT level, verdict, status, count(*) FROM signup GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;"
+python tools/reset.py && python tools/personas_ch4.py    # per-cohort verdicts and reasons
+curl -s localhost:5000/lab/fp/dashboard | python -m json.tool
+curl -s localhost:5000/lab/fp/logs | python -m json.tool | head -40
 ```
 
-- Which rules would you only ever use for `suspicious`, never for `bot`?
-- The collector costs 120–300 ms in headless Chromium, and much more on a cold page with a real GPU. Where in the page lifecycle would you run it in production?
+- Which rules would you only ever use for `monitor`, never for `block`?
+- The collector costs 100–300 ms in headless Chromium, and much more on a cold page with a real GPU. Where in the page lifecycle would you run it in production, and what do you do with a sign-up that arrives before it finishes?
 - The attacker's last move is to rotate **whole, coherent** fingerprints from a generator, or from a farm of real phones. Which signals are left?
   - **TLS and HTTP/2:** a "Windows Chrome" fingerprint arrives over Linux Python's TLS stack. That is W2 Ch5.
   - **Device binding and step-up on login:** W2 Ch6.
@@ -256,32 +309,36 @@ docker compose exec postgres psql -U workshop -d shop \
 
 ## Expected results (self-check)
 
-Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, httpx 0.28.1, Playwright 1.63.0 (Chromium 153) and the SQLite fallback (no Docker). The `docker compose` path is verified separately. Every checkpoint (rounds 0-4) passed, and the `LINK_MODE=naive` runs gave 2/40 (L3) and 10/40 (L4) refused. Numbers are accounts created out of 20 sign-ups (the scripts' default; the checkpoint uses 10). Each attack starts from an empty store.
+Generated from `python tools/verify.py --all --catch-up --markdown` (run `python tools/checkpoint.py --all --markdown` against your own store) on 2026-10-14 with Python 3.12.15, Flask 3.1.3, SQLAlchemy 2.1.4, Playwright 1.63.0 (Chromium 153), SQLite and the in-process Redis. Every round passed, and every `--level N-1` "before" run reported the round's farm succeeding where it should. The markdown output also holds one scoreboard per round. Numbers are accounts created out of 10 attempts (the checkpoint's default; by hand the scripts make 20). The checkpoint runs every farm on one store per round.
 
-| Attack ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Reason at the first stop |
+| Farm ↓ / `DEFENSE_LEVEL` → | 0 | 1 | 2 | 3 | 4 | Signal at the first stop |
 |---|---|---|---|---|---|---|
-| `round1_headless_signup` | 20 | **0** | 0 | 0 | 0 | `[L1] SwiftShader WebGL renderer` (40) |
-| `round2_patched_signup` | 20 | 20 | **0** | 0 | 0 | `[L2]` worker 40 + texture limits 20 + brands 30 = 90 |
-| `round3_replay_signup` | 20 | 20 | 20 | **3** | 3 | `[L3] fingerprint_linked` (40; 80 at L4) |
-| `round4_noise_signup` | 20 | 20 | 20 | 20 | **3** | `[L4] fingerprint_cluster` (40) |
-| Real users refused (`legit_traffic.py`) | 0/40 | 0/40 | 0/40 | 0/40 | 0/40 | 2 privacy-extension users `suspicious` (25) from L2 |
-| … with `LINK_MODE=naive` | | | | 2/40 | 10/40 | Identical MacBooks, office fleet, iPhones, a privacy extension |
+| `round1_headless_signup` | 10 | **0** | 0 | 0 | 0 | `fp:render_stack` (SwiftShader, 40) |
+| `round2_patched_signup` | 10 | 10 | **0** | 0 | 0 | `fp:fingerprint_mismatch` (worker 40 + texture limits 20 + brands 30 = 90) |
+| `round3_replay_signup` | 10 | 10 | 10 | **3** | 3 | `fp:fingerprint_linked` (40; 80 at L4, with `fp:fingerprint_cluster`) |
+| `round4_noise_signup` | 10 | 10 | 10 | 10 | **3** | `fp:fingerprint_cluster` (40) |
+| Real users refused, of the 39 with JavaScript | 0 | 0 | 0 | 0 | 0 | |
+| The no-JavaScript shopper refused | no | yes | yes | yes | yes | `fp:no_fingerprint` (40): the accepted cost |
+| Real users flagged but served (20–39) | 0 | 0 | 2 | 2 | 2 | the 2 privacy-extension users, `fp:tampered` (25) |
+| … refused with `LINK_MODE = "naive"` | | | | 2 | 9 | identical MacBooks, office fleet, iPhones, a Brave user |
 
-Defender cost measured on the author's laptop:
+Defender cost at level 4 (median, on the author's laptop; your numbers will differ):
 
 | Item | Cost |
 |---|---|
-| Collector | 120–300 ms in headless Chromium, about 2 s on a cold headed Chromium with a GPU; 3.9 KB payload |
-| Scoring at level 4 | median 0.8 ms |
-| Linking queries at level 4 | median 3.6 ms, p95 10 ms, on SQLite with a few dozen accounts |
+| Collector | about 110 ms in headless Chromium, about 2 s on a cold headed Chromium with a GPU; 3.9 KB payload |
+| Gate on the sign-up | median 2.5 ms, p95 4.8 ms |
+| … by check | `fp_gate` 0.4 ms · `render_stack` 0.03 ms · `lie_detector` 0.06 ms · `linking` 0.4 ms · `fuzzy_cluster` 0.4 ms |
+
+`linking` is a key lookup (one sorted set per device) and stays flat as accounts pile up; `fuzzy_cluster` scans every account created today, so it is the cost that grows. The scan is fine for a lab and far too slow at scale (see §4.5).
 
 Things to watch for:
 
 - **Version drift.** When Chrome or Playwright updates, re-run every checkpoint. Then check `round0_recon.py`:
   - Does headless still report SwiftShader? (Chrome dropped the automatic SwiftShader fallback in 139. Playwright enables it explicitly.)
   - Is `MAX_TEXTURE_SIZE` still 8192?
-- **Synthesized profiles.** Every shipped real-user profile is marked `synthesized`. They are built from real Chromium and Firefox captures plus each browser's documented behaviour, *not* captured on those exact devices. If you use Safari, Brave or a phone, add your capture in Round 0, and treat any refusal of a captured profile as a bug in the defense.
-- **PostgreSQL.** The no-Docker run above used the SQLite fallback. The queries are plain SQLAlchemy; the PostgreSQL path is covered by the separate `docker compose` verification.
+- **Synthesized profiles.** See above. If you use Safari, Brave or a phone, add your capture in Round 0, and treat any refusal of a captured profile as a bug in the defense.
+- **Where the history lives.** The accounts L3 and L4 count are in Redis (`lab:fp:acct:<stable_id>`, `lab:fp:cores`); `POST /lab/reset` flushes them. With `REDIS_URL=memory://` they vanish on a restart.
 
 ---
 

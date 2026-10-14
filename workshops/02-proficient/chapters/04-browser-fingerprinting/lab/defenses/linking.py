@@ -14,45 +14,69 @@ a standard corporate laptop image). Run the demo site with LINK_MODE=naive
 to see what happens without that: identical office laptops and identical
 MacBooks start blocking each other.
 
-The query (see `count_accounts` in demo_site/app.py):
+The lookup (`fingerprint.accounts_today`) is one Redis sorted set per device,
+scored by time:
 
-    SELECT count(*) FROM signup
-     WHERE status = 'created' AND stable_id = :sid AND created_at > now() - interval '24 hours'
+    ZRANGEBYSCORE lab:fp:acct:<stable_id> <now - 24 h> +inf
 
-It needs an index on (stable_id, created_at). Without one, this is the most
-expensive thing the defense does. The checkpoint reports its cost.
+That key is the index. In a SQL store the same rule is a `SELECT count(*) ...
+WHERE stable_id = :sid AND created_at > now() - interval '24 hours'`, which
+needs an index on (stable_id, created_at); without one it is the most
+expensive thing the defense does. Here the cost shows up in the
+`Server-Timing: linking;dur=...` header, and the checkpoint reports it.
 
 Trade-off: linking only works if the ID is stable. Anything that adds noise
 to a high-entropy component (canvas, audio) makes every sign-up look new.
 That is Round 4.
 """
 
-from population import account_limit
-from stable_id import device_class, stable_id
+from . import fingerprint, policy
+from .pipeline import Check
+from .rarity import account_limit
+from .stable_id import device_class, stable_id
 
 LINK_POINTS = 40
 
 
-def score_linking(fp, count_accounts, mode="rarity"):
+def score_linking(fp, accounts_today, mode="rarity"):
     """
     Return (points, reasons).
 
-    count_accounts(stable_id) -> number of accounts already created with
-    that ID in the last 24 hours (the app provides it, backed by SQL).
+    accounts_today(stable_id) -> the source IP of every account already
+    created with that ID in the last 24 hours (fingerprint.accounts_today,
+    backed by Redis): one entry per account.
     """
     sid, cls = stable_id(fp), device_class(fp)
     limit = account_limit(cls, mode)
     if limit is None:
         return 0, []
-    existing = count_accounts(sid)
-    # TODO (Round 3): a family sharing one laptop can legitimately create two
-    # or three accounts. Count *distinct IPs* as well, and only add points
-    # when the accounts came from more than one network. What does the
+    ips = accounts_today(sid)
+    existing = len(ips)
+    # TODO (Round 3, optional tuning): a family sharing one laptop can legitimately create two
+    # or three accounts. Count *distinct IPs* (`ips` holds one per account)
+    # and only add points when the accounts came from more than one network.
+    # This is optional tuning: the layer works as shipped. What does the
     # attacker do next?
     if existing >= limit:
         return LINK_POINTS, [f"fingerprint_linked: {existing} accounts today from device "
                              f"{sid} (limit {limit} for class {cls})"]
     return 0, []
+
+
+def evaluate(ctx):
+    """(points, reasons) for this session's record against the accounts created today."""
+    return score_linking(fingerprint.record(ctx)["payload"], lambda sid: fingerprint.accounts_today(ctx, sid),
+                         policy.LINK_MODE)
+
+
+def _check(ctx):
+    if fingerprint.record(ctx) is None:
+        return None
+    points, reasons = evaluate(ctx)
+    return fingerprint.signals("L3", "fingerprint_linked", points, reasons, ctx)
+
+
+CHECK = Check("linking", _check, phases=("action:register",))
 
 
 if __name__ == '__main__':
@@ -63,4 +87,4 @@ if __name__ == '__main__':
                   "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002503) Direct3D11 vs_5_0 ps_5_0, D3D11)"},
     }
     for already in range(5):
-        print(already, "existing →", score_linking(fp, lambda _sid: already))
+        print(already, "existing →", score_linking(fp, lambda _sid: ["192.0.2.1"] * already))

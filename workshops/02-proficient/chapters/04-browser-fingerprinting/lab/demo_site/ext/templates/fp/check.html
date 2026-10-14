@@ -1,22 +1,30 @@
-{% extends "base.html" %}
-{% block title %}Fingerprint check{% endblock %}
+{% extends "base.html" %}{% block page %}fp-check{% endblock %}
+{% block title %}Fingerprint check · {{ store_name }}{% endblock %}
 {% block content %}
-<h2>Your fingerprint</h2>
-<p id="status">Collecting…</p>
-<table id="summary"></table>
-<h3>How each defense level judges it</h3>
-<table id="levels"><tr><th>Level</th><th>Verdict</th><th>Score</th><th>Reasons</th></tr></table>
-<p><a href="/fp-profile">⬇️ Download as a real-user profile</a> → save it as <code>tools/profiles/you-&lt;browser&gt;.json</code></p>
-<details><summary>Raw payload</summary><pre id="raw"></pre></details>
-{% endblock %}
-{% block scripts %}
+{# Chapter 4's check page: collects your browser's fingerprint, then shows how every defense level judges it. #}
+<style>
+  .fpc table { border-collapse: collapse; width: 100%; font-size: .9rem; margin: .5rem 0 1.2rem; }
+  .fpc td, .fpc th { border-bottom: 1px solid var(--line); padding: .35rem .5rem; text-align: left; vertical-align: top; word-break: break-word; }
+  .fpc .block { color: #b91c1c; font-weight: 600; } .fpc .monitor { color: #b45309; font-weight: 600; } .fpc .allow { color: #15803d; font-weight: 600; }
+  .fpc pre { background: var(--surface); padding: 1rem; overflow-x: auto; font-size: .8rem; }
+</style>
+<section class="fpc">
+  <h1>Your fingerprint</h1>
+  <p id="status">Collecting…</p>
+  <table id="summary"></table>
+  <h2>How each defense level judges it</h2>
+  <table id="levels"><tr><th>Level</th><th>Verdict</th><th>Score</th><th>Reasons</th></tr></table>
+  <p><a href="/lab/fp/profile">Download as a real-user profile</a> and save it as <code>tools/profiles/you-&lt;browser&gt;.json</code>.</p>
+  <details><summary>Raw payload</summary><pre id="raw"></pre></details>
+</section>
+{% include "fp/script.html" %}
 <script>
   const esc = (s) => String(s ?? "–").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   document.addEventListener("fp:done", async () => {
-    const me = await (await fetch("/api/fp/me")).json();
+    const me = await (await fetch("/lab/fp/me")).json();
     const p = me.payload;
     document.getElementById("status").textContent =
-      `fp_id ${me.fp_id} · stable_id ${me.stable_id} · collected in ${p.collect_ms} ms`;
+      `fp_id ${me.fp_id} · stable_id ${me.stable_id} · collected in ${p.collect_ms} ms · store at level ${me.level}`;
     const rows = [
       ["Device class", me.device_class],
       ["User-Agent", p.nav.userAgent],

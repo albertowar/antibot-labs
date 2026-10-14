@@ -1,43 +1,38 @@
 """
-Chapter 4 — Round 3 Attack: Replay a Harvested Real Fingerprint (Section 4.7)
+Chapter 4, Round 3 attack: replay a harvested real fingerprint (Section 4.7).
 
-Objective: stop lying inside the page. Lies get caught because the
-attacker can't patch every context. So the attacker doesn't patch
-anything. They let the collector run, intercept its POST to /api/fp and
-swap in a complete, consistent payload "harvested" from one real Windows
-PC (data/harvested_fp.json). Fingerprint shops sell exactly this.
+Objective: stop lying inside the page. Lies get caught because the attacker cannot patch every
+context. So the attacker does not patch anything. They let the collector run, intercept its POST
+to /api/telemetry and swap in a complete, consistent payload "harvested" from one real Windows PC
+(data/harvested_fp.json). Fingerprint shops sell exactly this.
 
-To make the headers agree with the payload, the attacker sets the full
-User-Agent *and* Client Hints metadata through the Chrome DevTools
-Protocol (Emulation.setUserAgentOverride). That is the step W1 Ch4 Round 5
-ended on: every header is now genuine-looking, brands included.
+To make the headers agree with the payload, the attacker sets the full User-Agent *and* Client
+Hints metadata through the Chrome DevTools Protocol (Emulation.setUserAgentOverride). That is the
+step W1 Ch4 Round 5 ended on: every header is now genuine-looking, brands included.
 
-L1 sees a real NVIDIA GPU, L2 finds no contradictions. The weakness:
-it is the same device every time.
+L1 sees a real NVIDIA GPU, L2 finds no contradictions. The weakness: it is the same device every time.
 
 Expected results:
   - DEFENSE_LEVEL<=2: 20/20 created
-  - DEFENSE_LEVEL>=3: 3/20, then "[L3] fingerprint_linked: 3 accounts today from device ..."
+  - DEFENSE_LEVEL>=3: 3/20, then fp:fingerprint_linked ("3 accounts today from device ...")
 
-Run the demo site first:
-    cd demo_site && DEFENSE_LEVEL=2 python app.py
-Then:
+Run the store first, set the level (2 to see it succeed, 3 to see it stopped), then:
     python attacks/round3_replay_signup.py [--signups 20] [--payload you.json]
 """
 
-import argparse
 import json
 import os
 
 from playwright.sync_api import sync_playwright
 
-from _lab import bot_email, lab_ip, report, require_local, sign_up
+from _common import bot_email, common_args, finish, new_context, report, reset, sign_up
 
-HARVESTED = os.path.join(os.path.dirname(__file__), "data", "harvested_fp.json")
+HERE = os.path.dirname(os.path.abspath(__file__))
+HARVESTED = os.path.join(HERE, "data", "harvested_fp.json")
 
 
 def load_payload(path=HARVESTED):
-    """Accepts data/harvested_fp.json or a profile downloaded from /fp-profile."""
+    """Accepts data/harvested_fp.json or a profile downloaded from /lab/fp/profile."""
     with open(path) as f:
         data = json.load(f)
     if "users" in data:
@@ -62,27 +57,29 @@ def ua_override(fp):
 
 
 def replay_signup(context, fp, email):
-    """One sign-up whose /api/fp body is replaced by `fp` (keeping the session nonce)."""
+    """One sign-up whose telemetry body is replaced by `fp` (keeping the session nonce)."""
     page = context.new_page()
     cdp = context.new_cdp_session(page)
     cdp.send("Emulation.setUserAgentOverride", ua_override(fp))
 
     def swap(route):
         original = json.loads(route.request.post_data or "{}")
-        route.continue_(post_data=json.dumps({**fp, "nonce": original.get("nonce")}))
+        if original.get("kind") != "fp":
+            return route.fallback()
+        # fallback (not continue): the context's localhost guard still sees the request
+        route.fallback(post_data=json.dumps({**fp, "kind": "fp", "nonce": original.get("nonce")}))
 
-    page.route("**/api/fp", swap)
+    page.route("**/api/telemetry", swap)
     return sign_up(page, email)
 
 
 def run(signups=20, verbose=False, payload_path=HARVESTED):
-    require_local()
     fp = load_payload(payload_path)
     results = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         for i in range(signups):
-            context = browser.new_context(extra_http_headers={"X-Lab-Client-IP": lab_ip(i)})
+            context = new_context(browser, "round3_replay_signup", i)
             results.append(replay_signup(context, fp, bot_email(3, i)))
             context.close()
         browser.close()
@@ -91,9 +88,8 @@ def run(signups=20, verbose=False, payload_path=HARVESTED):
     return results
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--signups", type=int, default=20)
-    parser.add_argument("--payload", default=HARVESTED, help="harvested payload or /fp-profile download")
-    args = parser.parse_args()
-    run(args.signups, verbose=True, payload_path=args.payload)
+if __name__ == "__main__":
+    args = common_args(__doc__.split("\n")[1], payload=HARVESTED).parse_args()
+    if not args.no_reset:
+        reset()
+    finish("round3_replay_signup", run(args.signups, verbose=True, payload_path=args.payload))

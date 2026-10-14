@@ -28,8 +28,10 @@ off hardware acceleration, very old GPUs on the blocklist, and kiosks.
 None of them should reach the bot threshold through L1 alone.
 """
 
-from fields import (OSES_WITH_VOICES, is_software_renderer, is_swiftshader, os_from_ua,
-                    renderer)
+from . import fingerprint
+from .fields import (OSES_WITH_VOICES, is_software_renderer, is_swiftshader, os_from_ua,
+                     renderer)
+from .pipeline import Check
 
 SWIFTSHADER_POINTS = 40
 SOFTWARE_RENDERER_POINTS = 15
@@ -65,7 +67,7 @@ def score_render_stack(fp):
         reasons.append("OfflineAudioContext unavailable")
 
     voices = fp.get("voices") or {}
-    # TODO (Round 1): Android WebView and some de-Googled Android builds ship
+    # TODO (Round 1, optional tuning): Android WebView and some de-Googled Android builds ship
     # no voices. Add a profile that shows it, then decide whether Android
     # belongs in OSES_WITH_VOICES.
     if voices.get("count", 0) == 0 and claimed_os in OSES_WITH_VOICES:
@@ -73,6 +75,21 @@ def score_render_stack(fp):
         reasons.append(f"No speech voices, but the UA claims {claimed_os}")
 
     return points, reasons
+
+
+def evaluate(ctx):
+    """(points, reasons) for this session's record (the check page calls it for every level)."""
+    return score_render_stack(fingerprint.record(ctx)["payload"])
+
+
+def _check(ctx):
+    if fingerprint.record(ctx) is None:
+        return None                     # fp_gate has already said so
+    points, reasons = evaluate(ctx)
+    return fingerprint.signals("L1", "render_stack", points, reasons, ctx)
+
+
+CHECK = Check("render_stack", _check, phases=("action:register",))
 
 
 if __name__ == '__main__':

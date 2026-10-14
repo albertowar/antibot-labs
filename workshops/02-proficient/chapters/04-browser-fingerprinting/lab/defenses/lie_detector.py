@@ -21,8 +21,7 @@ mostly on cross-context and cross-signal checks: the worker runs its own
 navigator and WebGL, and the headers are produced by the network stack,
 not by page JavaScript.
 
-The reason name `fingerprint_mismatch` is what Workshop 2, Chapter 8 feeds
-into its risk engine.
+The signal name `fp:fingerprint_mismatch` is what Chapter 8 feeds into its risk engine.
 
 False positives to expect:
   - Privacy extensions patch canvas and WebGL methods with plain functions,
@@ -39,8 +38,10 @@ False positives to expect:
     checks simply don't run for them.
 """
 
-from fields import (DESKTOP_OSES, brand_set, os_from_platform, os_from_ua, parse_sec_ch_ua,
-                    primary_language, renderer)
+from . import fingerprint
+from .fields import (DESKTOP_OSES, brand_set, os_from_platform, os_from_ua, parse_sec_ch_ua,
+                     primary_language, renderer)
+from .pipeline import Check
 
 TAMPERED_POINTS = 25
 OWN_PROPS_POINTS = 25
@@ -63,7 +64,7 @@ WORKER_FIELDS = [
     ("userAgent", lambda fp: (fp.get("nav") or {}).get("userAgent")),
     ("uadPlatform", lambda fp: (fp.get("uad") or {}).get("platform")),
     ("webglRenderer", renderer),
-    # TODO (Round 2): languages and timeZone are in the worker payload too.
+    # TODO (Round 2, optional tuning): languages and timeZone are in the worker payload too.
     # Add them, run the checkpoint, and check that no real-user profile breaks.
 ]
 
@@ -167,6 +168,23 @@ def score_lies(fp, headers):
                            f"navigator.languages[0] {languages[0]!r}")
 
     return points, reasons
+
+
+def evaluate(ctx):
+    """(points, reasons) for this session's record and the headers its payload arrived with."""
+    rec = fingerprint.record(ctx)
+    return score_lies(rec["payload"], fingerprint.Headers(rec["headers"]))
+
+
+def _check(ctx):
+    if fingerprint.record(ctx) is None:
+        return None
+    points, reasons = evaluate(ctx)
+    name = "fingerprint_mismatch" if any(r.startswith("fingerprint_mismatch") for r in reasons) else "tampered"
+    return fingerprint.signals("L2", name, points, reasons, ctx)
+
+
+CHECK = Check("lie_detector", _check, phases=("action:register",))
 
 
 if __name__ == '__main__':

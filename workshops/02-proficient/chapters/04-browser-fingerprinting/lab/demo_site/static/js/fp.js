@@ -2,7 +2,9 @@
 /**
  * Chapter 4 — Fingerprint Collector (Sections 4.2–4.6)
  *
- * Collects raw OBSERVATIONS and posts them to /api/fp. It makes no
+ * Collects raw OBSERVATIONS and posts them to the store's telemetry sink,
+ * POST /api/telemetry {"kind": "fp", ...}, with the session's nonce
+ * (window.__fpNonce, written into the page by the ext). It makes no
  * judgements: every decision lives in the Python defenses on the server,
  * because this file runs on the attacker's machine and anything it decides
  * can be patched out. (Hiding and hardening the collector itself is
@@ -396,7 +398,7 @@
     ]);
     const payload = {
       v: 1,
-      nonce: document.documentElement.dataset.fpNonce || null,
+      nonce: /** @type {any} */ (window).__fpNonce || null,
       nav: collectNavigator(),
       uad,
       screen: collectScreen(),
@@ -419,10 +421,10 @@
     const w = /** @type {any} */ (window);
     w.__fp = payload;
     try {
-      const r = await fetch("/api/fp", {
+      const r = await fetch("/api/telemetry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ kind: "fp", ...payload }),
         credentials: "same-origin",
       });
       w.__fpResult = await r.json();

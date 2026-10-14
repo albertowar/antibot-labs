@@ -31,8 +31,10 @@ is what keeps an office full of identical laptops from being clustered
 into one "bot".
 """
 
-from population import account_limit
-from stable_id import core_components, device_class
+from . import fingerprint, policy
+from .pipeline import Check
+from .rarity import account_limit
+from .stable_id import core_components, device_class
 
 CLUSTER_POINTS = 40
 SIMILARITY_THRESHOLD = 0.9
@@ -62,7 +64,7 @@ def score_cluster(fp, recent_cores, mode="rarity"):
     Return (points, reasons).
 
     recent_cores() -> list of core-component dicts for accounts created in
-    the last 24 hours (the app provides it).
+    the last 24 hours (fingerprint.recent_cores, backed by Redis).
     """
     reasons = [f"note: {m}" for m in noise_markers(fp)]
     cls = device_class(fp)
@@ -70,14 +72,30 @@ def score_cluster(fp, recent_cores, mode="rarity"):
     if limit is None:
         return 0, reasons
     mine = core_components(fp)
-    # TODO (Round 4): weight the components instead of counting them. A
-    # matching font list is much stronger evidence than a matching timezone.
+    # TODO (Round 4, optional tuning): weight the components instead of counting them.
+    # A matching font list is much stronger evidence than a matching timezone.
     similar = sum(similarity(mine, other) >= SIMILARITY_THRESHOLD for other in recent_cores())
     if similar >= limit:
         reasons.append(f"fingerprint_cluster: {similar} accounts today from near-identical "
                        f"devices (limit {limit} for class {cls})")
         return CLUSTER_POINTS, reasons
     return 0, reasons
+
+
+def evaluate(ctx):
+    """(points, reasons) for this session's record against the cores of the accounts created today."""
+    return score_cluster(fingerprint.record(ctx)["payload"], lambda: fingerprint.recent_cores(ctx),
+                         policy.LINK_MODE)
+
+
+def _check(ctx):
+    if fingerprint.record(ctx) is None:
+        return None
+    points, reasons = evaluate(ctx)
+    return fingerprint.signals("L4", "fingerprint_cluster", points, reasons, ctx)
+
+
+CHECK = Check("fuzzy_cluster", _check, phases=("action:register",))
 
 
 if __name__ == '__main__':

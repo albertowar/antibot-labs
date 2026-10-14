@@ -1,6 +1,8 @@
 """
 Chapter 4 — How Many Real People Share This Fingerprint? (Section 4.5, Round 3)
 
+(Rarity weighting. `python -m defenses.rarity` prints the classes.)
+
 A fingerprint is only an identifier if few people share it. Eight people
 on the same iPhone model, or a whole office on the same laptop image,
 present the same fingerprint, and that is normal. Before we treat "five
