@@ -1,9 +1,8 @@
 """
-Chapter 7 — Round 3 Attack: the oracle prober (Section 7.6, Part 4)
+Round 3 attack: the oracle prober
 
-Objective: stop guessing. Treat the defense as a black box, send cheap
-probe sessions, read what comes back, and search for the cheapest
-configuration that passes. Then spend money only on that one.
+Objective: stop guessing. Treat the defense as a black box, send cheap probe sessions, read what comes
+back, and search for the cheapest configuration that passes. Then spend money only on that one.
 
 Knobs (cheapest value first):
   fingerprint  rotate (free randomizer) |
@@ -13,21 +12,20 @@ Knobs (cheapest value first):
   pool         datacenter ($0.10/GB) | residential ($4/GB)
   browse       0 | 3 product pages first
 
-Search: coordinate descent. For each knob, probe every value with
-PROBES_PER_CONFIG sessions and keep the value with the lowest risk.
-The demo site has been returning `risk` in every checkout response since
-Round 1 (a "teaching aid"). That is a gradient, and the prober follows it.
+Search: coordinate descent. For each knob, probe every value with PROBES_PER_CONFIG sessions and keep
+the value with the lowest risk. The store has been returning `X-Lab-Score` on every response since
+Round 1 (the gate's teaching-aid header; 75 is the blocking line, and the score climbs with the model's
+risk on both sides of it). That is a gradient, and the prober follows it.
 
-Round 4 takes the oracle away: every checkout answers 202 "pending
-review", with no score, and orders are cancelled later. The default
-prober then sees identical answers for every config and buys the cheapest.
-`--patient` tries every config, waits for the reviews to come back, and
-pays for it in probes and time.
+Round 4 takes the oracle away: every purchase answers 202 "pending review" with a score of 0, and
+orders are cancelled later. The default prober then sees identical answers for every config and buys
+the cheapest. `--patient` tries every config, waits for the reviews to come back, and pays for it in
+probes and time.
 
 Expected results:
-  - DEFENSE_LEVEL=3 → finds a passing config in ≈ 10–16 probes; exploit ≈ 80–100%
-  - DEFENSE_LEVEL=4 → default: exploit ≈ 0%; --patient: ≈ 48 probes and one
-    review cycle, then the exploit works again (the oracle is slowed, not removed)
+  - DEFENSE_LEVEL=3 -> finds a passing config in a handful of probe sessions; the exploit mostly succeeds
+  - DEFENSE_LEVEL=4 -> default: exploit ~0%; --patient: 32 probes and one review cycle, then it works again
+    (the oracle is slowed, not removed)
 
 Run:
     python attacks/round3_oracle_prober.py
@@ -36,20 +34,22 @@ Run:
 
 import argparse
 import itertools
+import json
 import os
 import random
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling attacks, also when imported by checkpoint.py
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
+sys.path.insert(0, HERE)                                   # sibling attacks, also when imported by checkpoint.py
 
-import labclient as labnet  # noqa: E402
+import labclient  # noqa: E402  (runs the labnet guard)
 import round0_baseline  # noqa: E402
 import round2_farm  # noqa: E402
 import shopper  # noqa: E402
-from shopper import (UA, Persona, browser_headers, desktop_behavior,  # noqa: E402
-                     fingerprint, fixed_think, human_think, pick_device)
+from shopper import (UA, Persona, accept_language, desktop_behavior, fingerprint,  # noqa: E402
+                     fixed_think, human_think, pick_device)
 
 KNOBS = {
     "fingerprint": ["rotate", "purchased"],
@@ -57,14 +57,16 @@ KNOBS = {
     "pool": ["datacenter", "residential"],
     "browse": [0, 3],
 }
+POOLS = {"datacenter": ("cloud_vm", 0.10), "residential": ("resi_us", 4.0)}
 CHEAPEST = {k: v[0] for k, v in KNOBS.items()}
 PROFILE_USD = 0.50
 PROBES_PER_CONFIG = 2
+BLOCK_SCORE = 75            # X-Lab-Score at which the gate blocks: risk 1.0
 
 
-def make_persona(cfg, rng, purchased_pool):
-    pool = labnet.Pool(cfg["pool"], country="US", rng=rng)
-    ip, _ = pool.next()
+def make_persona(cfg, rng, purchased_pool, n):
+    pool, usd = POOLS[cfg["pool"]]
+    ip = rng.choice(labclient.world_pool(pool))
     extra_usd = 0.0
     if cfg["fingerprint"] == "rotate":
         ua_key, langs, fp = round2_farm.randomized_profile(rng)
@@ -77,12 +79,9 @@ def make_persona(cfg, rng, purchased_pool):
         behavior, think = round0_baseline.scripted_behavior(rng), fixed_think(0.8)
     else:
         behavior, think = desktop_behavior(rng), human_think(6.0)
-    p = Persona(actor="round3_oracle_prober", cohort="prober", is_bot=True, ip=ip,
-                user_agent=UA[ua_key], headers=browser_headers(langs), fp=fp,
-                behavior=behavior, think=think, browse=cfg["browse"],
-                usd_per_gb=pool.usd_per_gb, config=dict(cfg))
-    p.config["extra_usd"] = extra_usd
-    return p
+    return Persona(actor=f"bot:prober:{n:03d}", persona="prober", browser=("prober",), ip=ip, ua=UA[ua_key],
+                   accept_language=accept_language(langs), fp=fp, behavior=behavior, think=think,
+                   browse=cfg["browse"], usd_per_gb=usd, extra_usd=extra_usd, config=dict(cfg))
 
 
 def purchased_profiles(rng, n=400):
@@ -103,23 +102,23 @@ class Prober:
         self.inventory = purchased_profiles(self.rng)
         self.results = []
 
-    def sessions(self, cfgs, label):
-        personas = [make_persona(c, self.rng, self.inventory) for c in cfgs]
+    def sessions(self, cfgs):
+        personas = [make_persona(c, self.rng, self.inventory, len(self.results) + i) for i, c in enumerate(cfgs)]
         self.seed += 1
-        res = shopper.run_sessions(personas, seed=self.seed, run=label)
+        res = shopper.run_sessions(personas, seed=self.seed)
         self.results += res
         return res
 
     @staticmethod
     def risk(r):
-        """What the attacker reads from a response. No score → only the status code."""
+        """What the attacker reads from a response: the gate's score, as a share of the blocking line."""
         if r["score"] is not None:
-            return r["score"]
-        return 0.0 if r["status"] in (200, 202) else 1.0
+            return r["score"] / BLOCK_SCORE
+        return 0.0 if r["final"] in ("confirmed", "pending") else 1.0
 
     def probe(self, cfg):
         """Send PROBES_PER_CONFIG sessions; return (mean observed risk, all passed?)."""
-        res = self.sessions([cfg] * PROBES_PER_CONFIG, "round3_probe")
+        res = self.sessions([cfg] * PROBES_PER_CONFIG)
         risks = [self.risk(r) for r in res]
         print(f"  probe {self.n_probes():>3}  {fmt(cfg)}  risk={sum(risks) / len(risks):.2f}")
         return sum(risks) / len(risks), all(x < 1.0 for x in risks)
@@ -143,8 +142,7 @@ class Prober:
         """No usable response? Try every config at once and wait for the reviews."""
         configs = [dict(zip(KNOBS, combo)) for combo in itertools.product(*KNOBS.values())]
         started = time.time()
-        res = self.sessions([c for c in configs for _ in range(PROBES_PER_CONFIG)],
-                            "round3_probe")
+        res = self.sessions([c for c in configs for _ in range(PROBES_PER_CONFIG)])
         passed = []
         for cfg in configs:
             mine = [r for r in res if all(r["config"][k] == cfg[k] for k in KNOBS)]
@@ -167,7 +165,7 @@ def fmt(cfg):
 
 
 def bill(results):
-    return sum(r["usd"] + r["config"].get("extra_usd", 0) for r in results)
+    return sum(r["usd"] for r in results)
 
 
 def run(seed=41, exploit_n=30, patient=False, budget=24, quiet=False):
@@ -180,26 +178,26 @@ def run(seed=41, exploit_n=30, patient=False, budget=24, quiet=False):
         best = prober.patient() if patient else prober.greedy(budget)
         n_probe, probe_usd = prober.n_probes(), bill(prober.results)
         print(f"  chosen config: {fmt(best)}")
-        exploit = prober.sessions([best] * exploit_n, "round3_exploit")
+        exploit = prober.sessions([best] * exploit_n)
     finally:
         if quiet:
             sys.stdout.close()
             sys.stdout = out
-    run.stats = {"probes": n_probe, "probe_usd": probe_usd, "config": best,
-                 "exploit_usd": bill(exploit)}
+    run.stats = {"probes": n_probe, "probe_usd": round(probe_usd, 2), "config": best, "exploit_usd": round(bill(exploit), 2)}
     return exploit
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Black-box search for a passing bot config.")
-    parser.add_argument("--patient", action="store_true",
-                        help="Round 4: try every config and wait for review outcomes")
+    parser.add_argument("--patient", action="store_true", help="Round 4: try every config and wait for review outcomes")
     parser.add_argument("--seed", type=int, default=40)
     args = parser.parse_args()
 
-    print(f"=== Round 3: oracle prober{' (patient)' if args.patient else ''} → {labnet.target()} ===")
+    print(f"=== Round 3: oracle prober{' (patient)' if args.patient else ''} -> {labclient.BASE_URL} ===")
     exploit = run(seed=args.seed, patient=args.patient)
-    ok = sum(shopper.succeeded(r) for r in exploit)
     s = run.stats
-    print(f"\n  probes used: {s['probes']}  (≈ ${s['probe_usd']:.2f})")
-    print(f"  exploit: {ok}/{len(exploit)} checkouts confirmed  (≈ ${s['exploit_usd']:.2f})")
+    ok = sum(shopper.succeeded(r) for r in exploit)
+    print(f"\n  probes used: {s['probes']}  (~ ${s['probe_usd']:.2f})")
+    print(f"  exploit: {ok}/{len(exploit)} purchases confirmed  (~ ${s['exploit_usd']:.2f})")
+    print(json.dumps(shopper.summarize_attack(exploit, probes=s["probes"], probe_usd=s["probe_usd"],
+                                              config=fmt(s["config"]))))

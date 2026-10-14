@@ -1,49 +1,45 @@
 """
-Chapter 7 — Anomaly detection: catching bots nobody labeled (Round 3, Section 7.4)
+Anomaly detection: catching bots nobody labeled (Round 3)
 
-A supervised model can only recognise the bots in its labels. An anomaly
-detector flips the question: learn what VERIFIED HUMANS look like and flag
-whatever does not fit, including bot families you have never seen.
+A supervised model can only recognise the bots in its labels. An anomaly detector flips the question:
+learn what VERIFIED HUMANS look like and flag whatever does not fit, including bot families you have
+never seen.
 
 Model: how improbable are this session's DEVICE CLAIMS among verified humans?
 
     surprise = -log P(platform) - log P(gpu | platform) - log P(screen | platform)
-               - Σ log P(flag) for each consistency flag
+               - sum of log P(flag) for each consistency flag
 
-Probabilities are counted on verified-human sessions with add-one (Laplace)
-smoothing, so a combination never seen still gets a small, finite
-probability. A randomizer that draws each attribute independently produces
-combinations no real device has (an Apple GPU on Win32, a phone with zero
-touch points): very low probability, very high surprise. Each term is
-readable on its own, so a flagged session comes with its reasons.
+Probabilities are counted on verified-human sessions with add-one (Laplace) smoothing, so a
+combination never seen still gets a small, finite probability. A randomizer that draws each
+attribute independently produces combinations no real device has (an Apple GPU on Win32, a phone
+with zero touch points): very low probability, very high surprise. Each term is readable on its
+own, so a flagged session comes with its reasons.
 
-Why not Isolation Forest? We tried (Liu et al., 2008, a fine default for
-continuous features). On these features it fails in two instructive ways:
-  - it can only split on features that VARY in its training data. Verified
-    humans almost never have a consistency flag set, so those columns are
-    constant and the forest ignores them;
-  - it cannot extrapolate. A combination rarer than anything in training
-    scores the same as the rarest human it saw.
+Why not Isolation Forest? We tried (Liu et al., 2008, a fine default for continuous features). On
+these features it fails in two instructive ways:
+  - it can only split on features that VARY in its training data. Verified humans almost never have
+    a consistency flag set, so those columns are constant and the forest ignores them;
+  - it cannot extrapolate. A combination rarer than anything in training scores the same as the
+    rarest human it saw.
 Pick the anomaly model for the shape of your features, not by name.
 
-Behavior features are left out on purpose: human behavior varies so much
-that it drowns the device signal, and the supervised model already covers
-scripted behavior. `tz_ip_mismatch` is left out too: on its own it describes
-VPN users and travellers, not bots.
+Behaviour features are left out on purpose: human behaviour varies so much that it drowns the
+device signal, and the supervised model already covers scripted behaviour. `tz_ip_mismatch` is left
+out too: on its own it describes VPN users and travellers, not bots.
 
-Threshold: a false-positive budget on held-out verified humans, as in
-train.py. Combination with the supervised score lives in scorer.py.
+Threshold: a false-positive budget on held-out verified humans, as in train.py. Combination with the
+supervised score lives in ml_check.py.
 
 False-positive profile, read before you ship one:
-  "Rare" is not "bot". Privacy browsers (generic GPU string, rounded screen
-  sizes), Linux desktops, less common phones and brand-new devices are all
-  rare among verified humans. An anomaly detector trained on your loyal
-  customers flags exactly the people who look least like your loyal
-  customers. Run --audit and look per cohort.
+  "Rare" is not "bot". Privacy browsers (generic GPU string, rounded screen sizes), Linux desktops,
+  less common phones and brand-new devices are all rare among verified humans. An anomaly detector
+  trained on your loyal customers flags exactly the people who look least like your loyal customers.
+  Run `python tools/audit.py anomaly` and look per cohort.
 
 Run:
-    python defenses/anomaly.py            # fit, pick threshold, save
-    python defenses/anomaly.py --audit    # lab only: flag rate per true cohort
+    python -m defenses.anomaly            # fit, pick threshold, save artifacts/anomaly_v3.json
+    python tools/audit.py anomaly         # lab only: flag rate per true cohort
 """
 
 import argparse
@@ -56,23 +52,18 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from features import build_dataset  # noqa: E402
-from labels import load_truth, weak_labels  # noqa: E402
-from store import make_engine  # noqa: E402
-
-ARTIFACTS = os.path.join(os.path.dirname(__file__), "..", "artifacts")
+from . import history, models
+from .features import build_dataset
+from .labels import weak_labels
 
 FLAGS = ["ua_platform_mismatch", "gpu_platform_mismatch", "touch_platform_mismatch",
          "software_gpu", "webdriver", "input_platform_mismatch"]
 MOBILE_PLATFORMS = ("iPhone", "iPad", "Linux armv")
-# Known-benign rare signatures: Firefox resistFingerprinting reports this WebGL
-# renderer and rounds the window size. Skipping the GPU and screen terms for it
-# stops flagging privacy-browser users, and also hands attackers a disguise.
-# Every allowlist entry is both.
-# TODO (Round 3): empty this set, re-run `python defenses/anomaly.py --audit`,
-# and look at the privacy_browser row. Then decide whether to put it back.
+# Known-benign rare signatures: Firefox resistFingerprinting reports this WebGL renderer and rounds
+# the window size. Skipping the GPU and screen terms for it stops flagging privacy-browser users,
+# and also hands attackers a disguise. Every allowlist entry is both.
+# EXERCISE (Round 3): empty this set, re-run `python tools/audit.py anomaly`, and look at the
+# privacy_browser row. Then decide whether to put it back.
 KNOWN_BENIGN_GPUS = {"Mozilla"}
 FPR_BUDGET = 0.01
 
@@ -137,16 +128,15 @@ class AnomalyModel:
         return -math.log((count + 1) / (total + vocab + 1))
 
     def terms(self, c):
-        """Per-claim surprise, in nats. Larger = less like a verified human."""
-        t = {"platform": self._nll(self.platform.get(c["platform"], 0), self.n, len(self.platform))}
-        if c["gpu"] not in KNOWN_BENIGN_GPUS:
-            for name, table in (("gpu", self.gpu), ("screen", self.screen)):
-                seen = table.get(c["platform"], {})
-                t[name] = self._nll(seen.get(c[name], 0), sum(seen.values()), len(seen))
-        for flag in FLAGS:
-            p_set = (self.flags[flag] + 1) / (self.n + 2)
-            t[flag] = -math.log(p_set if c[flag] else 1 - p_set)
-        return t
+        """Per-claim surprise, in nats. Larger = less like a verified human. `c` is claims(row)."""
+        # TODO (Round 3): return a dict {term name: surprise}, one entry per claim:
+        #   "platform"  _nll(count of this platform, self.n, number of platforms seen)
+        #   "gpu", "screen"  the same, counted among humans on THE SAME platform (self.gpu[platform],
+        #               self.screen[platform]); skip both when c["gpu"] is in KNOWN_BENIGN_GPUS
+        #   one term per name in FLAGS: with p = (self.flags[flag] + 1) / (self.n + 2), the surprise
+        #               is -log(p) when the session has the flag set and -log(1 - p) when it does not
+        # score_row() sums them, so a flagged session can say which claims made it rare.
+        return {}
 
     def score_row(self, row):
         c = claims(row)
@@ -156,13 +146,8 @@ class AnomalyModel:
         return np.array([self.score_row(row) for _, row in df.iterrows()])
 
     def save(self):
-        with open(os.path.join(ARTIFACTS, "anomaly_v3.json"), "w") as fh:
+        with open(models.path("anomaly_v3.json"), "w") as fh:
             json.dump(self.meta, fh, indent=2)
-
-    @classmethod
-    def load(cls):
-        with open(os.path.join(ARTIFACTS, "anomaly_v3.json")) as fh:
-            return cls(json.load(fh))
 
 
 def fit(df, budget):
@@ -177,23 +162,23 @@ def fit(df, budget):
     return model, hold_scores
 
 
+def labeled_dataset():
+    hist = history.load()
+    df = build_dataset(hist, with_cohort=False)
+    if df.empty:
+        sys.exit("No purchase attempts in the history yet. Run: python tools/simulate.py")
+    df["label"] = weak_labels(df, hist["accounts"])
+    return df
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fit the human-only anomaly detector.")
     parser.add_argument("--fpr-budget", type=float, default=FPR_BUDGET)
-    parser.add_argument("--audit", action="store_true",
-                        help="lab only: flag rate per true cohort on all recent checkouts")
     args = parser.parse_args()
 
-    engine = make_engine()
-    with engine.connect() as conn:
-        df = build_dataset(conn, with_cohort=False)
-        accounts = pd.read_sql("SELECT * FROM accounts", conn)
-    if df.empty:
-        sys.exit("No checkouts yet. Run tools/simulate.py first.")
-    df["label"] = weak_labels(df, accounts)
-
+    df = labeled_dataset()
     model, hold_scores = fit(df, args.fpr_budget)
-    os.makedirs(ARTIFACTS, exist_ok=True)
+    os.makedirs(models.ARTIFACTS, exist_ok=True)
     model.save()
     print(f"=== Anomaly model: device-claim likelihood on {model.n} verified-human sessions ===")
     print(f"  threshold {model.threshold:.2f} nats = top {args.fpr_budget:.0%} of "
@@ -202,20 +187,10 @@ def main():
 
     df["anomaly"] = model.score(df)
     worst = df.sort_values("anomaly", ascending=False).iloc[0]
-    print(f"\n  most surprising session: {worst['fp_combo']}")
-    for name, v in sorted(model.terms(claims(worst)).items(), key=lambda kv: -kv[1])[:4]:
-        print(f"    {v:5.2f}  {name}")
-
-    if args.audit:
-        truth = load_truth()
-        if truth.empty:
-            return
-        t = df.merge(truth, on="sid")
-        t["who"] = np.where(t["is_bot"] == True, "bot:", "human:") + t["cohort"]  # noqa: E712
-        print("\n  flag rate per TRUE cohort (lab-only view):")
-        for who, g in t.groupby("who"):
-            flagged = (g["anomaly"] >= model.threshold).mean()
-            print(f"    {who:<26} {flagged:>5.0%}  of {len(g)}")
+    if claims(worst) is not None:
+        print(f"\n  most surprising session: {worst['fp_combo']}")
+        for name, v in sorted(model.terms(claims(worst)).items(), key=lambda kv: -kv[1])[:4]:
+            print(f"    {v:5.2f}  {name}")
 
 
 if __name__ == "__main__":

@@ -1,43 +1,53 @@
 """
-Chapter 7 — Shopper engine shared by real-user simulation and every attack
+Shopper engine shared by the real-user simulation and every attack
 
-A `Persona` describes one session: network, browser, fingerprint, behavior
-and pacing. `shop()` walks the drop-day journey the store is built around:
+A `Persona` describes one session: network, browser, fingerprint, behaviour and pacing. `shop()` walks
+the drop-day journey the store is built around:
 
-    home → (login) → browse products → limited drop → add to cart → checkout
+    home -> (sign in) -> browse products -> the limited drop -> buy
 
-Real users (tools/simulate.py) and bots (attacks/*.py) use the SAME engine.
-They differ only in their Persona, which is exactly the point: the model
-can only learn from what the persona leaks.
+Real users (tools/personas_ch7.py) and bots (attacks/*.py) use the SAME engine. They differ only in
+their Persona, which is exactly the point: the model can only learn from what the persona leaks.
 
-Fingerprints and behavior summaries stand in for what the page collectors
-from W2 Ch3 (behavior) and W2 Ch4 (fingerprinting) would POST to
-/api/telemetry. No real browser runs in this lab.
+Fingerprints and behaviour summaries stand in for what the page collectors from W2 Ch3 (behaviour)
+and W2 Ch4 (fingerprinting) would POST to /api/telemetry. No real browser runs in this lab.
 
-Ground truth (who was actually a bot) is appended to data/truth.jsonl.
-Only the scoreboard and `labels.py --audit` may read it: production has no
-such file, and a model trained on it would be cheating.
+Lab time. `think()` sleeps a VIRTUAL duration times LAB_TIME_SCALE (default 0.02), so a 10 s pause is
+0.2 s. The model's features divide every measured gap by the same factor (defenses/features.py).
+
+Ground truth (who was actually a bot) is the actor label every request carries to the store's edge
+(`human:<cohort>:<n>`, `bot:<family>:<n>`). The edge strips it before any defense runs; only the
+scoreboard, the decision log and tools/audit.py read it.
 """
 
 import hashlib
-import json
+import math
 import os
 import random
-import threading
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-import httpx
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-import labclient as labnet
+import labclient  # noqa: E402  (runs the labnet guard on import)
+import population  # noqa: E402
+from labclient import BASE_URL, LabClient, csrf_of  # noqa: E402
+from demo_site.seed import password_for, username  # noqa: E402
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-TRUTH_FILE = os.path.join(DATA_DIR, "truth.jsonl")
-_truth_lock = threading.Lock()
-
+LAB_TIME_SCALE = float(os.environ.get("LAB_TIME_SCALE", "0.02"))
+DROP = "lab-hoodie-1"
 N_PRODUCTS = 40
+
+# Simulated page weight for the attacker's bandwidth bill
+PAGE_WITH_ASSETS_KB = 1800
+PAGE_ONLY_KB = 60
+API_KB = 4
+
+HTML_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 UA = {
     "chrome_win": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -109,12 +119,6 @@ def accept_language(langs):
     return ",".join(parts)
 
 
-def browser_headers(langs):
-    return {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": accept_language(langs),
-            "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate"}
-
-
 def fingerprint(rng, device, locale, ua_key, canvas=None):
     """A fingerprint that is internally consistent: what a real device reports."""
     platform, gpu, screens, dprs, hws, touches, _uas, _w, variants = DEVICES[device]
@@ -129,7 +133,7 @@ def fingerprint(rng, device, locale, ua_key, canvas=None):
             "webdriver": False, "canvas": canvas}
 
 
-# --- behavior summaries (what the W2 Ch3 collector would report) -------------
+# --- behaviour summaries (what the W2 Ch3 collector would report) -------------
 
 def _clamp(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))
@@ -166,7 +170,6 @@ def keyboard_behavior(rng):
 
 def human_think(mean_s=6.0):
     """Log-normal think time: mostly a few seconds, occasionally much longer."""
-    import math
     mu = math.log(mean_s) - 0.32
 
     def _think(rng):
@@ -180,125 +183,183 @@ def fixed_think(seconds, jitter=0.05):
     return _think
 
 
+def think(virtual_seconds):
+    """Sleep a virtual duration, compressed by LAB_TIME_SCALE."""
+    time.sleep(max(virtual_seconds, 0) * LAB_TIME_SCALE)
+
+
 @dataclass
-class Persona:
-    actor: str                  # "human" or the attack script name
-    cohort: str                 # human cohort or bot family
-    is_bot: bool
-    ip: str
-    user_agent: str
-    headers: dict = field(default_factory=dict)
-    fp: Optional[dict] = None             # None: never runs JS
+class Persona(population.Persona):
+    """One session. `persona` (inherited) is the cohort or bot family; `actor` is the ground-truth label."""
+    ua: str = ""
+    accept_language: Optional[str] = "en-US,en;q=0.9"
+    browser_like: bool = True                # Accept, Accept-Language and Sec-Fetch-* headers like a browser
+    fp: Optional[dict] = None                # None: never runs JS
     behavior: Optional[dict] = None
     think: Callable = field(default_factory=human_think)
-    browse: int = 2                       # product pages before the drop
+    browse: int = 2                          # product pages before the drop
     loads_assets: bool = True
-    account: Optional[str] = None
-    honeypot: float = 0.0                 # P(follow the hidden link)
-    api_v0: float = 0.0                   # P(call the robots.txt-disallowed API)
+    honeypot: float = 0.0                    # P(follow the hidden link)
+    partner_feed: float = 0.0                # P(call the robots.txt-disallowed endpoint)
     usd_per_gb: float = 0.0
+    extra_usd: float = 0.0                   # e.g. a purchased fingerprint
     config: dict = field(default_factory=dict)   # attack knobs, for reports
 
 
-def _server_ms(r):
-    for part in r.headers.get("Server-Timing", "").split(","):
-        if part.strip().startswith("mlscore;dur="):
-            return float(part.split("=")[1])
-    return None
+class _Headers:
+    """Header sets in wire order, with the Referer chain of a browser that clicked through the site."""
+
+    def __init__(self, p):
+        self.p, self.last = p, None
+
+    def nav(self, post=False):
+        p = self.p
+        h = [("User-Agent", p.ua), ("Accept", HTML_ACCEPT if p.browser_like else "*/*")]
+        if p.browser_like:
+            if p.accept_language:
+                h.append(("Accept-Language", p.accept_language))
+            h += [("Sec-Fetch-Site", "same-origin" if self.last else "none"), ("Sec-Fetch-Mode", "navigate")]
+        if self.last:
+            h.append(("Referer", self.last))
+        return h
+
+    def ajax(self):
+        p = self.p
+        h = [("User-Agent", p.ua), ("Accept", "application/json")]
+        if p.browser_like:
+            h += [("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "cors")]
+        if self.last:
+            h.append(("Referer", self.last))
+        return h
+
+    def asset(self):
+        p = self.p
+        h = [("User-Agent", p.ua), ("Accept", "*/*")]
+        if p.browser_like:
+            h += [("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "no-cors")]
+        if self.last:
+            h.append(("Referer", self.last))
+        return h
 
 
-def shop(p, rng):
-    """Walk the drop-day journey once. Returns a result dict for the scoreboard."""
-    c = labnet.Client(p.ip, p.user_agent, p.headers)
-    out = {"actor": p.actor, "cohort": p.cohort, "is_bot": p.is_bot, "ip": p.ip,
-           "sid": None, "status": None, "order_id": None, "score": None,
-           "score_ms": None, "final": None, "kb": 0, "usd": 0.0, "config": p.config}
+def _score_of(client):
+    v = client.verdict()
     try:
-        def page(path):
-            c.get(path, page=True, assets=p.loads_assets)
-            if p.loads_assets:
-                img = path.rsplit("/", 1)[-1] if path.startswith("/product/") else "hero"
-                c.get(f"/img/{img}.svg")
+        return int(v[1]) if v else None
+    except (TypeError, ValueError):
+        return None
 
-        page("/")
+
+def shop(p, client, rng):
+    """Walk the drop-day journey once. Fills and returns p.result."""
+    out = p.result
+    out.update(actor=p.actor, persona=p.persona, is_bot=p.actor.startswith("bot:"), ip=p.ip, kb=0, usd=0.0,
+               config=p.config, final=None, order=None, score=None)
+    h = _Headers(p)
+
+    def page(path):
+        r = client.get(path, headers=h.nav(), allow_redirects=False)
+        h.last = BASE_URL + path
+        out["kb"] += PAGE_WITH_ASSETS_KB if p.loads_assets else PAGE_ONLY_KB
         if p.loads_assets:
-            c.get("/static/app.js")
-            c.get("/static/style.css")
+            client.get("/static/css/store.css", headers=h.asset())
+            client.get("/static/js/store.js", headers=h.asset())
+            if path == "/" or path.startswith(("/product/", "/drop/")):
+                client.get("/img/p001.svg" if path == "/" else f"/img/{path.rsplit('/', 1)[-1]}.svg", headers=h.asset())
+        return r
+
+    def telemetry(kind, payload):
+        out["kb"] += API_KB
+        client.post("/api/telemetry", json=dict(payload, kind=kind), headers=h.ajax())
+
+    try:
+        page("/")
         if p.fp is not None:
-            c.post("/api/telemetry", {"kind": "fp", "data": p.fp})
+            telemetry("fp", p.fp)
         if rng.random() < p.honeypot:
-            labnet.think(p.think(rng))
-            page("/specials-archive")
-        if rng.random() < p.api_v0:
-            c.get("/api/v0/products")
-        if p.account:
-            labnet.think(p.think(rng))
-            c.post("/login", {"username": p.account})
+            think(p.think(rng))
+            page("/archive")
+        if rng.random() < p.partner_feed:
+            out["kb"] += API_KB
+            client.get("/partner-feed", headers=h.ajax())
+        if p.account is not None:
+            think(p.think(rng))
+            out["kb"] += API_KB
+            client.post("/api/login", json={"email": username(p.account), "password": password_for(p.account)},
+                        headers=h.ajax())
         for _ in range(p.browse):
-            labnet.think(p.think(rng))
-            page(f"/product/{rng.randint(1, N_PRODUCTS)}")
-        labnet.think(p.think(rng))
-        page("/product/drop")
-        labnet.think(p.think(rng))
-        c.post("/cart/add", {"sku": "DROP-1"})
+            think(p.think(rng))
+            page(f"/product/p{rng.randint(1, N_PRODUCTS):03d}")
+        think(p.think(rng))
+        r = page(f"/drop/{DROP}")
+        if r.status_code != 200:
+            out.update(final="blocked" if r.status_code in (403, 429) else f"http_{r.status_code}", score=_score_of(client))
+            return out
+        fields = {"csrf": csrf_of(r.text), "size": "M"}
+        if p.account is None:
+            fields["email"] = f"{p.actor.replace(':', '.')}@example.test"
+        think(p.think(rng))
         if p.behavior is not None:
-            c.post("/api/telemetry", {"kind": "beh", "data": p.behavior})
-        labnet.think(p.think(rng))
-        r = c.post("/checkout", {"sku": "DROP-1", "qty": 1})
-        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
-        out.update(status=r.status_code, order_id=body.get("order_id"),
-                   score=body.get("score"), score_ms=_server_ms(r),
-                   final={200: "confirmed", 403: "blocked"}.get(r.status_code, body.get("status")))
-    except httpx.HTTPError as e:
-        out.update(status=-1, final=f"error: {e.__class__.__name__}")
+            telemetry("beh", p.behavior)
+        think(p.think(rng))
+        out["kb"] += API_KB
+        r = client.post(f"/drop/{DROP}", data=fields, headers=h.nav(post=True), allow_redirects=False)
+        out.update(score=_score_of(client), status=r.status_code, verdict=client.verdict())
+        if r.status_code == 200 and "order-confirmed" in r.text:
+            out["final"] = "confirmed"
+        elif r.status_code == 202:
+            out.update(final="pending", order=r.json().get("order"))
+        elif r.status_code == 403:
+            out["final"] = "blocked"
+        elif r.status_code == 410:
+            out["final"] = "sold_out"
+        else:
+            out["final"] = f"http_{r.status_code}"
+    except Exception as e:                              # a transport error must not kill the run
+        out["final"] = f"error: {e.__class__.__name__}"
     finally:
-        out["sid"] = c.sid
-        out["kb"] = c.kb
-        out["usd"] = c.kb / 1024 / 1024 * p.usd_per_gb
-        c.close()
+        out["sid"] = client.http.cookies.get("sid")
+        out["usd"] = out["kb"] / 1024 / 1024 * p.usd_per_gb + p.extra_usd
+        out["requests"] = client.requests
     return out
 
 
-def log_truth(results, run):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with _truth_lock, open(TRUTH_FILE, "a") as fh:
-        for r in results:
-            if r["sid"]:
-                fh.write(json.dumps({"sid": r["sid"], "actor": r["actor"], "cohort": r["cohort"],
-                                     "is_bot": r["is_bot"], "run": run}) + "\n")
+def resolve_pending(results, timeout=120):
+    """Level 4: the purchase answered 202. Wait for the review, then read what it decided."""
+    pending = [r for r in results if r.get("final") == "pending" and r.get("order")]
+    deadline = time.time() + timeout
+    while pending and time.time() < deadline:
+        still = []
+        for r in pending:
+            status = labclient.admin("GET", f"/lab/ml/orders/{r['order']}")["status"]
+            if status == "pending":
+                still.append(r)
+            else:
+                r["final"] = status
+        pending = still
+        if pending:
+            time.sleep(0.5)
 
 
-def run_sessions(personas, seed=0, workers=16, run="run"):
-    """Run personas concurrently; log ground truth; resolve deferred (Round 4) orders."""
-    rngs = [random.Random(seed * 100003 + i) for i in range(len(personas))]
+def succeeded(r):
+    """A purchase that ends as a shipped order."""
+    return r.get("final") == "confirmed"
+
+
+def run_sessions(personas, seed=0, workers=16):
+    """Run personas concurrently (each with its own client); resolve deferred orders. One result per persona."""
+    def one(args):
+        p, k = args
+        rng = random.Random(seed * 100003 + k)
+        return shop(p, LabClient(p.actor, ip=p.ip, rng=rng), rng)
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(shop, personas, rngs))
-    log_truth(results, run)
+        results = list(pool.map(one, [(p, k) for k, p in enumerate(personas)]))
     resolve_pending(results)
     return results
 
 
-def resolve_pending(results):
-    """Round 4: checkout returns 202 'pending review'. Wait for the review, then read the outcome."""
-    pending = [r for r in results if r["status"] == 202 and r["order_id"]]
-    if not pending:
-        return
-    with httpx.Client(base_url=labnet.target(), headers={"X-Lab-Client-IP": "10.2.0.2"},
-                      timeout=10) as http:
-        deadline = time.time() + 120
-        while pending and time.time() < deadline:
-            still = []
-            for r in pending:
-                body = http.get(f"/orders/{r['order_id']}").json()
-                if body["status"] == "pending":
-                    still.append(r)
-                else:
-                    r["final"] = body["status"]
-            pending = still
-            if pending:
-                time.sleep(0.5)
+def summarize_attack(results, **extra):
+    """The one JSON line an attack ends with (tools/checkpoint_core reads attempted and succeeded)."""
+    return dict({"attempted": len(results), "succeeded": sum(succeeded(r) for r in results),
+                 "usd": round(sum(r["usd"] for r in results), 2)}, **extra)
 
-
-def succeeded(r):
-    """A checkout that results in a shipped order."""
-    return r["final"] == "confirmed"
