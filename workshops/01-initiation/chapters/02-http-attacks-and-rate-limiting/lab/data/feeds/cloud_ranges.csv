@@ -1,3 +1,4 @@
 cidr,provider
 203.0.113.0/26,Example Cloud
 203.0.113.64/26,Example Hosting GmbH
+198.51.100.96/27,Example Cloud Platform

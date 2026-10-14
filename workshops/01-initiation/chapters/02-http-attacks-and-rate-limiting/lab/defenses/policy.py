@@ -29,9 +29,13 @@ CLEARANCE_TTL = 15 * 60
 
 # Token buckets: name -> (capacity, refill per second). Capacity is the burst you
 # allow; refill is the sustained rate. Used by Ctx.bucket(name, key).
+# W1 Ch2: `ip` is 30 requests a minute (0.5/s) with a burst of 20 (Round 3). `login_ip` is the
+# per-endpoint bucket (Round 4). `prefix` is per IPv4 /24 and loose (every home shopper here shares
+# 192.0.2.0/24); `prefix6` is per IPv6 /64, one host's allocation, and tight (Round 5).
 RATE_LIMITS = {
-    "ip": (60, 2.0),
-    "prefix": (200, 8.0),
+    "ip": (20, 0.5),
+    "prefix": (300, 10.0),
+    "prefix6": (15, 0.5),
     "login_ip": (10, 0.1),
     "checkout_ip": (12, 0.2),
 }
@@ -56,3 +60,28 @@ def decide(score, signals, level):
     if score >= BANDS["monitor"]:
         return "monitor"
     return "allow"
+
+
+# --- W1 Ch2: HTTP Attacks & Rate Limiting ------------------------------------------------------
+
+# Round 1 (defenses/flood_monitor.py): more than `threshold` requests from one address in
+# `window` seconds earns a `monitor` tag. Logged and served, never blocked.
+FLOOD_MONITOR = (60, 60)            # (threshold, window seconds)
+FLOOD_MONITOR_POINTS = 20           # the monitor band: logged, served
+
+# Round 2 (defenses/fixed_window.py): `limit` requests per address per `window` seconds, in
+# windows aligned to the clock (key = now // window). Short, so a lab run crosses a boundary.
+FIXED_WINDOW = (20, 10)             # (limit, window seconds): 120 a minute on paper
+
+# Round 3, alternative (defenses/sliding_window.py): the same idea without the boundary.
+SLIDING_WINDOW = (30, 60)           # (limit, window seconds): 30 a minute, like RATE_LIMITS["ip"]
+
+# Round 4 (defenses/endpoint_limit.py): which bucket each action spends, on top of `ip`.
+ENDPOINT_LIMITS = {"login": "login_ip"}
+
+# Round 4 (defenses/account_limit.py): login attempts per target account, any source.
+ACCOUNT_LIMIT = (5, 900)            # (attempts, window seconds): 5 per 15 minutes
+ACCOUNT_RETRY_AFTER = 60            # what the 429 tells the client; the window is the real wait
+
+# Round 5 (defenses/trusted_proxy.py): weak evidence from a forged X-Forwarded-For.
+XFF_POINTS = {"xff_mismatch": 10, "xff_internal_claim": 20}

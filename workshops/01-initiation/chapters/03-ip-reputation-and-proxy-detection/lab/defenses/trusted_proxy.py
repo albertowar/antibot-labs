@@ -1,11 +1,11 @@
 """
-Round 4: read the client IP from the right of X-Forwarded-For.
+trusted_proxy: read the client IP from the right of X-Forwarded-For.
 
 Wiring this check is the fix. While a check named `trusted_proxy` is enforced at the current
 level, client_ip(ctx) (defenses/client_ip.py) stops trusting the leftmost entry and returns
 the first hop your own proxies did not add: here, the address the edge saw. Every IP-based
-check keys on client_ip(), so the rate limit, the blocklists and the reputation score all
-start looking at the real address at once.
+check keys on client_ip(), so every rate limit (and, where wired, the blocklists and the
+reputation score) starts looking at the real address at once.
 
 The check itself adds weak evidence, never a verdict on its own:
 
@@ -15,7 +15,8 @@ The check itself adds weak evidence, never a verdict on its own:
 Weak, because honest clients send X-Forwarded-For too: a shopper behind a corporate proxy or
 an old forward proxy arrives with a chain. Treat the left side as a hint, never as identity.
 
-What it catches: forged chains, which Rounds 1-3 handed straight to every IP-based check.
+What it catches: forged chains, which every earlier level handed straight to every IP-based
+check.
 What it misses: origin bypass. If an attacker can reach the origin without passing the edge,
 they write the whole chain, including the "trusted" last entry. Lock the origin to the edge
 (firewall on the CDN's ranges, mutual TLS, or a shared secret the edge adds). The lab's edge

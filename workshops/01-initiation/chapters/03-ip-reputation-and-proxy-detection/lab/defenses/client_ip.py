@@ -15,13 +15,13 @@ written by infrastructure you run. Everything to its left was written by the cli
     trusted_client_ip   walk from the right, skip only proxies you operate, stop at the
                         first hop you don't: the client as your edge saw it.
 
-Until Round 4 wires `trusted_proxy` into the ladder, client_ip() uses the naive reader,
-like many real apps that grew an `request.headers["X-Forwarded-For"].split(",")[0]`
-somewhere. Rounds 1-3 work against honest clients and fall over the moment one lies.
+Until the ladder wires `trusted_proxy`, client_ip() uses the naive reader, like many real
+apps that grew an `request.headers["X-Forwarded-For"].split(",")[0]` somewhere. Every
+round before that one works against honest clients and falls over the moment one lies.
 
-Which reader is live depends on the ladder at the CURRENT level, so running Round 4's
-attack at `--level 3` still shows the bypass. Shadow checks don't count: a check that is
-only logging has not fixed anything.
+Which reader is live depends on the ladder at the CURRENT level, so running the spoofing
+attack one level below `trusted_proxy` still shows the bypass. Shadow checks don't count:
+a check that is only logging has not fixed anything.
 
 Not in this lab: origin bypass. If the origin is reachable directly, the attacker writes
 the whole chain, including the "trusted" last entry. Lock the origin to the edge with a

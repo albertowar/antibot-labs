@@ -1,0 +1,7 @@
+{
+  "solutions/round3/defenses/rate_limit.py": "workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/lab/defenses/rate_limit.py",
+  "solutions/round5/defenses/client_ip.py": "workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/lab/defenses/client_ip.py",
+  "solutions/round5/defenses/trusted_proxy.py": "workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/lab/defenses/trusted_proxy.py",
+  "solutions/round5/defenses/prefix_limit.py": "workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/lab/defenses/prefix_limit.py",
+  "tools/ipkit.py": "workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/lab/tools/ipkit.py"
+}

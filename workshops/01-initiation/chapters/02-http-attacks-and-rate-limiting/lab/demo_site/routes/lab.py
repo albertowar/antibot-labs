@@ -37,7 +37,7 @@ def whoami():
     ctx = gate.build_ctx(current_app)
     last = Decision.query.filter_by(sid=ctx.session.sid).order_by(Decision.id.desc()).first()
     return jsonify(ip=ctx.edge.ip, asn=ctx.edge.asn, org=ctx.edge.org, country=ctx.edge.country, pool=ctx.edge.pool,
-                   ja4=ctx.edge.ja4, ja4_source=ctx.edge.ja4_source, actor=request.environ.get("lab.actor", "you"),
+                   ja4=ctx.edge.ja4, ja4_source=ctx.edge.ja4_source, xff_claimed=ctx.edge.xff_claimed, actor=request.environ.get("lab.actor", "you"),
                    session=ctx.session.sid, session_age_s=round(ctx.session.age_seconds, 1), user=ctx.user.email if ctx.user else None,
                    level=current_app.config["LAB"].defense_level, ua=ctx.ua.family, last_decision=last.to_dict() if last else None)
 
