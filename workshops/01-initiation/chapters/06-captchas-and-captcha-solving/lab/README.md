@@ -28,23 +28,25 @@ Starts from: workshops/01-initiation/starter/ (contract 1.4). Adds: the `captcha
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_06_content.md`, §6.6.
+**Format:** **wire-it.** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. Each round's defense ships
+as a stub with `TODO (Round N)` markers and a full version in `solutions/roundN/`;
+`python tools/checkpoint.py --round N --catch-up` installs them if you fall behind. See `../chapter_06_content.md`, §6.6.
 
-You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (`TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
+You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (the `TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
 
 ## Rules of engagement
 
-- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `labnet.py` at the lab root, which refuses any target that is not this machine before a single request is sent. It also refuses a non-local `PROVIDER_URL` or `REDIS_URL`. Do not remove that check.
+- **Local only, enforced in code.** Every attack script and tool reaches the demo store through `tools/labclient.py`, which asks `labnet.py` at the lab root for `DEMO_URL` and refuses any target that is not this machine before a single request is sent (side-service URLs such as `PROVIDER_URL` and `REDIS_URL` too). Do not remove that check.
 - The CAPTCHA provider is the local mock in `provider/mock_turnstile.py`. Nothing in this lab contacts a real CAPTCHA provider or solving service; the "farm" is simulated people.
-- Simulated client addresses are RFC 5737 documentation ranges sent in `X-Lab-Client-IP`, which the store trusts only from loopback.
-- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages, browsers and container images.
+- Everything is synthetic. Simulated client addresses are rented from the pools in `data/world.json` (documentation ranges, IPv4 and IPv6), never invented, never real, and sent in `X-Lab-Client-IP`, which the store trusts only from loopback.
+- **Outbound network:** none during the rounds. Only setup needs the internet: installing packages and container images.
 - Do not point these scripts, or anything you build from them, at a site you do not own.
 
 ```
 lab/
-  labkit.py                 shared settings: URLs, simulated time and IPs, ethics guard
-  demo_site/app.py          the Chapter 5 store + CAPTCHAs; DEFENSE_LEVEL 0–4
-  provider/mock_turnstile.py  offline provider with a Turnstile-compatible API (:5001)
+  labnet.py                 the localhost guard (byte-identical to scripts/labnet.py)
+  demo_site/                the starter store + ext/captcha.py: the widget slots, the promo and the challenge type
+  provider/mock_turnstile.py  offline provider with a Turnstile-compatible API (the store starts it itself)
   defenses/                 YOU EDIT THESE
     siteverify.py             Round 1: server-side token verification
     challenge_store.py        Round 2: where the answer lives
@@ -55,17 +57,16 @@ lab/
     round3_ocr.py             round4_retry_ocr.py  round4_solver_farm.py
     ocr_solver.py             the targeted solver (segmentation + k-NN)
     farm.py                   a simulated human solving service
-    common.py                 bot plumbing (Chrome UA, cookies, proxy IPs)
   solutions/roundN/         reference defenses, installed by --catch-up
   tools/
-    checkpoint.py             end-of-round measurement (bots, humans, cost)
-    legit_traffic.py          40 simulated shoppers
-    scoreboard.py             solve-time histogram by actor (Round 4)
-    fake_redis.py             no-Docker Redis
-    reset.py                  clear Redis + provider state
+    checkpoint.py             end-of-round measurement (bots, shoppers, cost)
+    population.py             the 40 simulated shoppers (+ personas_ch6.py: this chapter's cast)
+    scoreboard.py             served and stopped per actor, gate cost
+    solve_times.py            solve-time histogram by actor (Round 4)
+    labclient.py              every attack's HTTP client; runs the labnet guard on import
 ```
 
-**Why Python only:** everything in this chapter is server-side or an HTTP client: Flask, Redis, Pillow, scikit-learn. The browser widget is 20 lines of inline JavaScript in the mock provider. Students never edit it.
+**Why Python only:** everything in this chapter is server-side or an HTTP client: Flask, Redis, Pillow, scikit-learn. The browser widget is a small piece of inline JavaScript served by the mock provider. Students never edit it.
 
 ---
 
@@ -73,24 +74,31 @@ lab/
 
 ```bash
 cd workshops/01-initiation/chapters/06-captchas-and-captcha-solving/lab
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
+python3.12 -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate; one venv per chapter
 pip install -r requirements.txt
-
-docker compose up -d --wait          # Redis 8 on 127.0.0.1:6379
-#   no Docker?  python tools/fake_redis.py    (in its own terminal)
+python tools/doctor.py
 ```
 
-Then, in **three terminals** (each with the venv active):
+One venv per chapter (`.venv` here); the root README explains why. No Docker needed: the store defaults to
+`REDIS_URL=memory://` (in-process fakeredis). `docker compose up -d --wait` runs a real Redis instead
+(`export REDIS_URL=redis://127.0.0.1:6379/0`).
+
+Then start the store once and leave it running:
 
 ```bash
-python provider/mock_turnstile.py            # terminal 1: mock CAPTCHA provider on :5001
-DEFENSE_LEVEL=0 python demo_site/app.py      # terminal 2: the store on :5000 (restart per round)
-python tools/checkpoint.py --round 0                 # terminal 3: attacks + measurements
+python demo_site/app.py        # 127.0.0.1:5000; starts the mock CAPTCHA provider on a thread (:5001)
 ```
 
-Open http://localhost:5000 in a browser: the store, the newsletter form, `/register` and `/promo` all work by hand.
+Open http://localhost:5000 in a browser: the store, the newsletter form, `/register` and `/promo/` all work by hand.
 
-| `DEFENSE_LEVEL` | Adds | You edit |
+**You never restart the store.** The checkpoint sets `DEFENSE_LEVEL` over `POST /lab/level`, and the store
+re-reads your edits under `defenses/` on the next request (`LAB_RELOAD=1`, the default). Set a level by hand with:
+
+```bash
+curl -X POST localhost:5000/lab/level -H 'content-type: application/json' -d '{"level": 2}'
+```
+
+| Level | Adds | You edit |
 |---|---|---|
 | 0 | nothing | — |
 | 1 | provider token required on `/register` | `defenses/siteverify.py` |
@@ -98,13 +106,11 @@ Open http://localhost:5000 in a browser: the store, the newsletter form, `/regis
 | 3 | + the hardened generator style | `defenses/captcha_generator.py` |
 | 4 | + solver signals and serve-on-risk | `defenses/solver_signals.py` |
 
-The store runs with Flask's reloader: **saving a file under `defenses/` restarts it**. Changing `DEFENSE_LEVEL` needs a manual restart (Ctrl+C, then run again).
-
 ### Lab-only shortcuts (never ship these)
 
-- **Simulated time:** `LAB_TIME_SCALE=5`, so one real second counts as five. A 40 s farm solve takes 8 s, and the 40-shopper simulation runs in about 5 s. Every threshold in `solver_signals.py` is in simulated seconds.
-- **Simulated IPs:** the store trusts `X-Lab-Client-IP` from 127.0.0.1 only, standing in for the Chapter 3 edge proxy. Humans come from 198.51.100.0/24, bots from 203.0.113.0/24, farm workers from 192.0.2.0/24 (RFC 5737 documentation ranges).
-- **Simulated eyes:** every challenge's answer is also written to `lab:eyes:<id>` in Redis, so simulated humans and the simulated farm can "read" the image the way a person would. Bot scripts (other than the farm) never read it.
+- **Simulated time:** `LAB_TIME_SCALE=5`, so one real second counts as five. A 40 s farm solve takes 8 s, and the 40-shopper simulation runs in seconds. Every threshold in `solver_signals.py` is in simulated seconds.
+- **Simulated IPs:** actors rent addresses from the pools in `data/world.json` and send them in `X-Lab-Client-IP`, standing in for the Chapter 3 edge. Shoppers come from the home and mobile pools, bots from `cloud_vm`, farm workers from `home_broadband`, the rotating farm from `residential_proxy`.
+- **Simulated eyes:** every challenge's answer is also written to `lab:eyes:<id>` in Redis, so simulated humans and the simulated farm can "read" the image the way a person would (`/lab/captcha/eyes/<id>`). Bot scripts (other than the farm) never read it.
 - **Actor labels:** `X-Lab-Actor` (human/bot/farm) only colours the scoreboard. Defenses must never read it.
 - **Verbose 403s:** the store tells the client which rule fired. In production that is a free oracle for the attacker.
 
@@ -112,12 +118,11 @@ The store runs with Flask's reloader: **saving a file under `defenses/` restarts
 
 | Problem | Fix |
 |---|---|
-| Port 5000 busy (macOS AirPlay Receiver) | `PORT=5050 DEFENSE_LEVEL=0 python demo_site/app.py` and `export DEMO_URL=http://localhost:5050` in the other terminals |
-| `ConnectionError` to Redis | Start Redis (`docker compose up -d --wait`) or `python tools/fake_redis.py` |
-| No Docker | `python tools/fake_redis.py`. It is slower than real Redis (p95 check latency is higher), but the results are the same |
-| Checkpoint says "Mock provider not reachable" | `python provider/mock_turnstile.py` in its own terminal |
-| `Connection reset` in the middle of a checkpoint | You saved a defense file while it ran, and the reloader restarted the store. Run it again |
-| Checkpoint says the store did not reload after `--catch-up` | Restart the store by hand, then re-run the checkpoint |
+| Port 5000 busy (macOS AirPlay Receiver) | `PORT=5050 python demo_site/app.py` and `export DEMO_URL=http://localhost:5050` in the attack terminal |
+| `Store not reachable on http://127.0.0.1:5000` | Start it: `python demo_site/app.py` |
+| Want the provider in its own terminal | `python provider/mock_turnstile.py`, then start the store with `PROVIDER_AUTOSTART=0` |
+| `ConnectionError` to Redis | You set `REDIS_URL` to a server that is not running. Start it (`docker compose up -d --wait`) or unset it (`memory://`) |
+| Checkpoint FAILs with "store is at level X, expected N" | Let the checkpoint set the level (`--round N`), or set it by hand with the `curl` above |
 | Stale results | `python tools/reset.py` (the checkpoint resets state itself) |
 
 ---
@@ -125,39 +130,47 @@ The store runs with Flask's reloader: **saving a file under `defenses/` restarts
 ## How to measure a round
 
 ```bash
-python tools/checkpoint.py --round 3
+python tools/checkpoint.py --round N              # set level N, run the round's attacks next to the shoppers
+python tools/checkpoint.py --round N --level N-1  # the same attacks against the previous level: the "before"
+python tools/checkpoint.py --round N --catch-up   # install solutions/round1..N first
+python tools/checkpoint.py --restore              # put your own files back (the .bak copies)
 ```
 
+The checkpoint sets the level, resets the store and the provider, runs the round's attacks while the 40
+shoppers sign up and claim the voucher, and prints:
+
+- **The scoreboard**: requests served and stopped per actor, and the gate's cost per request (`Server-Timing` on every response has the per-check split).
+- **The shoppers**: per persona, who signed up, who met a CAPTCHA and who was lost, with the reason for each loss. The two screen-reader users, the no-JavaScript visitor, the deep-linkers and the Wi-Fi → cellular hopper are named because a CAPTCHA's false positives are exactly those people.
+- **The attacks**: accounts or vouchers obtained out of the attempts (and dollars spent on the farm), against the round's expectation.
+- **Defender cost**: siteverify, image generation and answer checking in milliseconds, from the decision log.
+- **PASS or FAIL** against the round's expectations in `tools/checkpoint.py`, including which personas the round is *allowed* to hurt (`allowed_fp`). That list is the price of the layer.
+
 ```
-=== Checkpoint: Round 3 (DEFENSE_LEVEL=3, generator=hardened) ===
+== Round 3: hardened images: the targeted solver drops from ~100% to a few percent (level 3)
+...
+Bots stopped: 21/102 requests · shoppers hurt: 3/40 people
 
-Bot traffic
-  ✅ round0_mass_register    0/20  succeeded  (expected: blocked)
-  ✅ round1_bypass           0/20  succeeded  (expected: blocked)
-  ✅ round2_cookie_replay    0/20  succeeded  (expected: blocked)
-  ✅ round3_ocr              3/20  succeeded  (expected: ≤25% succeed)
+attacks:
+  cookie_replay    0% succeeded
+  ocr              5% succeeded
 
-Real users (40 simulated shoppers)
-  completed 38/40 · challenged 40/40 · 43 CAPTCHAs shown · median journey 24 s
-  ⚠️  user 15 lost: inaccessible: image-only CAPTCHA
-  ⚠️  user 33 lost: inaccessible: image-only CAPTCHA
+  lost: human:screen_reader:00       image-only CAPTCHA, no audio or alternative path
+  lost: human:screen_reader:01       image-only CAPTCHA, no audio or alternative path
+  lost: human:no_js:00               no JavaScript: no widget, no token
 
-Defender cost (per request)
-  captcha_check  median   2.50 ms · p95 293.33 ms
-  captcha_gen    median 143.65 ms · p95 259.06 ms
-  siteverify     median  13.37 ms · p95  57.30 ms
+defender cost (ms)         n   median      p95
+gate (all requests)      374     4.09    26.62
+siteverify                40     5.94    16.96
+image generation          62    14.67    36.56
+answer check              79     0.59     1.71
 
-✅ Round 3 checkpoint passed.
+Round 3 at level 3: PASS
 ```
 
-It checks the store's `DEFENSE_LEVEL`, resets Redis and the provider, and then reports:
-- every attack introduced so far against its expected result;
-- the 40 shoppers: completed, challenged and lost, with the reason for each loss;
-- defender cost from `Server-Timing`.
+A shopper lost to a CAPTCHA is a cost the round owns up to (`allowed_fp`), not a silent pass. A shopper
+who is hurt outside that list fails the checkpoint.
 
-A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't *register* fails the checkpoint.
-
-**Fell behind?** `python tools/checkpoint.py --round N --catch-up` installs the reference solutions for rounds 1..N from `solutions/` over your files and keeps each of yours once as `.bak`. Restart the store at `DEFENSE_LEVEL=N`, then run the checkpoint again. `python tools/checkpoint.py --restore` puts your own files back.
+`tools/verify.py` runs the same thing with its own in-process store on a free port (used for the table below).
 
 ---
 
@@ -166,10 +179,9 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 | Step | Do | Expected |
 |---|---|---|
 | 🗡️ Attack | `python attacks/round0_mass_register.py` | `20/20` accounts in well under a second |
-| 👥 Humans | `python tools/legit_traffic.py` | `completed 40/40 · challenged 0/40` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 0` | passes |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 0` | PASS: bots 20/20 served · shoppers 40/40, 0 challenged |
 
-**Write the scoreboard row:** bots 20/20, humans 40/40, challenged 0/40. Every later round is compared with it.
+**Write the scoreboard row:** bots 20/20, shoppers 40/40, challenged 0/40. Every later round is compared with it.
 
 ---
 
@@ -177,16 +189,18 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 | Step | Do | Expected |
 |---|---|---|
-| 🛡️ Defend | Restart with `DEFENSE_LEVEL=1`. Sign up by hand at `/register` and watch the widget | form works |
+| 🛡️ Defend | `python tools/checkpoint.py --round 1` sets level 1. Sign up by hand at `/register` and watch the widget | the form works; the checkpoint FAILs on the shipped verifier |
 | 🗡️ Attack | `python attacks/round0_mass_register.py` | still `20/20`: a missing token is "fine" |
 | 🗡️ Attack | `python attacks/round1_bypass.py` | `20/20` via `missing`, `newsletter`, `laundered`, `outage` |
 | 🛡️ Defend | Fix the five `TODO (Round 1)` in `defenses/siteverify.py`. Test with `python defenses/siteverify.py` | 1 accept, 3 rejects |
 | 🗡️ Re-run | `python attacks/round1_bypass.py` | `0/20`, with a distinct reason per technique |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | 0/20 · 40/40 shoppers · siteverify ~20 ms median |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 1` | PASS: 0/20 · 39/40 shoppers · siteverify a few ms median |
 
 **Rules of engagement:**
 - A bot may mint tokens for non-interactive actions (`newsletter`), and for other hostnames (laundering through visitors to the attacker's page).
 - An interactive token for *your* hostname costs money: it only comes from `attacks/farm.py`. The mock can't tell people from programs, so this rule stands in for the provider's risk engine.
+
+**False-positive check:** the widget is JavaScript, so the no-JS visitor can't mint a token and is lost the moment the sign-up needs one. The round's `allowed_fp` names that persona; it stays lost for the rest of the lab.
 
 **Discuss:** with all four bypasses closed, what does an attacker now have to buy? (A farm-solved token per account, about $2 per 1,000.) For a fake account worth $0.10, did the CAPTCHA change the economics?
 
@@ -196,13 +210,13 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 | Step | Do | Expected |
 |---|---|---|
-| 🛡️ Defend | Restart with `DEFENSE_LEVEL=2`. Try `/promo` in the browser | image CAPTCHA |
+| 🛡️ Defend | `python tools/checkpoint.py --round 2` sets level 2. Try `/promo/` in the browser | image CAPTCHA |
 | 🗡️ Attack | `python attacks/round2_cookie_replay.py` | prints the cookie payload with the answer · `20/20` vouchers from one challenge |
 | 🛡️ Defend | Fix the `TODO (Round 2)` in `defenses/challenge_store.py`. Test with `python defenses/challenge_store.py` | correct / used / other session |
 | 🗡️ Re-run | `python attacks/round2_cookie_replay.py` | `0/20`: "no answer in any cookie" |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | 0/20 · **38/40** shoppers |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 2` | PASS: 0/20 · **37/40** shoppers |
 
-**False-positive check:** the two screen-reader users (15 and 33) are lost the moment every redemption needs an image CAPTCHA. This lab has no audio or alternative path. Leave it for now; Round 4 comes back to it.
+**False-positive check:** the two screen-reader users are lost the moment every redemption needs an image CAPTCHA. This lab has no audio or alternative path. Leave it for now; Round 4 comes back to it.
 
 ---
 
@@ -210,11 +224,11 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round3_ocr.py` (still at level 2) | trains in ~3–5 s · `20/20` (100%) |
+| 🗡️ Attack | `python attacks/round3_ocr.py` (still at level 2) | trains in a few seconds · `20/20` (100%) |
 | 🔍 Read | `attacks/ocr_solver.py`: binarize → segment → classify | list the assumptions |
-| 🛡️ Defend | Restart with `DEFENSE_LEVEL=3`. Implement `generate_hardened()` and `text_length()`. Look at the samples: `python defenses/captcha_generator.py` | you can still read them |
+| 🛡️ Defend | `python tools/checkpoint.py --round 3` sets level 3 (the gate now draws the hardened style). Implement `generate_hardened()` and `text_length()`; look at the samples: `python defenses/captcha_generator.py` | you can still read them |
 | 🗡️ Re-run | `python attacks/round3_ocr.py` | `1–3/20` (5–15%) |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | ≤25% · 38/40 shoppers, more CAPTCHAs shown |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 3` | PASS: ocr ≤35% · 37/40 shoppers, more CAPTCHAs shown |
 
 **Optional:** `pip install pytesseract`, install the `tesseract` binary, then `python attacks/round3_ocr.py --tesseract`. A generic engine with no knowledge of your generator is a weak baseline. Real attackers on a self-hosted CAPTCHA write a targeted solver.
 
@@ -226,12 +240,16 @@ A shopper lost to a CAPTCHA is a ⚠️ cost, not a failure. A shopper who can't
 
 | Step | Do | Expected |
 |---|---|---|
-| 🗡️ Attack | `python attacks/round4_retry_ocr.py` (level 3) | `10/10` vouchers after ~50–100 challenges |
+| 🗡️ Attack | `python attacks/round4_retry_ocr.py` (still at level 3) | `10/10` vouchers after ~50–100 challenges |
 | 🗡️ Attack | `python attacks/round4_solver_farm.py` | `10/10` · ~$0.01 spent |
-| 📊 Look | `python tools/legit_traffic.py`, then `python tools/scoreboard.py` | humans 3–15 s, bot < 1 s, farm 10–40 s |
-| 🛡️ Defend | Restart with `DEFENSE_LEVEL=4`. Fix the `TODO (Round 4)` in `defenses/solver_signals.py` | — |
+| 📊 Look | `python tools/solve_times.py` | humans 3–15 s, bot < 1 s, farm 10–40 s |
+| 🛡️ Defend | `python tools/checkpoint.py --round 4` sets level 4. Fix the `TODO (Round 4)` in `defenses/solver_signals.py` | — |
 | 🗡️ Re-run | both Round 4 attacks | `0/10` and `0/10` |
-| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | **40/40 shoppers · 4/40 challenged** |
+| ✅ Checkpoint | `python tools/checkpoint.py --round 4` | PASS: **39/40 shoppers · 8/40 challenged** · the screen readers are served again |
+
+Serve-on-risk is the win hiding in the numbers: the CAPTCHA now appears only for risky sessions, so the two
+screen-reader users (lost since Round 2) finish again, and the Wi-Fi → cellular hopper is stepped up once
+(issuer ≠ submitter), solves it, and passes.
 
 **Residual:** `python attacks/round4_solver_farm.py --sticky-ip` gets `10/10` again for ~$0.01. With one proxy per voucher there is no IP mismatch, and the farm's 10–40 s band alone is too weak to block on (slow humans live there too). That is the end of what a CAPTCHA can do. It has priced a $10 voucher at a tenth of a cent plus half a minute. The fix is a business rule (one voucher per verified account) and identity signals (W2 Ch6), not a harder puzzle.
 
@@ -244,10 +262,10 @@ Fill in your scoreboard:
 | Round | Bots succeeded | Attacker cost | Shoppers completed | Shoppers challenged | Defender cost (p95) |
 |---|---|---|---|---|---|
 | 0 | 20/20 | $0 | 40/40 | 0/40 | — |
-| 1 | 0/20 | needs a farm | 40/40 | 0/40 | siteverify |
-| 2 | 0/20 | needs a solver | 38/40 | 40/40 | + generation, check |
-| 3 | 1–3/20 | retries | 38/40 | 40/40 | hardened generation |
-| 4 | 0/10, 0/10 | sticky farm: $0.01 / 10 | 40/40 | 4/40 | signals ~free |
+| 1 | 0/20 | needs a farm | 39/40 | 0/40 | siteverify |
+| 2 | 0/20 | needs a solver | 37/40 | 39/40 | + generation, check |
+| 3 | 1–3/20 | retries | 37/40 | 39/40 | hardened generation |
+| 4 | 0/10, 0/10 | sticky farm: $0.01 / 10 | 39/40 | 8/40 | signals ~free |
 
 Then use the discussion questions in the content doc (§6.6).
 
@@ -255,37 +273,42 @@ Then use the discussion questions in the content doc (§6.6).
 
 ## Expected results (self-check)
 
-Measured on Python 3.12.15 (Linux, WSL2) with Flask 3.1.3, Flask-Session 0.8.0, redis 8.1.0, fakeredis 2.39.0 standing in for Redis, httpx 0.28.1, Pillow 12.3.0, numpy 2.5.4 and scikit-learn 1.9.1, `LAB_TIME_SCALE=5`, and the reference solutions (`--catch-up`). The `docker compose` path has not been run for the migrated lab. **Before** means the shipped student files; **after** means the reference solutions (what `--catch-up` installs). Numbers vary slightly between runs (OCR accuracy, retries, timings); the ranges come from repeated runs.
+Measured October 2026 on Python 3.12 (Linux, WSL2) with the baseline pins (Flask 3.1, redis 8.1, fakeredis 2.39
+on `memory://`, Pillow 12.3, numpy 2.5, scikit-learn 1.9) and `LAB_TIME_SCALE=5`. The `docker compose` path has
+not been run for the migrated lab. **Before the fix** is the round run against its shipped stub (rounds 1..N−1
+fixed): `python tools/verify.py --round N`. **After** is the reference solutions:
+`python tools/verify.py --all --catch-up --markdown`, which regenerates this table's numbers; do not edit them
+by hand. Numbers vary slightly between runs (OCR accuracy, retries, timings).
 
-| Attack ↓ / state → | L0 | L1 before | L1 after | L2 before | L2 after | L3 before | L3 after | L4 before | L4 after |
-|---|---|---|---|---|---|---|---|---|---|
-| `round0_mass_register` (20) | 20 | 20 | **0** | 0 | 0 | 0 | 0 | 0 | 0 |
-| `round1_bypass` (20) | — | 20 | **0** | 0 | 0 | 0 | 0 | 0 | 0 |
-| `round2_cookie_replay` (20) | — | 20 (no CAPTCHA) | 20 (no CAPTCHA) | 20 | **0** | 0 | 0 | 0 | 0 |
-| `round3_ocr` (20) | — | — | — | — | 20 | 19–20 (stub = basic) | **1–3** | 4 | **0** |
-| `round4_retry_ocr` (goal 10) | — | — | — | — | — | — | 10 (50–97 tries) | 10 (61–85 tries) | **0** (300 tries) |
-| `round4_solver_farm` (goal 10) | — | — | — | — | — | — | 10, $0.011 | 10, $0.010 | **0**, $0.030 |
-| `round4_solver_farm --sticky-ip` | — | — | — | — | — | — | — | — | 10, $0.010–0.012 (residual) |
-| Shoppers completed / 40 | 40 | 40 | 40 | 38 | 38 | 37 | 38 | 36–37 | **40** |
-| Shoppers challenged / 40 | 0 | 0 | 0 | 40 | 40 | 40 | 40 | 40 | **4** |
+<!-- results:start -->
+| Round | Attack | Before the fix (stub) | After (solution) | Shoppers hurt after |
+|---|---|---|---|---|
+| 1 | `register` | 20/20 accounts | 0/20 | `no_js` (39/40 finish): no JS, no token |
+|  | `bypass` | 20/20 | 0/20 |  |
+| 2 | `cookie_replay` | 20/20 vouchers from one challenge | 0/20 | + both `screen_reader` users (37/40 finish) |
+| 3 | `ocr` | 20/20: the stub still draws the basic style | 1/20 (5%) | same 3/40 |
+| 4 | `retry` | 10/10 (~50–100 tries) | 0/10 (gave up at 300) | back to `no_js` only (39/40 finish, 8/40 challenged) |
+|  | `farm` | 10/10 · $0.01 | 0/10 · $0.03 |  |
+|  | `farm_sticky` | 10/10 · $0.01 | **10/10 · $0.01 (the residual)** |  |
+<!-- results:end -->
 
-**Defender cost (median / p95, 40 concurrent shoppers on the Flask dev server):**
-- siteverify: 13–23 ms / 44–100 ms against the local mock. Before switching to a pooled client it was 146 ms / 365 ms: a fresh client per call builds a TLS context.
-- captcha_gen: basic 77–112 ms / 150–190 ms, hardened 13–150 ms / 130–260 ms. Under load this is mostly GIL contention; unloaded it is 8 ms (basic) and 17 ms (hardened).
-- captcha_check: 1–7 ms median. The p95 is up to 300 ms with fakeredis and much lower with real Redis.
+The "previous level" view (`--round N --level N-1`) reports without judging and tells the same story, with two
+quirks worth knowing: Round 2 at level 1 nets the replay only 1/20, because with no CAPTCHA on the voucher the
+one-per-session rule is the only thing left charging it; and Round 4 at level 3 prints FAIL because the two
+screen-reader users are still being hurt there — which is exactly what Round 4 fixes.
+
+**Defender cost (median / p95, from the decision log, 40 concurrent shoppers on the Flask dev server):**
+- gate (all requests): 2–4 ms / 7–27 ms.
+- siteverify: 3–7 ms / 17–21 ms against the in-process mock.
+- image generation: 11–15 ms / 37–49 ms under load; unloaded it is ~8 ms (basic) and ~17 ms (hardened).
+- answer check: 0.5–1 ms / 1–2 ms.
 
 **Things to watch for:**
-- **Run-to-run variance:** solver accuracy on the hardened style is 5–20% per attempt. If your hardened style is much weaker than the reference (say >25%), the Round 3 checkpoint fails. Re-read the solver's assumptions.
+- **Run-to-run variance:** solver accuracy on the hardened style is 5–20% per attempt. If your hardened style is much weaker than the reference (say >35%), the Round 3 checkpoint fails. Re-read the solver's assumptions.
 - **Your thresholds:** if you set `FAST_SOLVE_SIM_S` above ~3 s, the checkpoint flags real users. That's the lesson, so let it fail once.
 - **Slow laptops:** the bot's solve time is real compute × `LAB_TIME_SCALE`. If OCR takes more than ~300 ms per image on your machine, its "solve time" approaches the 2 s floor. Use `LAB_TIME_SCALE=3` everywhere on that machine.
-- **Chrome version** in `attacks/common.py` and the simulator's UAs: update the major version each quarter.
-- **Cloudflare dummy keys:** re-check them in Cloudflare's Turnstile testing docs before you run Bonus 3.
-
-### Self-check before you start
-
-- [ ] `pip install -r requirements.txt` on the lab image; `docker compose up -d --wait` (or `fake_redis.py`)
-- [ ] Run `tools/checkpoint.py --round N --catch-up` for N = 0..4 once end to end (about 2 minutes), then `python tools/checkpoint.py --restore` to put the student files back
-- [ ] Optional: Tesseract installed on one machine for the generic-OCR comparison
+- **Chrome version** in `tools/captcha_kit.py` (`BOT_UA`) and the shoppers' UAs: update the major version each quarter.
+- **Cloudflare dummy keys:** re-check them in Cloudflare's Turnstile testing docs before you run Bonus 2.
 
 ---
 

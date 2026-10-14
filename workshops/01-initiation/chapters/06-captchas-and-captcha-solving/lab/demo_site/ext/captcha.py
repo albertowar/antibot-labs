@@ -6,7 +6,7 @@ Chapter 6 feature module: the CAPTCHAs, the widget, and the promo voucher they p
     hooks.slot("form:register", ...)            the (mock) Turnstile widget inside the sign-up form
     hooks.slot("body_end", ...)                 the same widget in the footer newsletter form
     hooks.enricher(_landing)                    session flag `landing` once a visitor has seen the home page
-    /lab/promo/                                 the page and POST /lab/promo/redeem: a $10 voucher per session
+    /promo/                                     the page and POST /promo/redeem: a $10 voucher per session
     /lab/captcha/eyes/<id>                      LAB ONLY: what a person sees in the image (a bot must not call it)
     /lab/captcha/provider                       where the mock provider listens
 
@@ -30,7 +30,7 @@ from flask import Blueprint, after_this_request, current_app, g, jsonify, redire
 
 from defenses import captcha_gate, challenge_store, policy
 
-from .. import gate, hooks
+from .. import hooks
 from ..routes import csrf_ok, csrf_token, guard
 
 LAB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -105,21 +105,7 @@ def _verify(ctx, answer):
     return _timed(ctx, "captcha_check", captcha_gate.verify, ctx, answer)
 
 
-# --- Gating the promo routes ---------------------------------------------------------------------------
-
-def _gate_here():
-    """/lab/ is skipped by the gate (lab tooling). The promo is a store feature, so run the gate for it."""
-    t_ctx = time.perf_counter()
-    ctx = gate.build_ctx(current_app)
-    g.ctx = ctx
-    for fn in hooks.ENRICHERS:
-        try:
-            fn(ctx)
-        except Exception as e:
-            ctx.note(enricher_error=repr(e))
-    g.gate_ms += (time.perf_counter() - t_ctx) * 1000
-    return gate.respond(gate.run_phase("request", ctx), ctx)
-
+# --- The promo routes ---------------------------------------------------------------------------
 
 def _landing(ctx):
     """Remember that this session saw the home page (Round 4 reads it). One Redis write per session."""
@@ -141,8 +127,9 @@ def init(app):
     hooks.slot("body_end", "captcha/widget_footer.html")
     hooks.enricher(_landing)
 
-    promo = Blueprint("promo", __name__, url_prefix="/lab/promo")
-    promo.before_request(_gate_here)
+    # /promo/ is a store feature, not lab tooling, so it lives outside /lab/ and the
+    # normal gate runs on it like on any other page (same shape as W1 Ch5's promo).
+    promo = Blueprint("promo", __name__, url_prefix="/promo")
 
     @promo.route("/")
     def page():
@@ -154,7 +141,7 @@ def init(app):
         ctx = g.ctx
         as_json = _wants_json()
         if not as_json and not csrf_ok():
-            return redirect("/lab/promo/")
+            return redirect("/promo/")
         if not ctx.session.get("promo"):
             return jsonify(error={"code": "not_unlocked", "message": "Open the offer page first."}), 400
         if int(ctx.session.get("redeemed", 0)) >= VOUCHER_LIMIT:

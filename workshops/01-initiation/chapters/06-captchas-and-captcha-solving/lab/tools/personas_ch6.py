@@ -138,10 +138,10 @@ def scenario_signup(p, client, rng):
     if not p.result["registered"]:
         return population._stop(p, client, "blocked" if r.status_code in (403, 429) else "failed", r)
 
-    r = population._visit(p, client, "/lab/promo/", "link", BASE_URL + "/account")
+    r = population._visit(p, client, "/promo/", "link", BASE_URL + "/account")
     ck.sim_sleep(rng.uniform(1, 3))
     for _ in range(4):                                                   # claim; initial try + step-ups / retries
-        r = client.post("/lab/promo/redeem", headers=_json_headers(p, BASE_URL + "/lab/promo/"), json={})
+        r = client.post("/promo/redeem", headers=_json_headers(p, BASE_URL + "/promo/"), json={})
         if r.status_code == 200:
             return population._stop(p, client, "redeemed", r)
         err = r.json().get("error", {}) if r.headers.get("content-type", "").startswith("application/json") else {}
@@ -151,7 +151,7 @@ def scenario_signup(p, client, rng):
         if p.persona == "screen_reader":
             p.result["inaccessible"] = True                               # an image, and nothing else to try
             return population._stop(p, client, "stuck_on_challenge", r)
-        if not solve_like_a_person(p, client, rng, err["payload"], BASE_URL + "/lab/promo/"):
+        if not solve_like_a_person(p, client, rng, err["payload"], BASE_URL + "/promo/"):
             if p.persona != "hopper" and rng.random() < ABANDON_AFTER_FAIL:
                 p.result["abandoned"] = True
                 return population._stop(p, client, "stuck_on_challenge", r)

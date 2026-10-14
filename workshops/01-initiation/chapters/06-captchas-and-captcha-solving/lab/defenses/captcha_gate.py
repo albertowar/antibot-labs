@@ -9,7 +9,7 @@ student files; it calls them:
     captcha_generator Round 3: the image                      (new_challenge)
     solver_signals    Round 4: solve signals + serve on risk  (assess / note_failure)
 
-What it does: a redemption (`action:promo_redeem`, POST /lab/promo/redeem) from a session that has
+What it does: a redemption (`action:promo_redeem`, POST /promo/redeem) from a session that has
 not just solved a CAPTCHA scores CAPTCHA_POINTS and asks for the `captcha` challenge. The gate
 turns that into a 403 (JSON `challenge_required` with the image in the payload, or the interstitial
 page). The client fetches/answers it at GET /api/challenge?type=captcha and POST

@@ -6,7 +6,7 @@ Everything here is lab plumbing, not defense or attack logic:
   - the mock provider: `mint_token()` asks it for a token, as its widget would after a pass
   - bot clients: a labclient.LabClient from a rented datacenter IP that already does what earlier
     chapters forced it to (a current Chrome User-Agent, cookies); each round adds one new trick
-  - the promo and CAPTCHA calls, as a client sees them (contract routes + /lab/promo/*)
+  - the promo and CAPTCHA calls, as a client sees them (contract routes + /promo/*)
   - simulated time: LAB_TIME_SCALE=5 means one real second counts as five simulated seconds
     (defenses/policy.py), so a 40-second farm solve takes 8 real seconds
   - "eyes": `look_at()` reads the lab-only /lab/captcha/eyes/<id> route, standing in for a human
@@ -110,7 +110,7 @@ def post_json(c, path, body=None, **kw):
 
 def unlock(c):
     """Open the offer page: a redemption without it is refused ("not unlocked")."""
-    return c.get("/lab/promo/", [("User-Agent", BOT_UA), ("Accept", "text/html")])
+    return c.get("/promo/", [("User-Agent", BOT_UA), ("Accept", "text/html")])
 
 
 def visit_home(c):
@@ -133,7 +133,7 @@ def answer_challenge(c, challenge_id, text, ip=None):
 
 def redeem(c, ip=None):
     """Claim the voucher. Returns (status, body); a 403 body carries the CAPTCHA payload."""
-    r = post_json(c, "/lab/promo/redeem", ip=ip)
+    r = post_json(c, "/promo/redeem", ip=ip)
     return r.status_code, r.json()
 
 

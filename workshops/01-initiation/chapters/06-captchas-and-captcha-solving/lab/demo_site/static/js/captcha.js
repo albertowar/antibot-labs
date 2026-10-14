@@ -45,7 +45,7 @@
     var payload = JSON.parse($("#captcha-payload").textContent);
     var next = inter.getAttribute("data-next") || "/";
     mount($("#captcha-box"), payload, function () {
-      location.href = next.indexOf("/redeem") > -1 ? "/lab/promo/" : next;      // a POST cannot be replayed by a reload
+      location.href = next.indexOf("/redeem") > -1 ? "/promo/" : next;      // a POST cannot be replayed by a reload
     });
   }
 
@@ -53,7 +53,7 @@
   if (form && window.fetch) {
     var msg = $("#promo-msg");
     var claim = function () {
-      post("/lab/promo/redeem", {}).then(function (r) {
+      post("/promo/redeem", {}).then(function (r) {
         if (r.status === 200) {
           $("#voucher").hidden = false; $("#voucher").querySelector("strong").textContent = r.body.voucher;
           $("#captcha-box").innerHTML = ""; msg.textContent = ""; return;

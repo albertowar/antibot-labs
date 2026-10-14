@@ -4,7 +4,7 @@
   <p class="eyebrow">Welcome offer</p>
   <h1>Claim your $10 voucher</h1>
   <p class="muted">One voucher per visit. (A lab feature: it is what a bot with a CAPTCHA solver would farm.)</p>
-  <form id="promo-form" action="/lab/promo/redeem" method="post">
+  <form id="promo-form" action="/promo/redeem" method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <button class="btn big" type="submit" id="claim">Claim voucher</button>
   </form>
