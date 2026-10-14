@@ -1,34 +1,35 @@
-"""L3: close the account-enumeration oracles.  <-- you harden these in Round 3.
+"""
+oracles (Round 3): stop telling attackers which accounts exist.
 
-Two leaks to close at L3:
-  * /forgot-password must answer identically whether or not the account exists
-    (``forgot_password_response``).
-  * A missing account must cost the same KDF time as a real one, so the response
-    clock is not a timing oracle (``equalize_timing``).
+Breach screening only helps if the attacker still has to try the WHOLE combo list. The moment an
+endpoint says which accounts exist, they prune the list to real users and the attack gets an order
+of magnitude cheaper (and far quieter: no unknown-account ratio left for Round 2's check to see).
 
-The timing guard is called from the login pipeline; the response is called from
-app.py. Fill in the TODOs. Reference: solutions/round3/defenses/oracles.py
+This store has one deliberate leak, the legacy `POST /api/account/recover` that a long-gone mobile
+app still calls: "Recovery link sent" for a real address, "No account with that email" (404) for
+the rest. The fix is the same answer for everyone, which is what the main password reset
+(`/api/password-reset`) already does. Closing the leak is one flag: the route reads
+`ctx.attrs["uniform_recover"]` and answers identically when it is set.
+
+The other classic oracle, timing, is already closed in the starter: `check_password` hashes the
+password against a dummy value when the account does not exist, so an unknown email costs what a
+real one does. Registration ("that email is already registered") and username-taken messages are
+the oracles production stores forget; they need rate limits and a CAPTCHA, because a sign-up form
+has to say something.
+
+Who it hurts: the honest user who mistyped their email now gets the same "if that address exists"
+message and has to check their inbox. That is the price, and it is a small one.
+
+Reference: solutions/round3/defenses/oracles.py (or `checkpoint.py --round 3 --catch-up`)
 """
 
-from __future__ import annotations
-
-import os
-import sys
-
-from werkzeug.security import check_password_hash
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from defenses.labhash import hash_pw  # noqa: E402
-
-# Same method/cost as real account hashes, so equalize_timing actually equalizes.
-DUMMY_HASH = hash_pw("lab-dummy-password-not-in-use")
+from .pipeline import Check
 
 
-def equalize_timing(password: str) -> None:
-    # TODO (Round 3): verify ``password`` against DUMMY_HASH to burn one KDF pass.
+def _check(ctx):
+    # TODO (Round 3): set ctx.attrs["uniform_recover"] = True so /api/account/recover answers
+    #   the same for every address. Return None: this check scores nothing, it only flips the flag.
     return None
 
 
-def forgot_password_response() -> dict:
-    # TODO (Round 3): return the same response for every address.
-    return {"status": "ok", "message": "If that account exists, we've sent a reset link."}
+CHECK = Check("oracles", _check, phases=("action:recover",))

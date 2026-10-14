@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block page %}account{% endblock %}{% block title %}Account · {{ store_name }}{% endblock %}
+{% block content %}
+<div class="section-head"><h1>Hi {{ user.name.split()[0] if user.name else 'there' }}</h1><form action="/logout" method="post"><button class="link" type="submit">Log out</button></form></div>
+<div class="tiles">
+  <div class="card"><p class="eyebrow">Loyalty</p><p class="big-num">{{ user.loyalty_points }}</p><p class="muted">points · redeem a <a href="/gift-cards">gift card</a></p></div>
+  <div class="card"><p class="eyebrow">Payment</p><p>{% if user.saved_card_last4 %}{{ user.saved_card_brand }} •••• {{ user.saved_card_last4 }}{% else %}No saved card{% endif %}</p><p class="muted">Member since {{ user.created_at.strftime('%b %Y') if user.created_at }}</p></div>
+  <div class="card"><p class="eyebrow">Address</p>{% if user.addresses %}<p>{{ user.addresses[0].line1 }}<br>{{ user.addresses[0].city }} {{ user.addresses[0].postcode }}, {{ user.addresses[0].country }}</p>{% else %}<p class="muted">No address saved</p>{% endif %}</div>
+</div>
+<section><div class="section-head"><h2>Recent orders</h2><a href="/orders" class="muted">All orders</a></div>
+{% include "partials/_orders.html" %}</section>
+{% endblock %}

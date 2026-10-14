@@ -1,56 +1,43 @@
-"""Round 3 attack — infostealer log replay.
+"""
+Round 3 attack: infostealer log replay.
 
-Credential stuffing tests *leaked* passwords, so breach screening (L3) kills it.
-This attack sidesteps that entirely: it uses credentials an infostealer lifted
-straight from the victim's browser. They are correct, current, and have never
-appeared in any breach corpus — so the breach screen sees nothing. The malware
-also grabbed the victim's device cookie and user-agent, which the attacker
-replays. The one thing it cannot fake is the victim's network.
+Credential stuffing tests LEAKED passwords, so the breached-password screen kills it. This attack
+sidesteps that entirely: it uses credentials an infostealer lifted straight from the victim's
+browser. They are correct, current and have never appeared in any breach corpus, so the screen
+sees nothing. The malware also grabbed the victim's device cookie (`did`), which the attacker
+replays. The one thing it cannot copy is the victim's network.
 
-Against L3 this walks straight in. Against L4's device/context check it is stopped,
-because the login arrives on an ASN the account has never used.
+Setup (not the attack): each of the 10 victims signs in from home on their usual device, so the
+store has a history for the account. The "stealer log" is then what the malware copied from that
+browser: the email, the password and the device id.
+
+Against Round 3 this walks straight in. Against Round 4's device and network check it is stopped:
+the login arrives over an ASN the account has never used and a step-up code goes to the victim's
+inbox, not to the attacker.
+
+    python attacks/round3_stealer_log_replay.py
 """
 
-from __future__ import annotations
+from _common import LabClient, is_success, login, password_for, report, username, victim_signs_in, world_pool
 
-import asyncio
-
-import httpx
-
-from _common import BASE_URL, edge_headers, is_success, load_json, require_local_target
-
-ATTACKER_IP = "198.51.100.50"   # datacenter egress — not the victims' home network
-ACTOR = "bot:round3"
+ACTOR = "bot:stealer"
+VICTIMS = range(200, 210)
 
 
-async def run() -> dict:
-    require_local_target(BASE_URL)
-    logs = load_json("stealer_logs.json")
-    hits: list[str] = []
-
-    async with httpx.AsyncClient(base_url=BASE_URL, timeout=10.0) as client:
-        for v in logs:
-            try:
-                r = await client.post(
-                    "/login",
-                    json={"email": v["email"], "password": v["password"]},
-                    headers=edge_headers(ACTOR, ATTACKER_IP, device=v["did"],
-                                         client_sig=v["client_sig"], user_agent=v["user_agent"]),
-                )
-                if is_success(r):
-                    hits.append(v["email"])
-            except httpx.RequestError:
-                pass
-
-    return {"attack": ACTOR, "attempts": len(logs), "accounts_taken_over": len(hits),
-            "hits": sorted(hits)}
-
-
-def main():
-    result = asyncio.run(run())
-    print(f"[{result['attack']}] {result['attempts']} stolen credentials -> "
-          f"{result['accounts_taken_over']} accounts taken over")
+def run():
+    home, hosting = world_pool("home_fiber"), world_pool("hosting_asn")
+    hits = []
+    for n, i in enumerate(VICTIMS):
+        victim = victim_signs_in(i, home[n])
+        stolen_did = victim.http.cookies.get("did")                  # what the malware copied
+        attacker = LabClient(ACTOR, ip=hosting[n])
+        attacker.set_cookie("did", stolen_did)
+        if is_success(login(attacker, username(i), password_for(i))):
+            hits.append(username(i))
+    return {"attacker": ACTOR, "attempted": len(VICTIMS), "succeeded": len(hits), "accounts_taken_over": len(hits)}
 
 
 if __name__ == "__main__":
-    main()
+    out = run()
+    print(f"[{ACTOR}] {out['attempted']} stolen credentials -> {out['accounts_taken_over']} accounts taken over")
+    report(**out)

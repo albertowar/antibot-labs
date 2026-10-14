@@ -1,20 +1,24 @@
-"""Redis sliding-window primitives (shared helper, not a student exercise).
-
-A sorted set per key, scored by timestamp: evict everything older than the window,
-add the current event, count what remains. O(log n) per call and self-expiring.
-The defense modules build their IP / account / cohort counters on top of this.
-
-Adapted from the companion repo's ``velocity.py`` (Chapter 21).
 """
+Redis sliding-window primitives (shared helper, not a student exercise).
 
-from __future__ import annotations
+A sorted set per key, scored by timestamp: evict everything older than the window, add the current
+event, count what remains. O(log n) per call and self-expiring. The login defenses build their
+IP, account and cohort counters on top of this.
+
+Every key starts with `lab:` so POST /lab/reset (which flushes `lab:*`) wipes the counters between
+rounds. The starter's token bucket (ctx.bucket, defenses/store.py) is the other way to rate limit;
+this lab uses windows because the lockout and cohort ratios need to *count*, not just admit.
+
+The sliding-window idea is the classic velocity counter of fraud systems, adapted from the
+companion code repo's velocity module.
+"""
 
 import time
 import uuid
 
 
-def hit(rds, key: str, window_s: int, now: float | None = None) -> int:
-    """Record one event under ``key`` and return the count within ``window_s``."""
+def hit(rds, key, window_s, now=None):
+    """Record one event under `key` and return the count within `window_s`."""
     now = time.time() if now is None else now
     pipe = rds.pipeline()
     pipe.zremrangebyscore(key, 0, now - window_s)
@@ -24,18 +28,11 @@ def hit(rds, key: str, window_s: int, now: float | None = None) -> int:
     return pipe.execute()[2]
 
 
-def count(rds, key: str, window_s: int, now: float | None = None) -> int:
-    """Count events under ``key`` within the window without recording a new one."""
-    now = time.time() if now is None else now
-    rds.zremrangebyscore(key, 0, now - window_s)
-    return rds.zcard(key)
+def incr_window(rds, key, window_s):
+    """Fixed-window counter. Returns the new value; the window starts at the first increment.
 
-
-def incr_window(rds, key: str, window_s: int, now: float | None = None) -> int:
-    """Monotonic per-window counter (fixed window). Returns the new value.
-
-    Cheaper than a sorted set when all you need is "how many in this window",
-    e.g. consecutive-failure tallies that reset on success.
+    Cheaper than a sorted set when all you need is "how many in this window", e.g. a
+    consecutive-failure tally that resets on success.
     """
     val = rds.incr(key)
     if val == 1:

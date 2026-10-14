@@ -1,39 +1,64 @@
-"""L4: device + network context, and re-auth for sensitive actions.  <-- Round 4.
+"""
+risk_engine (Round 4): device and network context at login, and fresh proof for sensitive changes.
 
-Fill in the TODOs so that an otherwise-clean login is stepped up when it comes
-from an unrecognized device or a known device over a never-seen ASN — but a
-returning user on a remembered device and network is not. ``remember`` must
-record the context after a clean login so the next visit is frictionless, and
-``needs_reauth`` gates sensitive changes regardless of how the session was born.
+Breach screening stops stuffing, not a FRESH credential: one an infostealer lifted straight from
+the victim's browser, never breached, perfectly correct. What still separates the thief from the
+owner is context. The attacker replays the password from a different network, and usually from a
+different device. So on an otherwise-clean login we compare this attempt with what we have seen
+for the account:
 
-Redis shape used by the reference: sets ``dev:<uid>`` (device ids),
-``asn:<uid>`` (ASNs) and ``sig:<uid>`` (client signatures).
+  * the device cookie (`did`) the store issued to this browser,
+  * the ASN the login comes from (`ctx.edge.asn`).
 
-Reference solution: solutions/round4/defenses/risk_engine.py
+A device we have never seen, or a known device arriving over a never-seen ASN, earns the same
+emailed-code step-up as Round 3. A returning user on a remembered device and network sails
+through, which is what keeps this from taxing everyone. `_login_result` records the context after
+a fully clean login so the next visit is frictionless; the first login we ever record for an
+account is trusted (trust on first use), because there is nothing to compare it with.
+
+And because a stolen SESSION cookie skips the login entirely (Round 4's attacker), sensitive
+changes get their own gate, REAUTH: an email change needs a fresh proof of possession (the current
+password) no matter how the session was born. This does not stop the cookie theft. Only
+device-bound sessions (DBSC), passkeys and session-anomaly models do (W2 Ch7). It blunts what the
+thief can DO with the session.
+
+Who it hurts: anyone on a new phone, a new laptop, a hotel or a different VPN exit, who now enters
+a code; and everyone who clears cookies (the device id is gone). The honest numbers are in the
+checkpoint's "stepped up" column. A device cookie is also copyable (the infostealer copies it
+too), so it is the network, not the cookie, that does the work against Round 3's attacker.
+
+Redis shape: sets `lab:ato:dev:<user id>` (device ids) and `lab:ato:asn:<user id>` (ASNs).
+Reference: solutions/round4/defenses/risk_engine.py (or `checkpoint.py --round 4 --catch-up`)
 """
 
-from __future__ import annotations
+from .pipeline import Check, Signal, Verdict
 
-DEVICE_TTL_S = 90 * 24 * 3600
+DEVICE_TTL_S = 90 * 24 * 3600       # remember a device and network for 90 days
+POINTS = 50                         # the challenge band: a step-up, not a block
 
 
-def assess(ctx) -> str | None:
-    # TODO (Round 4): compare ctx["device_id"] / ctx["asn"] against the account's
-    #   history (sets dev:<uid> / asn:<uid>). First-ever login (no history yet)
-    #   should pass. Unknown device, or known device over a new ASN, returns a
-    #   step-up reason.
+def _login_result(ctx):
+    login = ctx.attrs.get("login")      # {"ok": bool, "email": str, "known": bool, "password": str}
+    if not login or not login["ok"] or ctx.user is None:
+        return None
+    # TODO (Round 4): compare ctx.cookies.get("did") and str(ctx.edge.asn) with the account's history
+    #   (the two sets above, for ctx.user.id).
+    #   - No history yet (the asn set does not exist): trust this login.
+    #   - A device that is not in the set, or a known device over an ASN that is not: set
+    #     ctx.attrs["stepup"] = True and return Verdict("challenge", challenge="otp",
+    #     signals=(Signal("risk", "<unrecognized_device|new_network>", POINTS, <detail>),)).
+    #   - Otherwise, and only if ctx.attrs.get("stepup") is not set (Round 3 may have set it),
+    #     remember the device and ASN (sadd + expire DEVICE_TTL_S) so the next visit is clean.
     return None
 
 
-def remember(ctx) -> None:
-    # TODO (Round 4): add the device id, ASN and client signature to the account's
-    #   history sets (with DEVICE_TTL_S expiry).
+def _reauth(ctx):
+    proof = ctx.attrs.get("reauth") or {}   # the route verified the request's `password`: {"password_ok": bool}
+    # TODO (Round 4): unless proof.get("password_ok"), return
+    #   Verdict("challenge", challenge="reauth", signals=(Signal("risk", "reauth_required", POINTS, <detail>),)).
+    #   Until you do, sensitive actions are allowed through: exactly the gap Round 4's attacker uses.
     return None
 
 
-def needs_reauth(user, ctx) -> bool:
-    # TODO (Round 4): return True (block) unless the request carries a valid fresh
-    #   proof — a correct TOTP code (ctx["reauth_totp"]) or the current password
-    #   (ctx["reauth_password"]). Until you implement it, sensitive actions are
-    #   allowed through, which is exactly the gap the session-replay attack uses.
-    return False
+CHECK = Check("risk_engine", _login_result, phases=("action:login_result",))
+REAUTH = Check("reauth", _reauth, phases=("action:change_email",))

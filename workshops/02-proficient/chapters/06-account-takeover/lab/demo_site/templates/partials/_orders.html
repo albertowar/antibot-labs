@@ -1,0 +1,3 @@
+{% if orders %}<table class="lines"><thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>
+{% for o in orders %}<tr><td>{{ o.number }}</td><td>{{ o.created_at.strftime('%Y-%m-%d') if o.created_at }}</td><td>{% for i in o.items %}{{ i.qty }} × {{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}</td><td>${{ "%.2f"|format(o.total) }}</td><td><span class="tag ok">{{ o.status }}</span></td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="muted">No orders yet.</p>{% endif %}
