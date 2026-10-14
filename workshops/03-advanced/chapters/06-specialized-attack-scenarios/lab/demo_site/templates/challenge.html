@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Just making sure you're not a bot</h1>
+  <p class="muted">This page serves the <code>{{ challenge }}</code> challenge. A chapter's extension replaces it with a real interstitial.</p>
+  <pre class="payload">{{ payload|tojson(indent=1) }}</pre>
+  {{ slot("challenge", challenge=challenge, payload=payload) }}
+</section>
+{% endblock %}

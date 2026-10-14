@@ -1,80 +1,55 @@
-"""Cross-scenario scoreboard — the final debrief view.
+"""
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Reads the decision log and, for each round that has traffic, shows how the store
-split bots vs. humans across allow / challenge / block, the top reasons, and the
-median scoring cost. For Round 5 it also splits GIVT from SIVT by the reason tag.
-Run it after the last round, or any time, to see where the signal came from.
-
-    python tools/scoreboard.py
-    python tools/scoreboard.py --round 5
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
-from __future__ import annotations
-
 import argparse
-import collections
-import os
-import statistics
-import sys
+import json
 
-import requests
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attacks"))
-from _common import BASE_URL, require_local  # noqa: E402
-
-NAMES = {1: "Credential stuffing", 2: "Scalping", 3: "Scraping",
-         4: "Fake accounts", 5: "Click fraud"}
+from labclient import scoreboard
 
 
-def group(rows, is_bot):
-    sel = [r for r in rows if (r["actor"] in ("bot", "bot2")) == is_bot]
-    t = collections.Counter(r["outcome"] for r in sel)
-    return len(sel), t
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, choices=[1, 2, 3, 4, 5], default=None)
-    ap.add_argument("--url", default=BASE_URL)
-    a = ap.parse_args()
-    require_local(a.url)
-    rows = requests.get(f"{a.url}/lab/decisions", timeout=5).json()
-    if not rows:
-        print("No decisions recorded yet. Run a round's attack + checkpoint first.")
-        return 0
-
-    by_round = collections.defaultdict(list)
-    for r in rows:
-        by_round[r["round"]].append(r)
-    rounds = [a.round] if a.round else sorted(by_round)
-
-    print(f"=== Scoreboard ({len(rows)} decisions) ===")
-    for rd in rounds:
-        rr = by_round.get(rd, [])
-        if not rr:
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
             continue
-        nb, bt = group(rr, True)
-        nh, ht = group(rr, False)
-        lat = [r["latency_ms"] for r in rr if r["latency_ms"]]
-        print(f"\n[{rd}] {NAMES[rd]}  ({len(rr)} decisions)")
-        print(f"   bots   ({nb:4d}): " + "  ".join(f"{k}={v}" for k, v in sorted(bt.items())))
-        print(f"   humans ({nh:4d}): " + "  ".join(f"{k}={v}" for k, v in sorted(ht.items())))
-        if lat:
-            print(f"   median scoring cost: {statistics.median(lat):.3f} ms")
-        reasons = collections.Counter(r["reason"].split(" | ")[0] for r in rr
-                                      if r["outcome"] == "block")
-        if reasons:
-            top = "  ".join(f"{why}×{n}" for why, n in reasons.most_common(3))
-            print(f"   top block reasons: {top}")
-        if rd == 5:
-            tiers = collections.Counter(
-                ("givt" if r["reason"].startswith("givt") else
-                 "sivt" if r["reason"].startswith("sivt") else "other")
-                for r in rr if r["outcome"] == "block")
-            print(f"   IVT split: GIVT={tiers.get('givt',0)}  SIVT={tiers.get('sivt',0)}")
-    return 0
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
+
+
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

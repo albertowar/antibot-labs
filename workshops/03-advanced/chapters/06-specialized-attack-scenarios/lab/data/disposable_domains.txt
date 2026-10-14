@@ -1,0 +1,12 @@
+# Synthetic disposable-email blocklist (lab). In production you would use the maintained
+# open list (the disposable-email-domains project) and refresh it on a schedule.
+guerrillamail.com
+guerrillamailblock.com
+mailinator.com
+10minutemail.com
+tempmail.example
+trashmail.com
+sharklasers.com
+yopmail.com
+throwawaymail.com
+getnada.com

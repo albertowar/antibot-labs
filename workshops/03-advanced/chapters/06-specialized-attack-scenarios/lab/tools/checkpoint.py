@@ -1,130 +1,151 @@
-"""Round checkpoint — run at the end of every round, measuring BOTH sides.
+"""
+Round checkpoint for W3 Ch6 (Specialized Attack Scenarios). Declares the rounds and hands over to
+checkpoint_core.
 
-For the chosen round it resets the store, runs the legitimate customers, then
-resets again and runs the attacker, so each side is measured against a clean slate
-and the two never contend for the same stock. It then prints:
+    python tools/checkpoint.py --round 3              # set level 3, run this round's attackers next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same attackers against Round 2's defenses (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first (your files kept as .bak)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-    bots:   what the attacker achieved (takeovers / pairs / items / accounts / clicks)
-    humans: how the real customers fared (allowed / challenged / blocked)
-    verdict: a round passes when the attack is stopped at its scenario signature AND
-             no legitimate customer is blocked. A challenge is friction, not failure,
-             except where noted.
+Round N runs at DEFENSE_LEVEL N and each level includes the ones below it. Level 0 is the generic per-IP
+bucket. Each round adds one scenario's signature and runs the attackers that scenario ships:
 
-Fell behind, or want to see the finished defense?
-    python tools/checkpoint.py --round 2 --catch-up   # install the reference solution
-    python tools/checkpoint.py --restore                # put your own files back (.bak)
+    round  defense added                           attackers run                           what you should see
+    -----  --------------------------------------  --------------------------------------  ------------------------------
+      1    breached-password step-up (a code)      stuffer                                 30 takeovers -> 0 · 2 shoppers stepped up
+      2    funnel integrity + one unit per device  scalper, skip-view, patient              50 pairs -> 0 (patient: 4) · 40 shoppers buy
+      3    honeypot SKUs + catalogue coverage      crawler, skip-hidden                    120 pages -> 0 / 20 · researcher untouched
+      4    disposable + egress + device cluster    farm, clean-emails                      20 accounts -> 0 / 3 · 3 phones stepped up
+      5    GIVT filters + SIVT engagement funnel   givt, sivt                             60 billed -> 0 / 0 · nobody filtered
 
-Run with the demo store already running (python demo_site/app.py).
+Next to the attackers, the 40 shoppers of the starter run a scenario that mirrors the attack surface
+(tools/personas_ch6.py). Defender cost is the gate time of the shoppers' own requests from the decision log.
 """
 
-from __future__ import annotations
-
-import argparse
-import importlib
 import os
-import shutil
+import statistics
 import sys
 
-import requests
-
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB_DIR, "attacks"))
 sys.path.insert(0, HERE)
-from _common import BASE_URL, require_local  # noqa: E402
-import legit_traffic  # noqa: E402
 
-# round -> (defense module, attack module, attack kwargs, metric label, bot endpoints)
-ROUNDS = {
-    1: ("breached_passwords", "round1_stuffer", {}, "account takeovers", {"login"}),
-    2: ("scalping_funnel", "round2_scalper", {}, "pairs won", {"checkout"}),
-    3: ("scrape_defense", "round3_scraper", {}, "items harvested", {"products", "product"}),
-    4: ("account_cluster", "round4_account_farm", {}, "fake accounts created", {"register"}),
-    5: ("ivt_scoring", "round5_click_fraud", {}, "fraudulent clicks counted", {"click"}),
+import personas_ch6  # noqa: E402  (registers the ch6_* scenarios)
+from checkpoint_core import Round, main  # noqa: E402
+import labclient  # noqa: E402
+
+GATE_MEDIAN_MAX_MS = 20.0           # defender-cost threshold: median gate time per shopper request (in-process Redis)
+GATE_MEDIAN_MAX_MS_REDIS = 250.0    # with a real Redis the checks cost a network round trip each
+WEAK = 30                           # seed users 000-029 reuse a top-30 password: the combo list's real hits
+STOCK = 50                          # DROP_STOCK
+DEVICES = 4                         # the scalper's device cookies
+COVERAGE_CAP = 25
+IP_CAP = 3                          # the farm's leak when it dodges the blocklist
+
+
+def attackers(**want):
+    """want: name -> (lo, hi) on the attacker's `succeeded`. Prints the line the README table is made of."""
+    def check(board, results, attacks):
+        bad = []
+        print("\nattackers                  got   expected")
+        for name, (lo, hi) in want.items():
+            got = (attacks.get(name) or {}).get("succeeded", -1)
+            print(f"  {name:<22}{got:>5}   {lo}-{hi}")
+            if not lo <= got <= hi:
+                bad.append(f"{name}: got {got}, expected {lo}-{hi}")
+        return (not bad, "; ".join(bad))
+    return check
+
+
+def people(stepped_up=(0, 0), bought=None):
+    """The false-positive accounting: who paid for this round's defenses."""
+    lo, hi = stepped_up
+
+    def check(board, results, attacks):
+        rows = personas_ch6.summarize(results)
+        n_step = sum(r["stepped_up"] for r in rows.values())
+        n_hurt = sum(r["hurt"] for r in rows.values())
+        per = ", ".join(f"{k} {v['stepped_up']}" for k, v in sorted(rows.items()) if v["stepped_up"]) or "none"
+        print(f"\nthe people: {len(results)} shoppers · stepped up {n_step} ({per}) · hurt {n_hurt}")
+        bad = []
+        if not lo <= n_step <= hi:
+            bad.append(f"{n_step} people stepped up, expected {lo}-{hi}")
+        if bought is not None:
+            got = board["summary"]["purchases"].get("human", 0)
+            print(f"  humans who bought the drop: {got}/{len(results)}")
+            if got < bought:
+                bad.append(f"only {got} shoppers bought the drop, expected {bought}")
+        return (not bad, "; ".join(bad))
+    return check
+
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "actor": "human:"})["items"]
+    ms = [d["ms"] for d in rows]
+    if not ms:
+        return (False, "no shopper requests in the decision log")
+    median = statistics.median(ms)
+    limit = GATE_MEDIAN_MAX_MS if labclient.admin("GET", "/lab/config")["redis_url"].startswith("memory") else GATE_MEDIAN_MAX_MS_REDIS
+    p95 = statistics.quantiles(ms, n=20)[-1] if len(ms) > 1 else ms[0]
+    print(f"defender cost (the shoppers' requests, while the attackers run)\n  gate per request: median {median:.2f} ms, p95 {p95:.2f} ms over {len(ms)} requests")
+    return (median < limit, f"gate median {median:.2f} ms > {limit} ms")
+
+
+def scalper_totals(board, results, attacks):
+    bots = board["summary"]["purchases"].get("bot", 0)
+    cap = DEVICES
+    return (bots <= cap, f"bots bought {bots} pairs, at most {cap} (one per device) allowed")
+
+
+def tiers(board, results, attacks):
+    givt, sivt = attacks.get("givt") or {}, attacks.get("sivt") or {}
+    print(f"  givt flood: {givt.get('givt_filtered')} filtered as GIVT · sivt fleet: {sivt.get('sivt_filtered')} filtered as SIVT (givt tags: {sivt.get('givt_filtered')})")
+    ok = givt.get("givt_filtered") == givt.get("attempted") and sivt.get("sivt_filtered") == sivt.get("attempted")
+    return (ok, "every GIVT click should carry a givt_* tag and every SIVT click a sivt_* tag only")
+
+
+def canary(board, results, attacks):
+    seen = [attacks[k].get("canary") for k in ("crawler", "trap_aware") if attacks.get(k)]
+    return (all(seen), "the scraper's HTML should carry its per-session canary")
+
+
+ATTACKS = {
+    "stuffer": "attacks/round1_stuffer.py",
+    "scalper": "attacks/round2_scalper.py",
+    "skip_view": "attacks/round2_scalper.py --skip-view",
+    "patient": "attacks/round2_scalper.py --patient",
+    "crawler": "attacks/round3_scraper.py",
+    "trap_aware": "attacks/round3_scraper.py --skip-hidden",
+    "farm": "attacks/round4_account_farm.py",
+    "clean_emails": "attacks/round4_account_farm.py --clean-emails",
+    "givt": "attacks/round5_click_fraud.py",
+    "sivt": "attacks/round5_click_fraud.py --sivt",
 }
-# round -> max bot "successes" that still counts as stopped
-BOT_CEILING = {1: 0, 2: 4, 3: 30, 4: 0, 5: 0}
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
+def make_round(level, description, scenario, attacks, solutions, checks, **kw):
+    return Round(level=level, description=description, scenario=scenario, attacks={n: ATTACKS[n] for n in attacks},
+                 solutions=("defenses/ladder.py", *solutions), extra_checks=[*checks, gate_cost], **kw)
 
 
-def manage_solution(module, catch_up):
-    """--catch-up installs the reference solutions for every round up to this module's round
-    (your files are kept as .bak). Without it the checkpoint tests whatever is in defenses/;
-    --restore puts your .bak files back."""
-    if not catch_up:
-        return
-    upto = next(r for r, spec in ROUNDS.items() if spec[0] == module)
-    for f in labnet.catch_up(LAB_DIR, upto):
-        print(f"[catch-up] installed solutions -> {f}   (your version kept as {f}.bak)")
-
-
-def reset(base):
-    requests.post(f"{base}/lab/reset", timeout=5)
-
-
-def decisions(base, round_, actors):
-    rows = requests.get(f"{base}/lab/decisions?round={round_}", timeout=5).json()
-    return [r for r in rows if r["actor"] in actors]
-
-
-def tally(rows):
-    t = {}
-    for r in rows:
-        t[r["outcome"]] = t.get(r["outcome"], 0) + 1
-    return t
-
-
-def run(round_, catch_up=False, base=BASE_URL):
-    require_local(base)
-    try:
-        requests.get(f"{base}/whoami", timeout=3)
-    except Exception:
-        raise SystemExit(f"Demo store not reachable at {base}. Start it: python demo_site/app.py")
-
-    module, attack_mod, kwargs, label, bot_eps = ROUNDS[round_]
-    manage_solution(module, catch_up)
-
-    # Humans first, on a clean store.
-    reset(base)
-    human_tally = legit_traffic.run_humans(round_, base)
-
-    # Then the attacker, on a clean store.
-    reset(base)
-    attack = importlib.import_module(attack_mod)
-    importlib.reload(attack)
-    attack.run(base=base, **kwargs)
-    bot_rows = decisions(base, round_, {"bot", "bot2"})
-    bot_tally = tally([r for r in bot_rows if r["endpoint"] in bot_eps])
-    bot_success = bot_tally.get("allow", 0)
-
-    human_blocked = human_tally.get("block", 0)
-    passed = bot_success <= BOT_CEILING[round_] and human_blocked == 0
-
-    print(f"\n=== Round {round_} checkpoint ===")
-    print(f"  bots:   {label} = {bot_success}   (ceiling {BOT_CEILING[round_]})   {bot_tally}")
-    print(f"  humans: {human_tally}   (blocked legitimate customers = {human_blocked})")
-    print(f"  verdict: {'PASS' if passed else 'FAIL'}")
-    if not passed:
-        if bot_success > BOT_CEILING[round_]:
-            print(f"    - attack not stopped: wire the Round {round_} signature in defenses/{module}.py")
-        if human_blocked:
-            print(f"    - {human_blocked} real customers blocked: your rule is too broad (false positives)")
-    return passed
-
+ROUNDS = {
+    1: make_round(1, "breached-password step-up: a right-but-leaked password earns a code", "ch6_login", ["stuffer"],
+                  ("defenses/breached_passwords.py",),
+                  [attackers(stuffer=(0, 0)), people(stepped_up=(2, 2))]),
+    2: make_round(2, "funnel integrity and one unit per device", "ch6_drop", ["scalper", "skip_view", "patient"],
+                  ("defenses/scalping_funnel.py",),
+                  [attackers(scalper=(0, 0), skip_view=(0, 0), patient=(0, DEVICES)), scalper_totals, people(bought=40)],
+                  metric="purchases", bot_success_max=0.1),
+    3: make_round(3, "honeypot SKUs and catalogue coverage", "ch6_browse", ["crawler", "trap_aware"],
+                  ("defenses/scrape_defense.py",),
+                  [attackers(crawler=(0, 0), trap_aware=(COVERAGE_CAP - 5, COVERAGE_CAP - 5)), people(), canary]),
+    4: make_round(4, "disposable domains, egress velocity and device clusters", "ch6_signup", ["farm", "clean_emails"],
+                  ("defenses/account_cluster.py",),
+                  [attackers(farm=(0, 0), clean_emails=(IP_CAP, IP_CAP)), people(stepped_up=(3, 3))]),
+    5: make_round(5, "GIVT hard filters and the SIVT engagement funnel", "ch6_ads", ["givt", "sivt"],
+                  ("defenses/ivt_scoring.py",),
+                  [attackers(givt=(0, 0), sivt=(0, 0)), people(), tiers]),
+}
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, choices=[1, 2, 3, 4, 5], required="--restore" not in sys.argv)
-    ap.add_argument("--catch-up", action="store_true")
-    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    ap.add_argument("--url", default=BASE_URL)
-    a = ap.parse_args()
-    if a.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        sys.exit(0)
-    ok = run(a.round, catch_up=a.catch_up, base=a.url)
-    sys.exit(0 if ok else 1)
+    main(ROUNDS)

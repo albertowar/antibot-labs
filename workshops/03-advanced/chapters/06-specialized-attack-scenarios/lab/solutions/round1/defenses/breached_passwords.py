@@ -1,25 +1,37 @@
-"""Round 1 defense (REFERENCE SOLUTION) — breached-credential gate at login.
+"""
+breached_passwords (Round 1, reference): a correct password that is in a breach corpus is not proof of the owner.
 
-Economic chokepoint: the stuffer only has *breached* passwords to try. So gate on
-that fact. A login whose password is correct AND in the breach corpus does not get
-a bare session: it is sent to a forced reset / step-up (CHALLENGE). Every stuffing
-hit uses a breached password, so every hit converts to friction instead of a
-takeover — without the defender ever needing to know the attempt was a bot.
+The economics. A combo list IS a breach dump, so every credential a stuffer can use successfully
+is, by construction, a password that has already leaked. Gate on that fact and every stuffing hit
+turns into friction instead of a takeover, without the defender ever deciding "this was a bot".
 
-False positive, named honestly: a real user who reused a breached password gets the
-same one-time reset prompt. That is a cost. It is small and self-correcting (they
-reset once), but it is real, and it is why this belongs at login step-up and at
-password-set time, not as a silent block.
+Where it runs. After the password is verified, never before: telling a client "that password is
+breached" on a WRONG guess would be an enumeration oracle. The check runs in `action:login_result`
+(demo_site/ext/step_up.py); asking for the `otp` challenge takes the session back and emails a code.
+
+Who it hurts. Every real customer whose real password is in the corpus: two of the 40 shoppers here.
+They enter the code and get in. In production, screen at password-set time too (NIST SP 800-63B-4
+requires comparing new passwords against compromised values) so the prompt disappears as users rotate.
+
+What it misses. Credentials that never leaked (an infostealer's output), and a corpus that is older
+than the attacker's newest leak. Measure the prompt rate before you turn it on.
 """
 
-from __future__ import annotations
+from . import breachcorpus
+from .pipeline import Check, Signal, Verdict
 
-from store import allow, challenge, Decision, INVALID
+POINTS = 50      # the challenge band (40 to 74): a step-up, not a block
 
 
-def evaluate(ctx) -> Decision:
-    if not ctx["valid_creds"]:
-        return Decision(INVALID, 0.0, "bad credentials")
-    if ctx["breach"].is_breached(ctx["password"]):
-        return challenge("breached password -> forced reset", score=100.0)
-    return allow("clean password")
+def _check(ctx):
+    login = ctx.attrs.get("login")
+    if not login or not login["ok"]:
+        return None
+    seen = breachcorpus.pwned_count(login["password"])
+    if not seen:
+        return None
+    return Verdict("challenge", challenge="otp",
+                   signals=(Signal("breached_password", "in_corpus", POINTS, f"password seen {seen}x in the corpus"),))
+
+
+CHECK = Check("breached_passwords", _check, phases=("action:login_result",))

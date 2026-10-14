@@ -1,36 +1,42 @@
-"""Round 1 defense (YOUR CODE) — breached-credential gate at login.
+"""
+breached_passwords (Round 1): a correct password that is in a breach corpus is not proof of the owner.
 
-The generic layers (per-IP rate limit, datacenter blocking) are already wired in
-the store. A distributed stuffer that rotates egress walks straight past them: see
-attacks/round1_stuffer.py. This module adds the signature a stuffer cannot hide.
+The economics. A combo list IS a breach dump, so every credential a stuffer can use successfully
+is, by construction, a password that has already leaked. Gate on that fact and every stuffing hit
+turns into friction instead of a takeover, without the defender ever deciding "this was a bot".
 
-The credential-stuffing economy runs on *breached* passwords. A combo list is a
-breach dump. So: a login whose password is correct but appears in the breach corpus
-must not hand out a bare session. Return CHALLENGE (a forced reset / step-up)
-instead of ALLOW. Use the k-anonymity checker already in ctx: ctx["breach"].
+Where it runs. After the password is verified, never before: telling a client "that password is
+breached" on a WRONG guess would be an enumeration oracle. The starter checks a request before the
+route runs, so demo_site/ext/step_up.py adds a second phase, `action:login_result`, with the
+outcome in ctx.attrs["login"] = {"ok", "email", "known", "password"}. If this check asks for a
+challenge, the ext takes the session back and the store emails a six-digit code (read it in
+/lab/mailbox/<email>); the session exists only after POST /api/challenge/verify.
 
-ctx keys you get:
-    valid_creds : bool  -- did email+password match a real account?
-    password    : str   -- the password the client submitted
-    breach      : BreachCorpus -- .is_breached(password) -> bool (k-anonymity)
+Who it hurts. Every real customer whose real password is in the corpus gets the same step. In this
+lab that is two of the 40 shoppers (users 020 and 021). They enter the code and get in: friction,
+not harm, and a prompt to rotate the password is what you would add next.
 
-Run `python tools/checkpoint.py --round 1 --catch-up` to drop in the reference
-solution if you get stuck.
+What it misses. Credentials that never leaked: an infostealer reads the password out of the
+victim's browser, so the corpus has never seen it (W2 Ch6).
+
+Helper (finished): breachcorpus.pwned_count(password) -> times seen in the corpus (0 = not there)
+Reference: solutions/round1/defenses/breached_passwords.py (or `checkpoint.py --round 1 --catch-up`)
 """
 
-from __future__ import annotations
+from . import breachcorpus
+from .pipeline import Check, Signal, Verdict
 
-from store import allow, Decision, INVALID
+POINTS = 50      # the challenge band (40 to 74): a step-up, not a block
 
 
-def evaluate(ctx) -> Decision:
-    if not ctx["valid_creds"]:
-        return Decision(INVALID, 0.0, "bad credentials")
+def _check(ctx):
+    login = ctx.attrs.get("login")       # {"ok": bool, "email": str, "known": bool, "password": str}
+    if not login or not login["ok"]:
+        return None
+    # TODO (Round 1): if login["password"] is in the corpus (breachcorpus.pwned_count), return
+    #   Verdict("challenge", challenge="otp", signals=(Signal("breached_password", "in_corpus", POINTS, <detail>),))
+    # Otherwise return None. Do not look at the password of a failed login.
+    return None
 
-    # TODO (Round 1): if the (correct) password is in the breach corpus, return a
-    # CHALLENGE (forced reset) instead of allowing the session. Until you do, every
-    # stuffing hit becomes a full account takeover.
-    #   if ctx["breach"].is_breached(ctx["password"]):
-    #       return challenge("breached password -> forced reset", score=100.0)
 
-    return allow("login ok (no breach check wired yet)")
+CHECK = Check("breached_passwords", _check, phases=("action:login_result",))

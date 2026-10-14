@@ -1,35 +1,45 @@
-"""Round 2 defense (REFERENCE SOLUTION) — funnel integrity for a limited drop.
+"""
+scalping_funnel (Round 2, reference): make the buy path behave like a human one, and cap units per device.
 
-Economic chokepoint: scarce inventory. The scalper's edge is speed and parallelism
-through the page->cart->checkout funnel, and buying many units. Its traffic looks
-like buying, so we do not try to "block a bot" — we make the funnel behave like a
-human one and cap units per identity.
+The economics. A scalper profits from scarce stock bought faster, and in greater quantity, than a
+person can. Its traffic looks like buying because it IS buying, so we do not try to "block a bot":
+we take the speed and the parallelism away and leave price and availability alone.
 
-Three signals, each a scalper tell that costs a real shopper nothing:
-  1. no prior product view in this session   -> checkout skipped the funnel (BLOCK)
-  2. view-to-checkout faster than a human     -> machine-speed funnel   (CHALLENGE)
-  3. this fingerprint already bought a pair    -> one-per-customer cap    (BLOCK)
+Three signals, each a scalper tell that costs a shopper nothing:
+  1. no prior view of the drop in this session -> the buy skipped the funnel   (block)
+  2. this device already tried to buy          -> one unit per device           (block)
+  3. view-to-buy under a person's click time   -> machine-speed funnel          (challenge)
 
-False positive, named honestly: a decisive human on a fast connection can clear the
-funnel quickly; the dwell gate is set below realistic human speed (1.2 s) and sends
-them to a CHALLENGE, not a block, so friction is the worst case. Shared-NAT or
-family devices can collide on a coarse fingerprint — bind the cap to the account
-too, not the fingerprint alone, before shipping.
+Order: the cheap, certain tests first. The cap counts attempts that passed test 1, in Redis, with a
+window, so a patient bot that waits out the floor still gets one unit per device cookie.
+
+Who it hurts. A decisive person on a fast connection can clear a 1-second floor; it sits below real
+human speed and is a challenge, not a block. Shared and family devices collide on one `did`: bind the
+cap to the account and the payment card too. `did` is attacker-chosen, so a bot with a fresh cookie
+per attempt walks past the cap; a fingerprint (W2 Ch4) or account age has to carry that.
 """
 
-from __future__ import annotations
+from .pipeline import Check, Signal
 
-from store import allow, block, challenge, Decision
+MIN_FUNNEL_SECONDS = 1.0
+PURCHASE_CAP = 1
+WINDOW_S = 900
 
-MIN_FUNNEL_SECONDS = 1.2   # view -> checkout faster than this is machine speed
-PURCHASE_CAP = 1           # pairs per fingerprint for this drop
+
+def _check(ctx):
+    drop = ctx.attrs.get("drop")
+    if not drop:
+        return None
+    if drop["view_age_s"] is None:
+        return [Signal("funnel", "no_view", 100, "buy with no view of the drop this session")]
+    key = f"lab:funnel:buy:{drop['sku']}:{drop['device']}"
+    tries = ctx.redis.incr(key)
+    ctx.redis.expire(key, WINDOW_S)
+    if tries > PURCHASE_CAP:
+        return [Signal("funnel", "device_cap", 100, f"device already tried {tries - 1}x")]
+    if drop["view_age_s"] < MIN_FUNNEL_SECONDS:
+        return [Signal("funnel", "machine_speed", 70, f"view to buy in {drop['view_age_s']:.2f}s < {MIN_FUNNEL_SECONDS}s")]
+    return None
 
 
-def evaluate(ctx) -> Decision:
-    if ctx["view_age_s"] is None:
-        return block("checkout with no product view this session", score=100.0)
-    if ctx["bought_by_fp"] >= PURCHASE_CAP:
-        return block(f"fingerprint already bought {ctx['bought_by_fp']}", score=100.0)
-    if ctx["view_age_s"] < MIN_FUNNEL_SECONDS:
-        return challenge(f"funnel in {ctx['view_age_s']:.2f}s < {MIN_FUNNEL_SECONDS}s", score=70.0)
-    return allow("human-paced single purchase")
+CHECK = Check("scalping_funnel", _check, phases=("action:drop_buy",))

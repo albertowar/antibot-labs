@@ -1,60 +1,64 @@
-"""Round 5 attack — click / ad fraud.
+"""
+Round 5 attack: click fraud against the ad tracker.
 
-The economy: drain an advertiser budget or inflate publisher payouts by faking ad
-clicks. The default flood is General Invalid Traffic (GIVT): datacenter egress, no
-referrer, no impression, junk User-Agent — identifiable by routine means. The
-``--sivt`` variant is Sophisticated Invalid Traffic: it fires an impression first
-and dresses as a residential browser with a referrer, but its engagement funnel is
-hollow — it clicks instantly and in volume, which no real reader does.
+The economy: drain an advertiser's budget, or inflate a publisher's payout, with clicks nobody meant.
+Two attackers, one per MRC tier:
 
-    python attacks/round5_click_fraud.py          # GIVT flood
-    python attacks/round5_click_fraud.py --sivt    # SIVT, humanized
+    python attacks/round5_click_fraud.py          # GIVT: a flood from hosting addresses, library User-Agent,
+                                                  # no Referer, no impression: identifiable by routine means
+    python attacks/round5_click_fraud.py --sivt   # SIVT: dressed as a residential browser with a Referer, fires
+                                                  # an impression first; its engagement funnel is hollow
+
+The SIVT run uses six browser profiles on residential-proxy addresses (a fleet no address feed lists) and
+clicks ten times per profile the instant the impression lands. It reports how many of its clicks the
+store filtered under a `givt_*` tag and how many under a `sivt_*` tag (the X-Lab-Signals header).
 """
 
-from __future__ import annotations
-
 import argparse
-import os
-import random
-import sys
 
-import requests
+from _common import LIB_HEADERS, LabClient, browser_headers, map_threads, report, world_pool
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import BASE_URL, DATACENTER, RESIDENTIAL, REAL_UA, headers, rand_ip, require_local
+PROFILES, CLICKS_EACH = 6, 10
 
 
-def run(clicks=60, sivt=False, base=BASE_URL):
-    require_local(base)
-    rng = random.Random(5)
-    tally = {"allow": 0, "block": 0}
-    actor = "bot2" if sivt else "bot"
-    for i in range(clicks):
-        if sivt:
-            ip = rand_ip(RESIDENTIAL, rng)
-            sess = f"sivt-{i}"
-            h = headers(actor, ip, session=sess, ua=REAL_UA,
-                        referer="https://news.example/article")
-            requests.post(f"{base}/track/impression", json={"campaign": "camp-1"},
-                          headers=h, timeout=5)                 # impression, then...
-            r = requests.post(f"{base}/track/click", json={"campaign": "camp-1"},
-                              headers=h, timeout=5)              # ...instant click, hollow funnel
-        else:
-            ip = rand_ip(DATACENTER, rng)
-            h = headers(actor, ip, session=f"givt-{i}", ua="bot/1.0", referer="")
-            r = requests.post(f"{base}/track/click", json={"campaign": "camp-1"},
-                              headers=h, timeout=5)
-        tally[r.json().get("outcome", "?")] = tally.get(r.json().get("outcome", "?"), 0) + 1
-    label = "SIVT (humanized)" if sivt else "GIVT (flood)"
-    print(f"[clickfraud] {clicks} clicks, {label} -> {tally}")
-    print(f"[clickfraud] fraudulent clicks counted as valid: {tally['allow']}")
-    return tally
+def run(clicks=60, sivt=False):
+    actor = "bot:sivt" if sivt else "bot:givt"
+    tally = {"counted": 0, "givt": 0, "sivt": 0}
+
+    def record(r):
+        if r.status_code == 200 and r.json().get("counted"):
+            tally["counted"] += 1
+            return
+        tags = r.headers.get("X-Lab-Signals", "")
+        tally["givt" if "givt_" in tags else "sivt" if "sivt_" in tags else "givt"] += 1
+
+    if sivt:
+        fleet = world_pool("residential_proxy_net")
+        headers = browser_headers("link", "https://news.example/article", accept_json=True)
+
+        def profile(k):
+            bot = LabClient(actor, pool=fleet)
+            bot.set_cookie("did", f"sivt-profile-{k}")
+            bot.post("/api/ads/impression", json={"campaign": "camp-1"}, headers=headers)       # an impression, then...
+            for _ in range(CLICKS_EACH):                                                         # ...instant clicks
+                record(bot.post("/api/ads/click", json={"campaign": "camp-1"}, headers=headers))
+        map_threads(profile, range(PROFILES))
+        clicks = PROFILES * CLICKS_EACH
+    else:
+        def click(i):
+            bot = LabClient(actor, pool=world_pool("cloud_vm"))
+            record(bot.post("/api/ads/click", json={"campaign": "camp-1"}, headers=LIB_HEADERS))
+        map_threads(click, range(clicks))
+    return {"attacker": actor, "attempted": clicks, "succeeded": tally["counted"], "clicks_counted": tally["counted"],
+            "givt_filtered": tally["givt"], "sivt_filtered": tally["sivt"], "sivt": sivt}
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--clicks", type=int, default=60)
     ap.add_argument("--sivt", action="store_true")
-    ap.add_argument("--url", default=BASE_URL)
     a = ap.parse_args()
-    run(clicks=a.clicks, sivt=a.sivt, base=a.url)
+    out = run(a.clicks, a.sivt)
+    print(f"[clickfraud:{'SIVT' if a.sivt else 'GIVT'}] {out['attempted']} clicks -> {out['clicks_counted']} billed, "
+          f"filtered as GIVT {out['givt_filtered']} / SIVT {out['sivt_filtered']}")
+    report(**out)
