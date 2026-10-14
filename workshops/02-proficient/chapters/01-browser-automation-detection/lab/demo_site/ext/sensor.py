@@ -104,6 +104,11 @@ def _redis():
     return current_app.extensions["lab_redis"]
 
 
+def _headers(rows):
+    """Headers in wire order, cookie values blanked: a profile keeps the Cookie slot, never a session."""
+    return [[k, re.sub(r"=[^;]*", "=REPLACED", v) if k.lower() == "cookie" else v] for k, v in rows]
+
+
 @bp.route("/capture")
 def capture_page():
     """Open in YOUR browser to save it as a real-user profile. A capture id ties the three requests together."""
@@ -128,9 +133,9 @@ def capture_save():
     if not nav or not fetch:
         return jsonify(error="reload /lab/capture first"), 400
     profile = {"name": f"captured-{name}", "description": "Captured from a real browser with /lab/capture",
-               "source": "captured", "captured": date.today().isoformat(),
-               "navigation_headers": json.loads(nav), "fetch_headers": json.loads(fetch),
-               "post_headers": [[k, v] for k, v in request.headers],
+               "source": f"captured with /lab/capture on {date.today().isoformat()}",
+               "navigation_headers": _headers(json.loads(nav)), "fetch_headers": _headers(json.loads(fetch)),
+               "post_headers": _headers(request.headers),
                "signals": data.get("signals"), "interaction": data.get("interaction")}
     os.makedirs(PROFILES_DIR, exist_ok=True)
     path = os.path.join(PROFILES_DIR, f"{profile['name']}.json")

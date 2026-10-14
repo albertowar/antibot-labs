@@ -1,7 +1,7 @@
 {
  "name": "chromium-153-linux",
- "description": "Chromium 153 on Linux, captured live with /capture (headed window, real GPU via WSLg). The pointer path before the click was scripted.",
- "source": "captured with /capture on 2026-10-10",
+ "description": "Chromium 153 on Linux, captured live with /lab/capture (headed window, real GPU via WSLg). The pointer path before the click was scripted.",
+ "source": "captured with /lab/capture on 2026-10-10",
  "navigation_headers": [
   [
    "Host",
