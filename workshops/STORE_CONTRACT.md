@@ -288,6 +288,12 @@ starter template) and chapter JS in `demo_site/static/js/<name>.js`. Ext modules
 
 Things that are easy to get wrong:
 
+- **An ext that writes SQL per request opens its own engine.** The app's Flask-SQLAlchemy
+  pool is sized for the routes (15 connections); an `on_response` or `on_action` handler that
+  borrows it makes every request hold two of its connections at once, and 16 server threads
+  then starve the pool — the store stalls for the 30 s pool timeout, not the disk. Create a
+  separate engine on the same `DATABASE_URL` (W4 Ch7's `defenses/rule_store.py` is the model;
+  on SQLite set WAL + `synchronous=NORMAL` so readers and the store's writer coexist).
 - **Enrichers run at every level.** Per-round behaviour belongs in a check (which only runs at its level).
   A check may fill `ctx.attrs` for a later step of the same request (`issue()` of a challenge, a route):
   the gate and the route share one `Ctx` per request.
