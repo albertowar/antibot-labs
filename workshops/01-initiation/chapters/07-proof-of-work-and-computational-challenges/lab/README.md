@@ -253,7 +253,7 @@ price the neighbours' browsing set. An Android phone at 22 bits needs about 16 s
 **Exercise (discussion):** follow the `Exercise (Round 4, discussion)` note in `pow_adaptive.py`'s `rate_key`, which keys the rate by /24 instead of by IP. Re-run the checkpoint.
 
 - What happens to `round4_distributed`? All its IPs sit in `203.0.113.0/24`.
-- What happens to everybody else in a /24? Chapter 3's IP reputation has the same trade-off.
+- What happens to everybody else in a /24? Chapter 2's `prefix_limit` and Chapter 3's IP reputation made the same trade.
 
 There is no reference file for this one: the Round 4 checkpoint expects the IP key, so with the /24 key it reports
 `FAIL: round4_distributed: unexpected difficulty [22]`. That is the expected result. `--catch-up` does not undo the edit;
@@ -268,8 +268,8 @@ put `return ip` back before Round 5.
   22 bits instead of 16. The desktops still finish in about a second, so nobody new gave up in this run, but a phone in
   that /24 would. `mobile_cgnat` and `private_relay` share 198.51.100.0/24; 2 of the 8 CGNAT phones gave up, as before.
 - **The lesson:** the bigger the key, the more strangers share a price. A /24 catches the farm and charges everyone
-  near it, which is the same trade-off as Chapter 3's reputation by prefix. The attacker's next move is addresses
-  spread across many /24s: residential proxies.
+  near it — the trade-off you measured in Chapter 2 (`prefix_limit`'s loose /24 and tight /64 buckets) and met again
+  in Chapter 3's reputation by prefix. The attacker's next move is addresses spread across many /24s: residential proxies.
 
 ---
 

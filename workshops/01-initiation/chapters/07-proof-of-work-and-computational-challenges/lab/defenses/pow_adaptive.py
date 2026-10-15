@@ -4,7 +4,8 @@ Chapter 7, Round 4 defense (L4): adaptive (risk-based) difficulty.
 A fixed difficulty forces one compromise for everybody: too low and bots barely notice,
 too high and phones suffer. Adaptive difficulty charges by risk. Here the risk signal is
 the simplest one there is: how many requests this client made in the last
-policy.POW_RATE_WINDOW_S seconds.
+policy.POW_RATE_WINDOW_S seconds — Chapter 2's sliding window, re-used to set a price
+instead of a limit.
 
     rate <= 10/min  -> 16 bits   (~65k hashes, a browsing human)
     rate <= 20/min  -> 20 bits   (16x the work)
@@ -19,7 +20,8 @@ ASN, country, headers) and maps weight ranges to difficulty; Tor onion services 
 a suggested effort that rises with the queue of pending introductions (Proposal 327).
 
 Trade-offs:
-  - The key decides who shares a price. Keyed by IP, every household behind a
+  - The key decides who shares a price: Chapter 2's keying question again (per address,
+    or per /24 / /64 as in its prefix_limit.py). Keyed by IP, every household behind a
     carrier-grade NAT (CGNAT) shares one rate, and their phones pay the 22-bit price
     for each other's browsing. That is the false positive Round 4 measures.
   - The attacker controls the key. More IPs (residential proxies, Chapter 3) and
@@ -35,7 +37,8 @@ def rate_key(ip):
     """Which requests share a rate counter.
 
     Exercise (Round 4, discussion): try keying by the /24 instead of the IP, with
-    `from defenses.store import prefix_of` and `return prefix_of(ip)`.
+    `from defenses.store import prefix_of` and `return prefix_of(ip)` — exactly how
+    Chapter 2's prefix_limit.py keys its counter.
     Re-run the checkpoint: what happens to round4_distributed, and to the shoppers?
     The model answer is in the README's Round 4 section. The checkpoint FAILs on purpose
     (it expects the IP key), and --catch-up does not undo the edit: put `return ip`
