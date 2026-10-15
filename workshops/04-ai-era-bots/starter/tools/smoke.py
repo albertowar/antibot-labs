@@ -80,17 +80,23 @@ def check_bucket():
 def run():
     admin("POST", "/lab/reset")
     check_bucket()
+    st = admin("GET", "/lab/status")
+    # Ungated paths carry no X-Lab-* headers; /robots.txt may be ungated by a crawler chapter
+    # (the policy file must not cost a token of the budget it governs), so it is never required.
+    unstamped = tuple(st.get("ungated", [])) + ("/robots.txt",)
     for path in GETS:
         r = requests.get(BASE_URL + path, timeout=30)
         check(r.status_code == 200, f"GET {path} -> {r.status_code}")
-        if not path.startswith(("/lab", "/whoami", "/health", "/static", "/img")):
+        if not path.startswith(unstamped):
             check("X-Lab-Verdict" in r.headers and "X-Lab-Score" in r.headers and "Server-Timing" in r.headers, f"{path}: missing X-Lab-* headers")
     for path, pats in DOM.items():
         html = requests.get(BASE_URL + path, timeout=30).text
         for pat in pats:
             check(re.search(pat, html), f"DOM contract: {path} lacks {pat}")
-    st = admin("GET", "/lab/status")
-    check(st["products"] == 122, f"seed: {st['products']} products, expected 122")
+    # Visible products are the seed's 120 catalogue items + 2 drops. Hidden rows (a chapter's
+    # honeypot SKUs) may exist on top, so the total is >=, the visible count exact.
+    check(st["visible_products"] == 122, f"seed: {st['visible_products']} visible products, expected 122")
+    check(st["products"] >= 122, f"seed: {st['products']} products, expected >= 122")
     check(st["users"] == 301, f"seed: {st['users']} users, expected 301")
     api = requests.get(BASE_URL + "/api/products", timeout=30).json()
     check(set(api) >= {"items", "page", "pages", "total"} and api["total"] == 120, "api list shape / 120 visible products")
@@ -130,7 +136,9 @@ def run():
     check(r.status_code == 401, "api login wrong password -> 401")
     r = shopper.get("/api/account")
     check(r.status_code == 200 and r.json()["email"] == "user031@example.test", "api account")
-    r = shopper.post("/api/reviews", json={"sku": "p003", "rating": 4, "title": "ok", "body": "fine"})
+    r = shopper.post("/api/reviews", json={"sku": "p003", "rating": 4, "title": "Solid on the trail",
+                                           "body": "Took these on a weekend loop in light rain. Grippy, dried fast, "
+                                                   "no hotspots at mile ten. Would buy again."})
     check(r.status_code == 201, f"api review -> {r.status_code}")
     r = shopper.post("/api/telemetry", json={"kind": "smoke", "x": 1})
     check(r.status_code == 200 and r.json()["kind"] == "smoke", "telemetry sink")

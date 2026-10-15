@@ -59,6 +59,10 @@ def main():
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--markdown", action="store_true")
     args = ap.parse_args()
+    if args.smoke:
+        # The contract test sees the bare store: the gate runs an empty ladder at every level,
+        # so a lab with a permanent baseline at LADDER[0] still passes (contract 1.7).
+        os.environ["LAB_SMOKE"] = "1"
     app, srv = start_store(args.level if args.level is not None else (args.round or 0))
     print(f"[verify] store on {BASE}")
     try:
@@ -72,7 +76,7 @@ def main():
         rounds = sorted(checkpoint.ROUNDS) if args.all else [args.round or 0]
         if args.catch_up:
             checkpoint_core.catch_up(checkpoint.ROUNDS, max(rounds))
-        outs = [checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True, args.level) for n in rounds]
+        outs = [checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True, args.level, args.catch_up) for n in rounds]
         return 0 if all(o["ok"] for o in outs) else 1
     finally:
         srv.shutdown()

@@ -9,10 +9,13 @@ store is the one process talking to it. Production uses the real thing.
 """
 
 import ipaddress
+import math
 import os
+import threading
 import time
 
 _client = None
+_py_bucket_lock = threading.Lock()
 
 TOKEN_BUCKET_LUA = """
 local key      = KEYS[1]
@@ -49,13 +52,40 @@ def get_redis(url=None):
 
 
 def token_bucket(redis, bucket, key, limits=None):
-    """Take one token from `bucket` for `key`. Atomic in Lua. True if allowed."""
+    """Take one token from `bucket` for `key`. True if allowed.
+
+    On real Redis this is the Lua script above: one atomic round trip. On the in-process
+    fakeredis a Lua call serializes every thread for the whole (slow) script interpretation
+    — about 10 ms per call under a 16-thread attack, which buries the cost of the checks a
+    lab actually teaches — so `memory://` runs the same algorithm in Python under one
+    process-wide lock instead (about 0.4 ms; contract 1.7)."""
     from . import policy
     capacity, refill = (limits or policy.RATE_LIMITS)[bucket]
+    k = f"lab:rl:{bucket}:{key}"
+    if type(redis).__module__.startswith("fakeredis"):
+        return _token_bucket_py(redis, k, capacity, refill)
     script = _scripts.get(id(redis))
     if script is None:
         script = _scripts[id(redis)] = redis.register_script(TOKEN_BUCKET_LUA)
-    return bool(script(keys=[f"lab:rl:{bucket}:{key}"], args=[capacity, refill, time.time()]))
+    return bool(script(keys=[k], args=[capacity, refill, time.time()]))
+
+
+def _token_bucket_py(redis, k, capacity, refill):
+    """TOKEN_BUCKET_LUA, line for line, under a process lock (fakeredis is in-process only)."""
+    with _py_bucket_lock:
+        now = time.time()
+        state = redis.hmget(k, "tokens", "ts")
+        tokens = float(state[0]) if state[0] is not None else float(capacity)
+        ts = float(state[1]) if state[1] is not None else now
+        tokens = min(float(capacity), tokens + (now - ts) * refill)
+        allowed = tokens >= 1
+        if allowed:
+            tokens -= 1
+        p = redis.pipeline()
+        p.hset(k, mapping={"tokens": tokens, "ts": now})
+        p.expire(k, math.ceil(capacity / refill) + 1)
+        p.execute()
+        return allowed
 
 
 def prefix_of(ip):

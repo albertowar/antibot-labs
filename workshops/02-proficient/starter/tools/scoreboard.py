@@ -14,7 +14,7 @@ from labclient import scoreboard
 def rows(board):
     out = []
     for a in board["actors"]:
-        if a["kind"] not in ("human", "bot"):
+        if a["kind"] not in ("human", "bot", "legit"):
             continue
         out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
                     "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
@@ -33,7 +33,8 @@ def render(board, markdown=False):
         lines.append("")
         lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
                      f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
-                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+                     + (f"legit automation hurt: **{s['legit_hurt']}/{s['legit']}** ({s['legit_requests_stopped']}/{s['legit_requests']} requests stopped) · " if "legit" in s else "")
+                     + f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
     else:
         lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
         for r in rows(board):
@@ -41,7 +42,8 @@ def render(board, markdown=False):
         lines.append("")
         lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
                      f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
-                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+                     + (f"legit automation hurt {s['legit_hurt']}/{s['legit']}   " if "legit" in s else "")
+                     + f"purchases {s['purchases']}   drop stock {s['drops']}")
     return "\n".join(lines)
 
 

@@ -156,9 +156,11 @@ def login():
         user.last_login_at = utcnow()
         db.session.commit()
         g.ctx.note(login="ok")
-        return jsonify(ok=True, user=user.to_dict())
-    g.ctx.note(login="fail", login_reason="unknown_user" if user is None else "wrong_password")
-    return api_error("invalid_credentials", "Wrong email or password.", 401)
+        return after_action("login", jsonify(ok=True, user=user.to_dict()), user=user, ok=True)
+    reason = "unknown_user" if user is None else "wrong_password"
+    g.ctx.note(login="fail", login_reason=reason)
+    return after_action("login", api_error("invalid_credentials", "Wrong email or password.", 401),
+                        user=user, ok=False, reason=reason)
 
 
 @bp.route("/register", methods=["POST"])
@@ -177,7 +179,7 @@ def register():
     db.session.add(u)
     db.session.commit()
     g.ctx.session.set("uid", u.id)
-    return jsonify(ok=True, user=u.to_dict()), 201
+    return after_action("register", (jsonify(ok=True, user=u.to_dict()), 201), user=u)
 
 
 @bp.route("/logout", methods=["POST"])

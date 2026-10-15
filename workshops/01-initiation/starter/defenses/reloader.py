@@ -4,6 +4,10 @@ No restarts between rounds, which is what makes `checkpoint.py --catch-up` seaml
 
 Reload order: changed check modules first, then ladder.py (which imports them),
 so LADDER holds the fresh Check objects.
+
+Only top-level defenses/*.py files are watched: a subpackage (defenses/foo/bar.py)
+never hot-reloads, deliberately, because a package's import order under reload is
+ambiguous. Keep checks flat.
 """
 
 import importlib

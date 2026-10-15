@@ -6,7 +6,7 @@ and the hook points a chapter uses to add a defense or a feature. The Demo Store
 (`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
-Contract version: **1.6** (recorded in each starter's `STARTER.json`). Changing anything under
+Contract version: **1.7** (recorded in each starter's `STARTER.json`). Changing anything under
 "Canonical surface" is a contract bump: rebuild the starters (`scripts/build_starter.py`) and rerun
 `tools/smoke.py` in every lab.
 
@@ -19,6 +19,7 @@ Contract version: **1.6** (recorded in each starter's `STARTER.json`). Changing 
 | 1.4 | two fixes: the baseline pins `fakeredis[lua]` so `ctx.bucket` (a Lua script) works on `REDIS_URL=memory://` instead of raising into a silent `<check>:error` allow, and `smoke.py` exercises it once; `LabClient.verdict()` returns the `X-Lab-Verdict`/`X-Lab-Score`/`X-Lab-Signals` of a blocked (4xx) response instead of `None` (the old guard treated a falsy `requests.Response` as "no response") |
 | 1.5 | additive, for W1 Ch8 (and the W4 crawl-policy chapters): `/robots.txt` is extensible — an ext registers `hooks.robots(provider)` (a callable returning extra lines, called per request so lines may vary with the level) and `routes/seo.py` appends them to the base policy; the base body is byte-identical when nothing registers |
 | 1.6 | additive, for the W4 chapters: (a) `hooks.on_action(name, fn)` now actually fires — the `review`, `checkout` and `drop_buy` routes (HTML and JSON) call it after a successful write with the row (`review=`/`order=`), and the handler may hold it (`status="pending"`), attribute it, or return a replacement response (e.g. a 202); nothing registered leaves the default behaviour byte-identical. (b) `hooks.on_reset(fn)` runs after `POST /lab/reset` so an ext can drop or reseed its own tables and keys. (c) the scoreboard gives a chapter-specific `outcome` (an ext setting `g.outcome`, e.g. `paywalled`/`charged`/`held`) its own column instead of folding it into `other` |
+| 1.7 | the gaps the 29 lab migrations recorded (the old `TODO.md` §1.2). **Behaviour changes:** (a) `X-Lab-Verdict` and the log's `action` report the most severe decision of the request (allow < monitor < challenge < rate_limit < deceive < block, score as the tie-break), so a zero-score 429 no longer reads `allow`; checkpoints that want the HTTP result keep reading `outcome`. (b) `/api/challenge` and `/api/challenge/verify` are exempt from the challenge band (block and rate_limit still apply): a client whose every request scores into the band can now actually solve. (c) a soft `Verdict` with a score and no signals carries its points as one synthesized signal instead of summing to 0 and deciding `allow`. (d) a `deceive` verdict is honoured on login (byte-identical wrong-password 401, password never checked), register, review and newsletter (`routes/deceive.py`, called from `guard()`); checkout and drop keep their fakes in the route. (e) `robots.txt` drops its leading `Allow: /` (allow is the RFC 9309 default), so first-match parsers honour later `Disallow` lines, a chapter's bait entries included. (f) `tools/smoke.py` asserts 122 *visible* products (`/lab/status` `visible_products`), so hidden honeypot rows may sit in the catalogue; it requires no `X-Lab-*` headers on `/robots.txt` or ungated paths; and `tools/verify.py --smoke` sets `LAB_SMOKE=1` (the gate runs an empty ladder at every level), so a lab baseline at `LADDER[0]` passes smoke. (g) on `memory://` the token bucket runs in Python under one process lock (fakeredis serialized every thread for the whole Lua interpretation, ~10 ms per call under a 16-thread attack; real Redis keeps Lua). **Additive:** `hooks.ungate(prefix, session=True)` (Ctx, session cookie, enrichers and a log row, but no ladder); `hooks.on_response(fn)` (every response, gated or not, timed as gate cost); `hooks.stopped_outcome(*names)`; `on_action` also fires for `register` (after the account) and `login` (every attempt, `result={"user", "ok", "reason"}`); `Ctx.route/view_args/query_string/scheme`, `ctx.resumed`, `ctx.cleared(type)`, public `gate.spend_clearance`; `policy.decide` may declare `ctx=`; a challenge interstitial that interrupted a form POST carries the form in a hidden `#challenge-replay` resubmit (and `window.labReplay()`); held orders — the scoreboard counts only `status="paid"` orders as purchases, and `demo_site/orders.py cancel_order(order)` returns stock; a `legit:` actor kind (welcome automation) with its own scoreboard columns, added only when such actors exist; `Round.setup(level, caught_up)/teardown(level)/people/threads` and `scenario=None`; `population.POST_HOOKS`; `labclient.browser_context(..., ja4=, user_agent=, headers=, headers_fn=)`; `defenses/netinfo.py` (network type from the feeds) joins the skeleton |
 
 ## 1. The store
 
@@ -52,7 +53,8 @@ state: each workshop runs on its own, and a chapter that needs an earlier contro
 header rules, say) adds it in its own lab. A baseline that ever grows is listed in its starter's README,
 with why each control is there.
 
-Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.5). Adds: …`.
+Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract X.Y). Adds: …`, where
+X.Y is the contract version the lab was built (or last re-based) against.
 
 ## 3. Canonical surface
 
@@ -76,6 +78,8 @@ Every lab README starts with: `Starts from: workshops/<NN>/starter/ (contract 1.
 | `/img/<sku>.svg?w=` | product image (generated, cacheable) | asset fetch patterns |
 
 HTML forms carry a hidden `csrf` field (session-bound). Every form works with JavaScript disabled.
+Mind `/feed.xml` in a crawl-economics chapter: it hands any crawler the 20 newest records (name, blurb,
+link) for free, so a lab that prices or gates the catalogue must include it in its paid or governed paths.
 
 ### 3.2 JSON API (`/api/*`)
 
@@ -121,8 +125,11 @@ travels only via `X-Lab-Actor` (moved to `environ["lab.actor"]`, unreadable by a
 `X-Lab-Verdict` (`allow|monitor|challenge|block|rate_limit|deceive`), `X-Lab-Score` (0-100),
 `X-Lab-Signals` (`layer:name,…`), `X-Lab-Level`, `X-Lab-Shadow` (signals from shadow checks, when any),
 `Server-Timing: gate;dur=…, app;dur=…, <check>;dur=…`. `gate` is the defender cost only (building the
-`Ctx`, enrichers, every ladder pass of the request); `app` is the whole request including the route;
-one entry per check that ran. The decision log's `ms` is the `gate` figure; `extra.total_ms` is `app`.
+`Ctx`, enrichers, every ladder pass of the request, `on_response` hooks); `app` is the whole request
+including the route; one entry per check that ran. The decision log's `ms` is the `gate` figure;
+`extra.total_ms` is `app`. When a request ran several ladder phases, the verdict and score reported are
+the request's **most severe** decision (allow < monitor < challenge < rate_limit < deceive < block;
+score breaks ties), not its highest-scoring one; `outcome` says what the client actually got.
 
 ### 3.5 Environment
 
@@ -137,6 +144,7 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
 | `LAB_SHADOW` | 0 | 1 runs above-level checks in shadow (logged, never enforced) |
 | `LAB_SHADOW_CHECKS` | | checks forced to shadow regardless of level (W4 crawler labs) |
 | `LAB_RELOAD` | 1 | reload `defenses/*.py` on change (no restarts between rounds) |
+| `LAB_SMOKE` | 0 | 1: the gate runs an empty ladder at every level — the contract test's view of the bare store (`verify.py --smoke` sets it; set it yourself when running `tools/smoke.py` against a hand-started store whose lab wires `LADDER[0]`) |
 | `DROP_STOCK` | 50 | units per drop at seed and reset (W1 Ch9 uses 20) |
 | `LAB_HASH_ITERS` | 5000 | PBKDF2 iterations (lab speed) |
 | `DEMO_URL` | `http://127.0.0.1:5000` | client side; `labnet.py` (via `tools/labclient.py`) refuses non-local hosts |
@@ -150,7 +158,14 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
   before the app runs; only the decision logger and the order record read it. `tools/smoke.py` fails
   any defense or ext that reads it.
 - `X-Lab-JA4` is kept as a *claimed* fingerprint (`ctx.edge.ja4_source == "claimed"`) until a TLS edge
-  (W2 Ch5) sets a measured one. Every other `X-Lab-*` request header is dropped.
+  (W2 Ch5) sets a measured one. Every other `X-Lab-*` request header is dropped — the prefix is
+  **reserved for the edge**, so a chapter's own request header (a login token, a lab calendar stamp)
+  must use another name or the edge eats it.
+- A TLS edge reports a measurement through two WSGI environ keys the gate reads:
+  `environ["lab.ja4_measured"]` (sets `ctx.edge.ja4` with `ja4_source == "measured"`, outranking any
+  claim) and `environ["lab.h2"]` (the HTTP/2 fingerprint, `ctx.edge.h2`). Nothing in the starter sets
+  them; W2 Ch5's `ext/tls_edge.py` middleware fills them from fingerproxy's headers (and strips the
+  headers), and any lab that wants a measured JA4 reuses that shim.
 - Client-supplied `X-Forwarded-For` is removed from the headers and never trusted by the edge. Like a CDN,
   the edge appends the peer and keeps the chain aside as `ctx.edge.xff_claimed` (`"<client value>, <ip>"`,
   or just `<ip>`): everything left of the last entry is attacker-controlled. Only W1 Ch3 reads it, to
@@ -162,7 +177,9 @@ one entry per check that ran. The decision log's `ms` is the `gate` figure; `ext
   CGNAT, corporate, university, privacy relay (.0-.95), `cloud_gcp`, `free_proxy`, `bulletproof_host`
   (.96-.223); `203.0.113.0/24` datacenter, hosting, VPN, Tor, open proxies (full); one `2001:db8:<x>::/48`
   (or /64) per pool that needs a large fleet. Add a pool to `world.json` (and rebuild feeds) rather than
-  inventing addresses in a script.
+  inventing addresses in a script. One consequence to design around: every home-broadband user lives in
+  the same `192.0.2.0/24`, so a per-/24 cohort or reputation count is meaningless for them — count exact
+  addresses (as W2 Ch7's features do, with a comment saying why).
 - Pool keys beyond `cidr`/`hosts`/`asn`/`org`/`type`/`country`/`tz`: `spread: 64` enumerates one host per
   /64; `listed: 0.75` puts only the first 75 % of the hosts on a per-address feed (Tor, open proxies);
   `feeds: {"hosting_asns": false}` overrides the feeds a type lands in (the gaps of free feeds). Top-level
@@ -221,13 +238,22 @@ CHECK = Check("headers", _check, phases=("request",))   # or ("action:checkout",
 
 Wire it in `defenses/ladder.py`: `LADDER = {0: [], 1: [headers.CHECK], 2: [ip_reputation.CHECK]}`. Round N
 lives in `LADDER[N]`; `tools/checkpoint.py --round N` sets the level with `POST /lab/level`. Points sum to
-a 0-100 score; `policy.decide()` maps it to a band (`monitor` 20, `challenge` 40, `block` 75). A hard
-`Verdict` (`rate_limit`, `block`, `deceive`) stops the gate. `challenge` with no registered type is
-enforced as a block, so the cost of an unavailable challenge is visible. Tune numbers in `policy.py`.
+a 0-100 score; `policy.decide()` maps it to a band (`monitor` 20, `challenge` 40, `block` 75); an override
+that declares `ctx=` (or `**kwargs`) also receives the request's `Ctx`. A hard `Verdict` (`rate_limit`,
+`block`, `deceive`) stops the gate. A soft `Verdict` with a bare score carries its points as one
+synthesized signal, so `Verdict("challenge", 40, challenge="pow")` reaches the band. `challenge` with no
+registered type is enforced as a block, so the cost of an unavailable challenge is visible. Tune numbers
+in `policy.py`. A capstone that re-points a finished check at another surface rebinds it with
+`dataclasses.replace(check, phases=("action:drop_buy",))` rather than editing the module.
 
 `Ctx` offers: `method, path, args, form, json, cookies, headers` (ordered), `ua` (parsed), `edge`,
-`session`, `user`, `redis`, `attrs` (from enrichers), `ctx.header(name)`, `ctx.telemetry(kind)`,
-`ctx.bucket(name, key)`, `ctx.note(**extra)` (into the log). There is no actor field.
+`session`, `user`, `redis`, `route` (the matched endpoint), `view_args`, `query_string` (raw, for
+signature bases), `scheme`, `attrs` (from enrichers), `resumed` (a valid clearance existed when the Ctx
+was built: the request is likely the retry after a solve, so per-attempt counters skip it),
+`ctx.cleared(type=None)`, `ctx.header(name)`, `ctx.telemetry(kind)`, `ctx.bucket(name, key)`,
+`ctx.note(**extra)` (into the log). There is no actor field. `ctx.bucket` is burst **plus** refill: a
+`(30, 0.5)` bucket allows 30 up front and another one every 2 s while an attack runs, so "30 a minute"
+is not 30 in any one minute — size checkpoint assertions accordingly.
 
 ### 4.2 A feature (`demo_site/ext/<name>.py`)
 
@@ -242,12 +268,20 @@ def init(app):
     hooks.telemetry.register("pow_bench", _bench)       #   product:aside, challenge
     hooks.enricher(_tag_difficulty)                     # fn(ctx): fill ctx.attrs before the checks
     hooks.ungate("/lab/pow/")                           # paths the gate must skip
+    hooks.ungate("/lab/fp/", session=True)              # skip the ladder but keep Ctx, cookie and log row
     hooks.robots(lambda: ["Disallow: /lab/pow/"])       # extra robots.txt lines (called per request)
     hooks.on_action("review", _hold)                    # fn(ctx, result, response) after a review/checkout/
-                                                        #   drop_buy write; hold/attribute/swap the outcome
+                                                        #   drop_buy/register write, or any login attempt
+    hooks.on_response(_observe)                         # fn(info) on every response, gated or ungated
     hooks.on_reset(_reseed)                             # fn(app) after POST /lab/reset: clear your tables
+    hooks.stopped_outcome("paywalled")                  # count an ext outcome as a scoreboard stop
     app.register_blueprint(Blueprint("pow", __name__, url_prefix="/lab/pow"))
 ```
+
+`init(app)` is also the ext's lifecycle hook: start a background worker there (keep its state under
+`lab:…` keys so `POST /lab/reset` clears it, or register `on_reset`), and start a side service (a mock
+provider, a TLS edge) there on a thread bound to a free loopback port — or lazily from the attack
+callables that need it, as W2 Ch5 does; `tools/verify.py` itself starts nothing but the store.
 
 Chapter templates go in `demo_site/ext/templates/<name>/` (searched first, so a chapter may override a
 starter template) and chapter JS in `demo_site/static/js/<name>.js`. Ext modules load in name order.
@@ -266,8 +300,14 @@ Things that are easy to get wrong:
 ### 4.3 Challenges
 
 `GET /api/challenge?type=<name>` issues, `POST /api/challenge/verify {"type", "answer"}` verifies and
-grants a clearance. HTML clients get the type's `render` template (or `templates/challenge.html`) with a
-403; JSON clients get `{"error": {"code": "challenge_required", "challenge", "payload"}}`.
+grants a clearance. The two endpoints are exempt from the challenge **band** (a block or rate limit
+still applies): a client whose every request scores into the band must still be able to fetch the
+puzzle and deliver the answer. HTML clients get the type's `render` template (or
+`templates/challenge.html`) with a 403; JSON clients get
+`{"error": {"code": "challenge_required", "challenge", "payload"}}`. When the challenge interrupted a
+form POST, the interstitial carries the submitted fields in a hidden `#challenge-replay` form (fresh
+csrf, no JavaScript needed; a solver calls `window.labReplay()`), so the customer does not lose the
+form — the fields, password included, are echoed only to the client that sent them.
 `policy.DEFAULT_CHALLENGE` names the type served when a check does not.
 
 ```python
@@ -282,7 +322,10 @@ def verify(ctx, answer):                         # bool, or (bool, reason)
 for, the gate serves the request (as `monitor`) instead of challenging again, and spends one use. A
 check that decides a pass is stolen, shared or over budget must call `gate.revoke_clearance(ctx, type)`
 before returning its challenge verdict, or the verdict is absorbed. `gate.grant_clearance(ctx, type,
-ttl=None, uses=None)` and `gate.clearance_valid(ctx, type)` are the other two calls.
+ttl=None, uses=None)`, `gate.clearance_valid(ctx, type)` and `gate.spend_clearance(ctx, type)` are the
+other calls; a policy that wants to allow after a solve without a `challenge` verdict spends the
+clearance itself. A check never reads the `lab:s:<sid>:clear:*` keys directly — `ctx.resumed` and
+`ctx.cleared(type)` are the supported views.
 
 ### 4.4 Decision log and scoreboard
 
@@ -290,15 +333,24 @@ One `Decision` row per gated request: `ts, sid, user_id, actor, phase, method, p
 action, enforced, outcome, status, signals, shadow, ms, extra`. `outcome` is what the client experienced:
 `served | purchased | blocked | challenged | rate_limited | deceived | not_found | error`, or a
 chapter-specific label an ext sets on `g.outcome` (e.g. `paywalled`, `charged`, `held`), which the
-scoreboard reports in its own column rather than folding into `other`. The scoreboard
-groups actors by `kind:persona` and reports bots stopped next to shoppers hurt, purchases by kind and
-drop stock. Chapter-specific fields go in `extra` via `ctx.note()`.
+scoreboard reports in its own column rather than folding into `other`; `hooks.stopped_outcome(*names)`
+makes such a label count in the `stopped` column and the hurt rule. The scoreboard groups actors by
+`kind:persona` — the kinds are `human:`, `bot:` and `legit:` (welcome automation: verified crawlers,
+uptime monitors, link unfurlers, whose stops are false positives, not bots stopped; its summary columns
+`legit`, `legit_hurt`, `legit_requests`, `legit_requests_stopped` appear only when such actors exist) —
+and reports bots stopped next to shoppers hurt, purchases by kind and drop stock. Chapter-specific
+fields go in `extra` via `ctx.note()`.
 
-A write route (`review`, `checkout`, `drop_buy`, HTML and JSON) fires `hooks.on_action(name, fn)` after
-it commits, with the written row in `result` (`{"review": …}` or `{"order": …}`); `fn(ctx, result,
-response)` may hold it (`review.status`/`order.status = "pending"`), attribute it, or return a
-replacement response (a 202, a moderation notice). `hooks.on_reset(fn)` runs after `POST /lab/reset`
-clears the core store, so an ext reseeds or drops the tables and Redis keys it owns.
+A write route (`review`, `checkout`, `drop_buy`, `register`, HTML and JSON) fires
+`hooks.on_action(name, fn)` after it commits, with the written row in `result` (`{"review": …}`,
+`{"order": …}`, `{"user": …}`); the login routes fire it on **every** attempt with
+`result={"user": …, "ok": bool, "reason": …}`. `fn(ctx, result, response)` may hold a row
+(`review.status`/`order.status = "pending"`), attribute it, take the session back (delete `uid`), or
+return a replacement response (a 202, a moderation notice). A held order keeps its stock reserved and
+counts as neither a purchase nor a stop — only `status="paid"` orders reach `purchases` and the buyers
+set — until review either marks it paid or calls `demo_site/orders.py cancel_order(order, reason)`,
+which restocks its units. `hooks.on_reset(fn)` runs after `POST /lab/reset` clears the core store, so
+an ext reseeds or drops the tables and Redis keys it owns.
 
 Shoppers hurt are counted as **people**: an individual is hurt if the last thing that happened to them
 was a stop and they bought nothing. A shopper who met a challenge, solved it and carried on is not hurt;
@@ -311,12 +363,12 @@ those requests still show in `human_requests_stopped`. `purchases` respects `sin
 | `../labnet.py` | at the lab root, not in `tools/`: the one localhost guard (`target`, `require_local`, `require_local_env`) and the catch-up helper (`catch_up`, `restore`); a byte-identical copy of `scripts/labnet.py` |
 | `labclient.py` | the lab client, guarded by `labnet` on import; `LabClient` (ordered headers, rented IP, actor label), `world_pool` (pools and groups), `group_members`, `admin`, `reset`, `set_level`, `scoreboard`, `browser_context` for Playwright |
 | `browsers.py` | header templates of real browsers in wire order |
-| `population.py` | the 40 shoppers (personas and scenarios); `PAGE_HOOKS` for chapter JS equivalents (a hook may return a replacement response); every `tools/personas_*.py` is auto-imported |
+| `population.py` | the 40 shoppers (personas and scenarios); `PAGE_HOOKS` for chapter JS equivalents after a GET and `POST_HOOKS` after a form POST (a hook may return a replacement response); every `tools/personas_*.py` is auto-imported |
 | `scoreboard.py` | table or markdown from `/lab/scoreboard` |
 | `checkpoint_core.py`, `checkpoint.py` | `ROUNDS = {n: Round(...)}`; `--round N`, `--level L`, `--catch-up`, `--restore`, `--all`, `--markdown` |
 | `verify.py` | in-process harness on a free port (or `$PORT`): `--smoke`, `--round N [--level L] [--catch-up]`, `--all --markdown` |
 | `smoke.py` | this contract, as a test |
-| `doctor.py`, `reset.py`, `build_world.py` | readiness check, reset, feeds (+ provenance manifest) from `world.json` |
+| `doctor.py`, `reset.py`, `build_world.py` | readiness check, reset, feeds (+ provenance manifest) from `world.json`. `doctor.py` is a starter file, so a lab with extra prerequisites (browser downloads, a side-service binary) ships its preflight as `tools/doctor_<ch>.py` next to it, named in the README's setup steps |
 
 Solutions live in `solutions/round<N>/` mirroring the lab tree; `checkpoint.py --catch-up` installs rounds
 1..N cumulatively, keeping one `.bak` per student file, and `--restore` puts them back. Attack scripts live in

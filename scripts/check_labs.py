@@ -45,6 +45,7 @@ LABS = sorted(glob.glob(os.path.join(ROOT, "workshops", "*", "chapters", "*", "l
 STARTERS = sorted(glob.glob(os.path.join(ROOT, "workshops", "*", "starter")))
 BASELINE = {"Flask": "3.1.3", "Flask-SQLAlchemy": "3.1.1", "SQLAlchemy": "2.1.4", "redis": "8.1.0", "fakeredis": "2.39.0",
             "fakeredis[lua]": "2.39.0", "requests": "2.34.2", "httpx": "0.28.1", "psycopg[binary]": "3.3.6"}
+# /catalog is NOT retired: it is the starter's canonical alias of /products (contract §3.1).
 RETIRED = [r'"/admin/', r"'/admin/", r'"/api/v0', r'"/api/sensor"', r'"/api/session"', r'"/api/fp"', r'"/telemetry"',
            r'"/products/<', r'"/signup"']
 
