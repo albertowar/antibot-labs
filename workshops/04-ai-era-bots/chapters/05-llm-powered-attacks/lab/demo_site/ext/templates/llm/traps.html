@@ -1,0 +1,9 @@
+{#- Round 3: the block only a text reader perceives. Filled by defenses/extractor_traps.py (ctx.attrs["llm_traps"]);
+    empty, so inert, until that check is wired. Off-screen AND aria-hidden: off-screen alone is read aloud. -#}
+{% set t = llm_traps() %}{% if t and (t.hidden_records or t.canary_note or t.decoy_paragraphs) %}
+<div id="catalogue-notes" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+  {% if t.canary_note %}<p>{{ t.canary_note }}</p>{% endif %}
+  {% for h in t.hidden_records %}<article><p>{{ h.name }} SKU {{ h.sku }}</p><p>${{ "%.2f"|format(h.price) }}</p></article>{% endfor %}
+  {% for d in t.decoy_paragraphs %}<p>{{ d }}</p>{% endfor %}
+</div>
+{% endif %}

@@ -1,17 +1,16 @@
-"""Round 2, pre-wired — the challenge gate (puzzles, tiles, tokens, proof-of-work).
+"""Round 2, pre-wired: the challenge gate (puzzles, tiles, tokens, proof-of-work).
 
-This is the W1 Ch6 / Ch7 gate as the store had it: a text puzzle a script can't
-parse, a 3x3 image puzzle an OCR solver can't read, a single-use token, and an
-optional hashcash proof-of-work bound to the token. It is not student-edited;
-Round 2 shows an LLM/VLM solving all of it, and challenge_policy.py decides *who*
-gets it, *how expensive* it is and *what a solve is worth*.
+This is the W1 Ch6 / Ch7 gate as the store had it: a text puzzle a script can't parse, a 3x3 image puzzle
+an OCR solver can't read, a single-use token, and an optional hashcash proof-of-work bound to the token.
+It is not student-edited. `demo_site/ext/llm_surfaces.py` registers it as the `puzzle` challenge type;
+Round 2 shows an LLM/VLM solving all of it, and challenge_policy.py decides *who* gets it, *how
+expensive* it is and *what a solve is worth*.
 
-Puzzle kinds (text):  arithmetic, lexicon ("which of these is a fruit"), reverse,
-count, letter.  Image: nine 72x72 tiles, each with one shape; "select all tiles
-containing a triangle". Every tile PNG carries a ``lab-label`` tEXt chunk with the
-shape and colour. That label is how the *mock* vision model "sees"; a real model
-(``LLM_URL``) gets only the pixels. The label is a lab shortcut, not a weakness
-of real CAPTCHAs — and a reminder that no secret belongs in the image you serve.
+Puzzle kinds (text):  arithmetic, lexicon ("which of these is a fruit"), reverse, count, letter.  Image:
+nine 72x72 tiles, each with one shape; "select all tiles containing a triangle". Every tile PNG carries a
+``lab-label`` tEXt chunk with the shape and colour. That label is how the *mock* vision model "sees"; a
+real model (``LLM_URL``) gets only the pixels. The label is a lab shortcut, not a weakness of real
+CAPTCHAs, and a reminder that no secret belongs in the image you serve.
 
 An accessible alternative is non-negotiable: ``?mode=text`` always yields a text
 puzzle. Screen-reader users cannot solve the tiles (W1 Ch6).
@@ -110,7 +109,7 @@ def issue(rds, mode: str, pow_bits: int = 0) -> dict:
         tiles = []
     else:
         prompt, answer, tiles = image_puzzle(rng)
-    rds.setex(f"chal:{token}", TOKEN_TTL_S, json.dumps(
+    rds.setex(f"lab:llm:chal:{token}", TOKEN_TTL_S, json.dumps(
         {"answer": answer, "issued": time.time(), "bits": pow_bits, "mode": mode}))
     return {"token": token, "mode": mode, "prompt": prompt, "pow_bits": pow_bits,
             "tiles": [base64.b64encode(t).decode() for t in tiles]}
@@ -122,10 +121,10 @@ def normalize(ans: str) -> str:
 
 def verify(rds, token: str, answer: str, nonce: str):
     """Returns (ok, reason, solve_ms). Single use: the token is deleted either way."""
-    raw = rds.get(f"chal:{token}")
+    raw = rds.get(f"lab:llm:chal:{token}")
     if raw is None:
         return False, "unknown or expired challenge token", 0.0
-    rds.delete(f"chal:{token}")
+    rds.delete(f"lab:llm:chal:{token}")
     rec = json.loads(raw)
     solve_ms = (time.time() - rec["issued"]) * 1000
     if rec["bits"] and not pow_ok(token, nonce or "", rec["bits"]):

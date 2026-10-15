@@ -1,23 +1,19 @@
-"""Round 4, pre-wired — the deny-list the store shipped with its LLM features.
+"""
+Round 4, pre-wired: the deny-list the store shipped with its LLM features.
 
-The first thing every team writes when they hear "prompt injection": a regex
-list of phrases attackers use. It is in the OWASP LLM01 mitigations as a
-*supporting* control, and this round shows why it cannot be the main one:
+The first thing every team writes when they hear "prompt injection": a regex list of phrases attackers
+use. It is in the OWASP LLM01 mitigations as a *supporting* control, and this round shows why it cannot be
+the main one:
 
-  * it only matches the exact phrasing it was written for — paraphrase, zero-width
-    characters, confusable letters, encoding, splitting across two reviews, or
-    hiding in an HTML comment all walk past it;
-  * it matches real customers who write "ignore the instructions on the box",
-    and every match is a lost review.
+  * it only matches the exact phrasing it was written for: paraphrase, zero-width characters, confusable
+    letters, encoding, splitting across two reviews, or hiding in an HTML comment all walk past it;
+  * it matches real customers who write "ignore the instructions on the box", and every match is a lost
+    review.
 
-Not student-edited. llm_guard.py (your code) decides whether to keep using it.
+Not student-edited. The stub `llm_guard.py` calls it; deciding whether to keep it is Round 4's step 3.
 """
 
-from __future__ import annotations
-
 import re
-
-from store import allow, block, Decision
 
 PATTERNS = [
     r"\[SYSTEM[:\s\]]",
@@ -30,8 +26,9 @@ PATTERNS = [
 _RX = [re.compile(p, re.I) for p in PATTERNS]
 
 
-def evaluate(text: str) -> Decision:
+def match(text):
+    """The pattern that matched, or None."""
     for rx in _RX:
         if rx.search(text):
-            return block(f"injection deny-list: /{rx.pattern}/", score=80.0)
-    return allow("deny-list passed")
+            return rx.pattern
+    return None

@@ -1,16 +1,15 @@
 # W4 Ch5 lab. Python 3.12+. Pins verified October 2026.
-# Runs dependency-free: fakeredis + SQLite, a deterministic in-process mock LLM.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt. No browser, no Ollama needed: the LLM is a deterministic in-process mock by default.
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-requests==2.34.2
-# Redis client plus an in-process fake, so the lab runs with no Redis server.
+SQLAlchemy==2.1.4
 redis==8.1.0
-fakeredis==2.39.0
-# Image puzzle tiles for Round 2 (drawn at request time, no fixtures to download).
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+fakeredis[lua]==2.39.0
+requests==2.34.2
+httpx==0.28.1
+# The challenge gate draws its image tiles at request time (defenses/challenge_gate.py): no image fixtures to download.
 Pillow==12.3.0
-# Optional: only for the Dockerised PostgreSQL backend (set DATABASE_URL).
+# Unused on the default SQLite path. Only the Docker-backed PostgreSQL path (docker-compose.yml) needs it:
+# uncomment, or `pip install 'psycopg[binary]==3.3.6'`, before starting the store with DATABASE_URL=postgresql+psycopg://...
 # psycopg[binary]==3.3.6
-# Optional: a real local model instead of the mock. No Python package needed —
-# the client speaks the OpenAI-compatible HTTP API over `requests`:
-#   ollama pull qwen3:4b && ollama pull qwen2.5vl:3b
-#   export LLM_URL=http://127.0.0.1:11434/v1 LLM_MODEL=qwen3:4b LLM_VISION_MODEL=qwen2.5vl:3b

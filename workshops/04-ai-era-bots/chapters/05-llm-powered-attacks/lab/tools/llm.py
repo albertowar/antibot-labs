@@ -21,9 +21,10 @@ Every LLM call in this lab, on both sides of the arms race, goes through
     lab is deterministic. A real model fails the same way, less predictably.
 
   * **openai-compatible** (``LLM_URL`` set). Any server speaking the OpenAI chat
-    completions API: Ollama (``http://127.0.0.1:11434/v1``), llama.cpp, vLLM.
+    completions API on THIS machine: Ollama (``http://127.0.0.1:11434/v1``), llama.cpp, vLLM.
     ``LLM_MODEL`` for text, ``LLM_VISION_MODEL`` for tasks that pass images. No
-    API key, no cloud account; the lab never leaves your machine.
+    API key, no cloud account; ``labnet.require_local_env("LLM_URL")`` refuses a
+    URL that is not this machine, so prompts never leave the laptop.
 
 Token accounting (``usage()``) is the defender's cost meter *and* the attacker's
 bill: Round 2 reports tokens per solve, Round 3 tokens per page.
@@ -265,22 +266,23 @@ def _mock_solve_image(system, user, images):
 # extraction ---------------------------------------------------------------------
 
 _PRICE = re.compile(r"[€$]\s?(\d+(?:\.\d{2})?)")
-_SKU = re.compile(r"\bSKU\s+([a-z]+-\d{3})\b", re.I)
+_SKU = re.compile(r"\bSKU\s+([a-z]{1,3}-?\d{3})\b", re.I)
 
 
 def _mock_extract(system, user, images):
-    """Page text -> JSON records. Reads every line that carries a SKU; obeys any
-    instruction in the text that tells readers to add a field to each record."""
+    """Page text -> JSON records. Reads every line that carries a SKU (the product name is the rest of the
+    line, the price is on the next few lines); obeys any instruction in the text that tells readers to add
+    a field to each record."""
     text = _normalize(user)
     directives = _record_directives(text)
+    lines = text.splitlines()
     records = []
-    for line in text.splitlines():
+    for i, line in enumerate(lines):
         sku = _SKU.search(line)
         if not sku:
             continue
-        price = _PRICE.search(line)
-        name = _SKU.sub("", _PRICE.sub("", line))
-        name = re.sub(r"[·|•\-–]+", " ", name)
+        price = next((m for m in (_PRICE.search(nxt) for nxt in lines[i:i + 4]) if m), None)
+        name = re.sub(r"[·|•\-–]+", " ", _SKU.sub("", _PRICE.sub("", line)))
         name = re.sub(r"\s{2,}", " ", name).strip(" ·|:-")
         rec = {"sku": sku.group(1).lower(), "name": name,
                "price": float(price.group(1)) if price else None}
@@ -402,7 +404,7 @@ def _mock_assist(system, user, images):
     price = _field(user, "Price", "")
     base = f"About {product}: "
     if re.search(r"price|cost|how much", q, re.I) and price:
-        base += f"it is listed at €{price}."
+        base += f"it is listed at ${price}."
     elif re.search(r"return|refund", q, re.I):
         base += "returns are accepted within 30 days in original condition."
     elif re.search(r"waterproof|water", q, re.I):

@@ -1,0 +1,12 @@
+{#- Overrides the starter's card. The outer element is the contract's (.product-card[data-sku], asserted by
+    tools/smoke.py); every inner class is a per-session name (churn(role)), restyled by llm/churn_css.html,
+    and the SKU is printed so a reader that only sees text can still tell products apart. -#}
+<article class="product-card" data-sku="{{ p.sku }}">
+  <a href="{{ p.to_dict().url }}" class="{{ churn('img') }}"><img src="/img/{{ p.sku }}.svg" alt="{{ p.name }}" loading="lazy" width="320" height="320"></a>
+  <div class="{{ churn('body') }}">
+    <a class="{{ churn('title') }}" href="{{ p.to_dict().url }}">{{ p.name }}</a> <span class="muted small">SKU {{ p.sku }}</span>
+    <div class="{{ churn('meta') }}"><span class="muted">{{ p.category|capitalize }} · {{ p.colorway }}</span>{% include "partials/_stars.html" %}</div>
+    <div class="{{ churn('row') }}"><span class="{{ churn('price') }}">${{ "%.2f"|format(p.price) }}</span>
+      {% if p.is_drop %}<span class="tag drop">Drop</span>{% elif p.stock <= 0 %}<span class="tag">Sold out</span>{% endif %}</div>
+  </div>
+</article>

@@ -1,61 +1,78 @@
 """Shared helpers and the ethics guardrail for every attack script.
 
-Rules of engagement are absolute: these scripts run ONLY against the local demo
-store you run yourself. ``require_local`` enforces it in code — a non-loopback
-target raises before a single request is sent. Lab traffic never touches a third
-party, a public proxy, or anyone else's infrastructure. Every account, review,
-IP and session here is synthetic, and the "LLM" is a local mock unless you
-point LLM_URL at a model running on your own machine.
+Rules of engagement are absolute: these scripts run ONLY against the local demo store you run yourself.
+`tools/labclient.py` asks the lab-root `labnet.py` guard for the store URL (and checks every side-service URL
+that is set, `LLM_URL` included), and that guard refuses a non-loopback target before a single request is
+sent. Lab traffic never touches a third party, a public proxy, or anyone else's infrastructure. Every
+account, review, device and address here is synthetic, and the "LLM" is a local mock unless you point
+LLM_URL at a model running on your own machine.
 
-The IPs below are RFC 5737 documentation ranges. They are not real hosts; the
-store only honours them from loopback, to stand in for the egress a real attacker
-would rent. The point of the lab is to train defenders against your own app.
+Source addresses are rented from `data/world.json` (RFC 5737 / 3849 documentation ranges) and sent in
+`X-Lab-Client-IP`, which the store's edge honours only from loopback and only inside a pool. Each attack
+has its own: the review farm rents `cloud_vm`, the puzzle solver `hosting_asn` (both datacenters), and the
+extractor and the injector's accounts rent `residential_proxy`, which looks exactly like a person. A
+"device" is a `did` cookie; the farm and the solver spread many accounts over three of them.
+
+The attacks are just strong enough to beat the previous round and to teach the detection. They exist to
+train defenders against the student's own local app, not to be general-purpose tooling.
 """
 
-from __future__ import annotations
-
+import json
 import os
 import re
 import sys
 from html.parser import HTMLParser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-DATA = os.path.join(LAB_DIR, "data")
-sys.path.insert(0, LAB_DIR)   # tools.llm, defenses.challenge_gate (pow helper)
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
-
-RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)] + [f"203.0.113.{i}" for i in range(1, 255)]
-DATACENTER = [f"192.0.2.{i}" for i in range(1, 255)]
+LAB = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(LAB, "tools"))
+from labclient import BASE_URL, LabClient, world_pool  # noqa: E402  (runs the labnet guard on import)
 
 REAL_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-           "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+           "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
+JSON_HEADERS = [("User-Agent", REAL_UA), ("Accept", "application/json"), ("Content-Type", "application/json")]
+PAGE_HEADERS = [("User-Agent", REAL_UA), ("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")]
+
+FARM_POOL = world_pool("cloud_vm")[0:3]               # Round 1: a datacenter, three devices
+SOLVER_POOL = world_pool("hosting_asn")[0:3]          # Round 2: another datacenter, three devices
+EXTRACT_POOL = world_pool("residential_proxy")[0:40]  # Round 3: rented residential egress
+MULE_POOL = world_pool("residential_proxy")[40:80]    # Round 4: the injector's accounts, one address each
 
 
-def headers(actor, client_ip, fp="", session="", user="", ua=REAL_UA, round_=None):
-    h = {"X-Lab-Actor": actor, "X-Lab-Client-IP": client_ip, "User-Agent": ua}
-    if fp:
-        h["X-Lab-FP"] = fp
-    if session:
-        h["X-Lab-Session"] = session
-    if user:
-        h["X-Lab-User"] = user
-    if round_:
-        h["X-Lab-Round"] = str(round_)
-    return h
+def bot(actor, ip, device=None):
+    """A bot client on a rented address; `device` pins its `did` cookie (many accounts, few devices)."""
+    c = LabClient(actor, ip=ip)
+    if device:
+        c.set_cookie("did", device)
+    return c
+
+
+def finish(out):
+    """An attack script's last line: one JSON object with at least attempted and succeeded."""
+    print(json.dumps(out))
+    return out
+
+
+def catalogue(n):
+    """The first n catalogue products as (sku, name), read the way a scraper would: the JSON API, page by page."""
+    items, page = [], 1
+    c = LabClient("bot:farm:cat", ip=world_pool("cloud_vm")[3])
+    while len(items) < n:
+        r = c.get(f"/api/products?page={page}", headers=JSON_HEADERS).json()
+        items += [(p["sku"], p["name"]) for p in r["items"]]
+        if page >= r["pages"]:
+            break
+        page += 1
+    return items[:n]
 
 
 _BLOCK_TAGS = {"p", "div", "article", "section", "h1", "h2", "h3", "h4", "li", "ul", "ol",
-               "header", "footer", "main", "nav", "tr", "br", "table"}
+               "header", "footer", "main", "nav", "tr", "br", "table", "form", "select", "option", "label"}
 
 
 class _TextExtractor(HTMLParser):
-    """What an 'HTML to text' step gives a model: every text node, block
-    elements on their own lines, scripts and styles dropped. Hidden or not, it is
-    all text to the model — that is the whole of Round 3."""
+    """What an 'HTML to text' step gives a model: every text node, block elements on their own lines,
+    scripts and styles dropped. Hidden or not, it is all text to the model: that is the whole of Round 3."""
 
     def __init__(self):
         super().__init__()
@@ -80,10 +97,10 @@ class _TextExtractor(HTMLParser):
 
     def text(self):
         out = [" ".join(parts) for parts in self.lines if parts]
-        return "\n".join(re.sub(r"\s+", " ", l) for l in out)
+        return "\n".join(re.sub(r"\s+", " ", line) for line in out)
 
 
-def html_to_text(html: str) -> str:
+def html_to_text(html):
     p = _TextExtractor()
     p.feed(html)
     return p.text()
