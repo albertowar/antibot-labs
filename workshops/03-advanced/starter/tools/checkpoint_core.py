@@ -70,6 +70,7 @@ class Round:
     scenario: object = "browse"
     bot_success_max: float = 1.0
     humans_hurt_max: int = 0
+    legit_hurt_max: int = 0      # welcome automation (legit: actors) a defense may stop this round
     allowed_fp: tuple = ()
     metric: object = "served"
     solutions: tuple = ("defenses/ladder.py",)
@@ -205,6 +206,9 @@ def check_round(rounds, n, markdown=False, reset_store=True, level=None, caught_
     hurt = [r for r in results if r.get("outcome") in population.HURT and r["persona"] not in rnd.allowed_fp]
     if len(hurt) > rnd.humans_hurt_max:
         problems.append(f"{len(hurt)} shoppers stopped who should not be: " + ", ".join(sorted({r['actor'] for r in hurt})))
+    legit_hurt = board["summary"].get("legit_hurt", 0)
+    if judge and legit_hurt > rnd.legit_hurt_max:
+        problems.append(f"{legit_hurt} legit automation actors stopped (false positives), allowed {rnd.legit_hurt_max}")
     for fn in (rnd.extra_checks if judge else []):
         good, msg = _call(fn, board, results, attacks)
         if not good:
