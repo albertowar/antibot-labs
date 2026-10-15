@@ -1,72 +1,77 @@
 """
-netinfo: what kind of network is this address?
+netinfo: what the model may know about the network a session came from.
 
-The store's edge hands every check an ASN, an organization and a country (`ctx.edge`). It
-never says what KIND of network that is: a production ASN database (IPinfo, MaxMind GeoIP2)
-sells that as a separate field, and you derive it from feeds when you do not buy one. This
-module does the second, from the same synthetic feeds W1 Ch3 uses (`data/feeds/`):
+The store's edge hands every check an ASN, an organization and a country (`ctx.edge`).
+It never says what KIND of network that is: a production ASN database (IPinfo, MaxMind
+GeoIP2) sells that as a separate "type" field, and you derive it yourself from feeds
+when you do not buy one. So does this module, from the same files W1 Ch3 uses
+(`data/feeds/`): hosting ASNs, cloud and VPN ranges, Tor exits and open proxies mean
+"datacenter"; the rest is read off the organization name.
 
-    tor         the address is on the Tor exit list
-    relay       a privacy relay's egress range (paying Safari customers, not bots)
-    datacenter  a hosting ASN, a cloud or VPN range, or an open proxy
-    mobile      carrier-grade NAT: hundreds of people behind one address
-    corporate   an office or university egress
-    residential everything else
+    asn_type  one of ASN_TYPES. The strongest single feature for a bot model, and the
+              one that hurts VPN users, cloud desktops and corporate egress the most.
+              Treat it as context, never a verdict.
 
-and, separately, `blocklisted`: the address is on the community blocklist (the synthetic
-FireHOL level 1). That list also carries the Tor and open-proxy ranges here, so a Tor exit is
-reported as `tor` only: W1 Ch3's lesson is that a Tor Browser user must not be charged twice.
-
-Every one of these is context, never a verdict: datacenter ranges are where VPNs, relays and
-corporate proxies live.
+The one thing this module cannot see is a residential proxy: its exits sit in a real
+ISP's ranges, so they are "residential" here, exactly as in production. That blind spot
+is the point of Round 1.
 """
 
+import bisect
 import csv
 import ipaddress
 import os
 
 FEEDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "feeds")
-_DC_WORDS = ("cloud", "hosting", "vps", "vpn", "bulletproof", "datacenter")
+ASN_TYPES = ["residential", "mobile", "datacenter", "corporate", "unknown"]
+
+_DC_WORDS = ("cloud", "hosting", "vps", "vpn", "tor ", "bulletproof", "datacenter")
 _state = {}
 
 
 def _load():
     if _state:
         return _state
-    def nets(name):
+    ranges = {4: [], 6: []}
+    with open(os.path.join(FEEDS, "ip2asn.tsv")) as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            lo, hi, asn, cc, org = line.rstrip("\n").split("\t")
+            a, b = ipaddress.ip_address(lo), ipaddress.ip_address(hi)
+            ranges[a.version].append((int(a), int(b), int(asn), cc, org))
+    for v in ranges:
+        ranges[v].sort()
+    nets = []
+    for name in ("cloud_ranges.csv", "vpn_ranges.csv"):
         with open(os.path.join(FEEDS, name)) as fh:
-            return [ipaddress.ip_network(r["cidr"]) for r in csv.DictReader(fh)]
-    def lines(name):
-        with open(os.path.join(FEEDS, name)) as fh:
-            return [ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")]
+            nets += [ipaddress.ip_network(r["cidr"]) for r in csv.DictReader(fh)]
     with open(os.path.join(FEEDS, "hosting_asns.csv")) as fh:
         hosting = {int(r["asn"]) for r in csv.DictReader(fh)}
-    _state.update(hosting=hosting, cloud=nets("cloud_ranges.csv"), vpn=nets("vpn_ranges.csv"),
-                  relay=nets("relay_ranges.csv"), tor=set(lines("tor_exits.txt")),
-                  proxies=set(lines("open_proxies.txt")),
-                  blocklist=[ipaddress.ip_network(c) for c in lines("firehol_level1.netset")])
+    listed = set()
+    for name in ("tor_exits.txt", "open_proxies.txt"):
+        with open(os.path.join(FEEDS, name)) as fh:
+            listed |= {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+    _state.update(ranges=ranges, starts={v: [r[0] for r in rs] for v, rs in ranges.items()},
+                  nets=nets, hosting=hosting, listed=listed)
     return _state
 
 
-def _in(addr, networks):
-    return any(addr in n for n in networks if n.version == addr.version)
-
-
-def classify(ip, asn=0, org=""):
-    """{"kind": ..., "blocklisted": bool} for an address and the ASN/org the edge resolved for it."""
+def lookup(ip):
+    """{asn, org, country, asn_type} for an address; 'unknown' when no range covers it."""
     s = _load()
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
-        return {"kind": "unknown", "blocklisted": False}
+        return {"asn": 0, "org": "", "country": "??", "asn_type": "unknown"}
+    rs = s["ranges"][addr.version]
+    i = bisect.bisect_right(s["starts"][addr.version], int(addr)) - 1
+    if i < 0 or int(addr) > rs[i][1]:
+        return {"asn": 0, "org": "", "country": "??", "asn_type": "unknown"}
+    _, _, asn, cc, org = rs[i]
     low = org.lower()
-    if str(addr) in s["tor"]:
-        return {"kind": "tor", "blocklisted": False}
-    listed = _in(addr, s["blocklist"])
-    if _in(addr, s["relay"]):
-        kind = "relay"
-    elif (asn in s["hosting"] or str(addr) in s["proxies"] or _in(addr, s["cloud"]) or _in(addr, s["vpn"])
-          or any(w in low for w in _DC_WORDS)):
+    if (asn in s["hosting"] or str(addr) in s["listed"] or any(addr in n for n in s["nets"] if n.version == addr.version)
+            or any(w in low for w in _DC_WORDS)):
         kind = "datacenter"
     elif "mobile" in low:
         kind = "mobile"
@@ -74,17 +79,9 @@ def classify(ip, asn=0, org=""):
         kind = "corporate"
     else:
         kind = "residential"
-    return {"kind": kind, "blocklisted": listed}
+    return {"asn": asn, "org": org, "country": cc, "asn_type": kind}
 
 
-def of(ctx):
-    """classify() for this request's source address, computed once per request."""
-    if "ch8_net" not in ctx.attrs:
-        ctx.attrs["ch8_net"] = classify(ctx.edge.ip, ctx.edge.asn, ctx.edge.org)
-    return ctx.attrs["ch8_net"]
-
-
-# Continent of the country the edge resolved: enough for "is the browser's time zone on the
-# same continent as the address?" (correlation.py). Documentation countries only.
-CONTINENT = {"US": "America", "CA": "America", "BR": "America", "NL": "Europe", "DE": "Europe",
-             "GB": "Europe", "FR": "Europe", "JP": "Asia", "IN": "Asia"}
+if __name__ == "__main__":
+    for ip in ["192.0.2.10", "198.51.100.1", "203.0.113.5", "203.0.113.130", "198.51.100.20", "2001:db8:100::1", "8.8.8.8"]:
+        print(f"{ip:<18} {lookup(ip)}")

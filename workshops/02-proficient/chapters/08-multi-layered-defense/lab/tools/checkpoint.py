@@ -55,8 +55,9 @@ GATE_MEDIAN_MAX_MS = 20.0           # in-process Redis
 GATE_MEDIAN_MAX_MS_REDIS = 250.0    # a real Redis: ~10 round trips per login
 
 
-# The log's `action` column is the highest-SCORE decision of the request, so a campaign step-up (0 points) reads
-# "allow" there; `outcome` is what the client actually got.
+# Since contract 1.7 the log's `action` column is the most SEVERE decision of the request, so a
+# zero-point campaign step-up reads "challenge" there too; `outcome` stays what the client got,
+# and it is what everything below judges.
 STOPPED = ("blocked", "deceived", "challenged")
 
 
@@ -205,7 +206,9 @@ def campaign_probe(board, results, attacks):
 
 def make_round(level, description):
     extra = [budget(level), cost] + ([opaque] if level >= 3 else []) + ([campaign_probe] if level >= 4 else [])
+    # people/threads=1: the chapter's 200 customers, one at a time, so every run prints the same numbers
     return Round(level=level, description=description, scenario="ch8_login", humans_hurt_max=BUDGET_HURT[level], metric=show,
+                 people=personas_ch8.people, threads=1,
                  extra_checks=extra, solutions=("defenses/ladder.py", "defenses/policy.py"))
 
 

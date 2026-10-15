@@ -1,6 +1,6 @@
 # W2 Ch8 Lab: Multi-Layered Defense Architecture
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the eight sensor layers, the veto chain, the risk score and response ladder, the correlation and campaign layers, a login collector with two challenge types, and the 200 customers the engines are measured on (see the block below).
+Starts from: `workshops/02-proficient/starter/` (contract 1.7). Adds: the eight sensor layers, the veto chain, the risk score and response ladder, the correlation and campaign layers, a login collector with two challenge types, and the 200 customers the engines are measured on (see the block below).
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -9,7 +9,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the eight 
 - `defenses/campaign.py`
 - `defenses/correlation.py`
 - `defenses/features.py`
-- `defenses/netinfo.py`
+- `defenses/netinfo_ch8.py`
 - `defenses/sensor_automation.py`
 - `defenses/sensor_behavior.py`
 - `defenses/sensor_fingerprint.py`
@@ -75,7 +75,7 @@ The eight sensors (`defenses/sensor_*.py`) run at every level. Each one is a sma
 demo_site/ext/risk.py        collector slot, telemetry kind "risk", challenges "pow" and "step_up", refusal shaping
 demo_site/static/js/risk.js  the page's collector and challenge handling (runs in your own browser)
 defenses/                    sensors.py + sensor_*.py · veto.py · policy.py · correlation.py · campaign.py
-                             features.py (telemetry -> features) · netinfo.py (feeds -> network kind) · attempt.py
+                             features.py (telemetry -> features) · netinfo_ch8.py (feeds -> network kind) · attempt.py
 tools/                       checkpoint.py · sweep.py · layer_report.py · personas_ch8.py · report.py
 solutions/roundN/defenses/   the reference ladder.py and policy.py after Round N
 ```
@@ -230,15 +230,15 @@ python tools/sweep.py --signal no_keystrokes       # the largest minority you ne
 
 ## Expected results (self-check)
 
-Verified on 2026-10-14 with Python 3.12, Flask 3.1.3 and the `memory://` store; the same counts came out of the compose path (Redis 8.10, PostgreSQL 18.6). The population is seeded and runs one customer at a time, so the counts are exact; gate timings vary with the machine. Regenerate the lines with `python tools/checkpoint.py --all --markdown` (each round ends in a `README row:` line).
+Verified on 2026-10-15 (re-based onto contract 1.7) with Python 3.12, Flask 3.1.3 and the `memory://` store; the same counts came out of the compose path (Redis 8.10, PostgreSQL 18.6). The counts are unchanged from the 1.5 build; the gate medians dropped a little (the 1.7 starter's `memory://` token bucket no longer serializes threads in Lua). The population is seeded and runs one customer at a time, so the counts are exact; gate timings vary with the machine. Regenerate the lines with `python tools/checkpoint.py --all --markdown` (each round ends in a `README row:` line).
 
 | `DEFENSE_LEVEL` | Real customers blocked | Challenged | Who | Gate median (memory / Redis + PostgreSQL) |
 |---|---|---|---|---|
-| 0 | 0 | 0 | - | 2.6 / 5.9 ms |
-| 1 | **16 (8.0%)** | 0 | all 8 VPN customers, 3 more keyboard-only, all 3 privacy browsers, the Tor user, 1 CGNAT | 3.1 / 6.2 ms |
-| 2 | 1 (0.5%) | 4 (2.0%, all proof of work) | blocked: vpn + keyboard-only + autofill · PoW: tor, CGNAT, vpn x2 | 3.1 / 5.9 ms |
-| 3 | 1 (0.5%, deceptive) | 9 (4.5%, all proof of work) | + every VPN user (`tz_geo_mismatch`) | 4.5 / 8.4 ms |
-| 4 | 1 (0.5%, deceptive) | 9 (4.5%), step-up 0 | unchanged; no cluster is hot | 11 / 19 ms |
+| 0 | 0 | 0 | - | 2.6 / 4.2 ms |
+| 1 | **16 (8.0%)** | 0 | all 8 VPN customers, 3 more keyboard-only, all 3 privacy browsers, the Tor user, 1 CGNAT | 2.3 / 3.4 ms |
+| 2 | 1 (0.5%) | 4 (2.0%, all proof of work) | blocked: vpn + keyboard-only + autofill · PoW: tor, CGNAT, vpn x2 | 2.3 / 3.4 ms |
+| 3 | 1 (0.5%, deceptive) | 9 (4.5%, all proof of work) | + every VPN user (`tz_geo_mismatch`) | 3.0 / 4.3 ms |
+| 4 | 1 (0.5%, deceptive) | 9 (4.5%), step-up 0 | unchanged; no cluster is hot | 7.6 / 11.6 ms |
 
 Attacker profiles, as scored by `tools/sweep.py --signals`:
 

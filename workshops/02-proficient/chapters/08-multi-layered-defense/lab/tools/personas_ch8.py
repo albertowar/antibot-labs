@@ -38,8 +38,8 @@ Python client spent (a browser's WebCrypto is faster).
 Safety rails: source addresses come from data/world.json (documentation ranges), the client is
 tools/labclient.py (refuses a non-local DEMO_URL), the credentials are the synthetic seed users'.
 
-The people run ONE AT A TIME (population.run is wrapped with threads=1): the per-IP and per-cluster
-counters see the same order on every run, so a checkpoint prints the same numbers every time.
+The people run ONE AT A TIME (every Round sets threads=1): the per-IP and per-cluster counters
+see the same order on every run, so a checkpoint prints the same numbers every time.
 """
 
 import os
@@ -309,18 +309,11 @@ def scenario_ch8_login(p, client, rng):
 
 
 population.SCENARIOS["ch8_login"] = scenario_ch8_login
-population.personas = people
 population.HAPPY |= {"typo_rejected"}                 # a mistyped password correctly rejected is not a false positive
-
-_run = population.run
-
-
-def _one_at_a_time(*args, **kw):
-    kw["threads"] = 1
-    return _run(*args, **kw)
-
-
-population.run = _one_at_a_time
+# The 200 customers and the one-at-a-time ordering reach the checkpoint declaratively since
+# contract 1.7: every Round in tools/checkpoint.py sets people=people and threads=1 (the per-IP
+# and per-cluster counters see the same order on every run, so a checkpoint prints the same
+# numbers every time).
 
 
 def summarize(results):
@@ -339,5 +332,5 @@ def summarize(results):
 if __name__ == "__main__":
     import labclient
     labclient.wait_for_store()
-    results = population.run("ch8_login", quiet=True)
+    results = population.run("ch8_login", people=people(), threads=1, quiet=True)
     population.print_results(results)

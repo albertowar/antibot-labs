@@ -1,7 +1,7 @@
 """
 Layer: network reputation (stand-in for W1 Ch3)
 
-Reads what the feeds say about the source address (netinfo.py): a community blocklist hit, a
+Reads what the feeds say about the source address (netinfo_ch8.py, this chapter's richer fork of the starter's netinfo): a community blocklist hit, a
 Tor exit, or a datacenter/VPN range.
 
 False positives: datacenter ranges are where VPNs, corporate egress proxies and cloud desktops
@@ -10,7 +10,7 @@ with a real human cost, so this layer should rarely decide alone. A privacy rela
 reported as `relay` and scores nothing (paying Safari customers).
 """
 
-from . import netinfo
+from . import netinfo_ch8 as netinfo
 
 LAYER = "net"
 SIGNALS = {

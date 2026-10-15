@@ -27,7 +27,8 @@ False positives:
 Cost: two Redis set operations per request, and the keys hold hashes, not raw telemetry.
 """
 
-from . import features, netinfo, sensors
+from . import features, sensors
+from . import netinfo_ch8 as netinfo
 from .pipeline import Check
 
 LAYER = "correlation"

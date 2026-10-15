@@ -19,16 +19,14 @@ of a refusal. What this module adds (no starter file is edited):
     enricher              at level 4 only: check the password of every login attempt, also the ones
                           the gate is about to challenge, so the campaign layer can count failures
                           (the cost: one password hash more per attempt).
-    after_request         shapes a refusal on the login routes:
-                            levels 1-2 are LEAKY: a refusal explains itself (score, layer,
-                            reasons). Never do this in production; it is how you read the model
-                            while you tune it.
-                            from level 3 a block is DECEPTIVE: gate.respond() lets the route run
-                            (g.deceive), and this hook turns whatever it returned into the
-                            byte-identical "Wrong email or password" 401 and takes any session back,
-                            so the client cannot tell a block from a typo and learns nothing.
-                          The starter's hooks.on_action(...) is never called by a route, so this
-                          is the workaround (Ch4, Ch6 and W1 Ch8 use it too).
+    after_request         shapes a refusal on the login routes at levels 1-2 only, where a
+                          refusal is LEAKY on purpose: it explains itself (score, layer,
+                          reasons). Never do this in production; it is how you read the model
+                          while you tune it. From level 3 a block is DECEPTIVE, and since
+                          contract 1.7 the gate itself serves it: a `deceive` verdict on the
+                          login answers the byte-identical "Wrong email or password" 401
+                          without ever checking the password (routes/deceive.py), so the
+                          client cannot tell a block from a typo and learns nothing.
 
 Nothing here decides anything: the decisions live in defenses/*.py.
 """
@@ -39,19 +37,17 @@ import json
 import secrets
 from datetime import datetime, timezone
 
-from flask import flash, g, jsonify, make_response, request
+from flask import g, jsonify, request
 
 from defenses import attempt, policy, veto
 from demo_site import hooks
 from demo_site.models import User
-from demo_site.routes import api_error, render
 from demo_site.seed import check_password
 
 LOGIN_PATHS = ("/login", "/api/login")
 POW_BITS = 15           # ~33k SHA-256 attempts on average
 CHALLENGE_TTL = 300     # seconds
 CODE_TRIES = 3
-WRONG_PASSWORD = ("invalid_credentials", "Wrong email or password.", 401)
 
 
 # --- the telemetry kind ------------------------------------------------------------------------
@@ -150,22 +146,10 @@ def check_credentials(ctx):
 
 # --- the shape of a refusal ------------------------------------------------------------------------
 
-def _wrong_password(ctx):
-    """The route's own answer to a wrong password, byte for byte."""
-    if request.path == "/api/login":
-        return api_error(*WRONG_PASSWORD)
-    flash("Wrong email or password.", "warn")
-    email = attempt.credentials(ctx)[0]
-    return make_response(render("login.html", next=request.form.get("next", "/account"), email=email), 401)
-
-
 def shape_refusal(response):
     ctx = getattr(g, "ctx", None)
     if ctx is None or request.method != "POST" or request.path not in LOGIN_PATHS:
         return response
-    if getattr(g, "deceive", False):
-        ctx.session.delete("uid")                       # the password may well have been right
-        return make_response(_wrong_password(ctx))
     if ctx.level <= 2 and response.status_code == 403 and response.is_json and g.decisions:
         d = g.decisions[-1]
         body = response.get_json()
