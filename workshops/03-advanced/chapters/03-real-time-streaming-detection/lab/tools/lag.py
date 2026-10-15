@@ -1,81 +1,89 @@
 """
-W3 Ch3 — Consumer lag: when the detector falls behind, the gap reopens
+Consumer lag: when the detector falls behind, the gap reopens.
 
-Streaming only beats batch if the consumer keeps up with the stream. This tool
-makes that visible. A producer thread appends login events at a chosen rate
-while a consumer drains them at a chosen (slower) rate. Every tick it prints how
-many events have arrived, how many have been processed, and the backlog — the
-Redis consumer-group lag (delivered-but-unacked plus not-yet-delivered).
+Streaming only beats batch while the consumer keeps up. This tool makes the backlog visible. It
+sets the store to level 1, slows the consumer with the lag knob (POST /lab/stream/consumer, a
+`delay_ms` of work per event), fires Round 1's micro-burst (300 logins at 30 per second) and prints,
+twice a second, how many events have arrived, how many the consumer has handled, and the backlog:
+the consumer group's `pending + lag`.
 
-When the consumer is faster than the producer, the backlog stays near zero and
-verdicts are real-time. When it is slower, the backlog grows without bound and a
-verdict for an event that arrived now will not be computed until seconds later —
-the latency gap you closed in Round 1, reopened by operational reality. The fix
-is horizontal scale (more consumers in the group) and is the ops story of W3
-Ch4.
+While the consumer is faster than the traffic the backlog stays near zero and a flag lands within
+milliseconds. When it is slower, the backlog grows without bound; the flag for the 21st request is
+not computed until the consumer reaches it, and the attacker keeps being served in the meantime.
+The fix is horizontal: more consumers in the group (`--consumers`), which is the operations story
+of W3 Ch4. Nothing here is a pass/fail number: the backlog depends on your machine, so read the
+shape of the table, not the digits.
 
-    python tools/lag.py                      # consumer keeps up
-    python tools/lag.py --produce 400 --consume 120   # consumer falls behind
+    python tools/lag.py                          # a consumer that costs 100 ms per event: falls behind
+    python tools/lag.py --delay-ms 0             # the fast consumer: the backlog never builds
+    python tools/lag.py --delay-ms 100 --consumers 6   # six consumers in the group keep up
+
+Needs the store running (python demo_site/app.py) or run it through `python tools/verify.py`'s store.
 """
 
 import argparse
+import json
+import os
+import sys
 import threading
 import time
 
-import lab  # noqa: F401
-import store
-import stream
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import checkpoint_core  # noqa: E402
+import labclient  # noqa: E402
 
 
-def produce(r, n, rate, done):
-    for i in range(n):
-        stream.emit(r, {"ts": time.time(), "sid": f"s{i}", "ip": "198.51.100.1",
-                        "path": "/api/login", "status": "401", "actor": "bot:lagdemo"})
-        time.sleep(1.0 / rate)
-    done.set()
+def tune(**body):
+    return labclient.admin("POST", "/lab/stream/consumer", json=body)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("--produce", type=int, default=300, help="events to produce")
-    ap.add_argument("--rate", type=float, default=200, help="produce rate (events/s)")
-    ap.add_argument("--consume", type=float, default=300, help="consume rate (events/s)")
+    ap.add_argument("--delay-ms", type=float, default=100.0, help="work per event in the consumer (default 100)")
+    ap.add_argument("--consumers", type=int, default=1, help="consumers in the group (default 1)")
+    ap.add_argument("--level", type=int, default=1, help="DEFENSE_LEVEL to run at (default 1: the sliding window)")
     args = ap.parse_args()
 
-    r = store.connect()
-    stream.reset(r)
-    stream.ensure_group(r)
+    labclient.wait_for_store()
+    labclient.set_level(args.level)
+    labclient.reset()
+    start = labclient.admin("GET", "/lab/stream/status")
+    tune(delay_ms=args.delay_ms, consumers=args.consumers)
+    print(f"level {args.level} · {args.consumers} consumer(s) at {args.delay_ms:.0f} ms per event "
+          f"(capacity ~{args.consumers * 1000 / args.delay_ms:.0f} events/s)" if args.delay_ms else
+          f"level {args.level} · {args.consumers} consumer(s), no added work")
+    print("firing the micro-burst: 300 logins at 30 per second, from one IP\n")
+
+    out = {}
     done = threading.Event()
 
-    producer = threading.Thread(target=produce, args=(r, args.produce, args.rate, done))
-    producer.start()
+    def attack():
+        out.update(checkpoint_core.run_attack("attacks/round1_microburst.py"))
+        done.set()
 
-    processed = 0
-    delay = 1.0 / args.consume
-    print(f"producing {args.produce} at {args.rate:.0f}/s, consuming at {args.consume:.0f}/s\n")
-    print(f"{'t(s)':>5} {'arrived':>8} {'processed':>10} {'backlog':>8}")
-    t0 = time.time()
-    next_print = t0
-    while not done.is_set() or stream.lag(r)[0] + stream.lag(r)[1] > 0:
-        batch = stream.read_batch(r, "c1", count=max(1, int(args.consume / 10)))
-        if batch:
-            time.sleep(delay * len(batch))
-            stream.ack(r, [mid for mid, _ in batch])
-            processed += len(batch)
-        now = time.time()
-        if now >= next_print:
-            pending, lag = stream.lag(r)
-            arrived = r.xlen(stream.EVENTS)
-            print(f"{now - t0:5.1f} {arrived:8d} {processed:10d} {pending + lag:8d}")
-            next_print = now + 0.5
-        if not batch and not done.is_set():
-            time.sleep(0.01)
-
-    producer.join()
-    pending, lag = stream.lag(r)
-    verdict = "kept up" if (pending + lag) == 0 and args.consume >= args.rate else "fell behind"
-    print(f"\nconsumer {verdict}. Final backlog: {pending + lag}. "
-          f"A backlog that grows means verdicts arrive late — scale consumers (W3 Ch4).")
+    threading.Thread(target=attack, daemon=True).start()
+    print(f"{'t(s)':>5} {'arrived':>8} {'handled':>8} {'backlog':>8}")
+    t0, peak, drained_at = time.time(), 0, None
+    try:
+        while True:
+            st = labclient.admin("GET", "/lab/stream/status")
+            peak = max(peak, st["backlog"])
+            print(f"{time.time() - t0:5.1f} {st['events']:8d} {st['processed'] - start['processed']:8d} {st['backlog']:8d}")
+            if done.is_set() and st["backlog"] == 0:
+                drained_at = time.time() - t0
+                break
+            if time.time() - t0 > 300:
+                break
+            time.sleep(0.5)
+    finally:
+        tune(delay_ms=0, consumers=1)
+    attack_s = out.get("duration_s")
+    print(f"\nthe attack ran {attack_s} s; the first refusal came {out.get('first_block_after_s')} s in, "
+          f"after {out.get('served_before_first_block')} logins were served; {out.get('succeeded')}/{out.get('attempted')} were served in all.")
+    print(f"peak backlog {peak} events; the consumer " + (f"was caught up {drained_at:.1f} s after the burst began." if drained_at else "had not caught up when we stopped."))
+    print(json.dumps({"peak_backlog": peak, "served": out.get("succeeded"), "first_block_after_s": out.get("first_block_after_s")}))
 
 
 if __name__ == "__main__":

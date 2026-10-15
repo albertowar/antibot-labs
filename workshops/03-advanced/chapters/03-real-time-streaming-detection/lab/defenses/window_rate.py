@@ -1,28 +1,29 @@
 """
-Round 1 defense — sliding-window rate detector (on the stream)
+Round 1 defense: sliding-window rate per (IP, endpoint), computed on the stream.
 
-The static rate limiter from W1 Ch2 counts requests in a *fixed* window: it
-resets on the minute, so a burst that straddles the boundary is split in two
-and may never cross the threshold. On a stream we keep a true *sliding*
-window per (IP, endpoint): a sorted set scored by event time, trimmed to the
-last WINDOW_RATE seconds on every event. The count is always "requests in the
-last 60 seconds ending now", not "since the top of the minute".
+A fixed-window limiter resets on the clock, so a burst that straddles the boundary is split in
+two and may never cross the threshold. On a stream we keep a true *sliding* window per (IP,
+endpoint): a sorted set scored by event time, trimmed to the last WINDOW_RATE seconds on every
+event. The count is always "requests in the window ending now".
 
-This fires in milliseconds on the first event past the threshold, which is the
-whole point versus a session-level or batch model that waits for the session to
-end. It catches a single noisy IP. It does NOT catch a burst spread thin across
-many IPs — that is Round 2.
+It fires on the first event past the threshold, a second or so into the burst, which is the
+point against a session-level or batch model that waits for the session to end. The price is
+that the first THRESHOLD requests were already served: a streaming verdict stops the rest of a
+burst, never the start of it.
 
-False positives: a shared egress (corporate NAT, CGNAT, a VPN exit) looks like
-one very busy IP. The per-endpoint thresholds below are set well above a human
-rate, and login/checkout are much tighter than search, but a big NAT is the
-classic way this detector hurts real users. Measure it.
+It catches one noisy IP. It does NOT catch a burst spread thin across many IPs (Round 2).
+
+Who it hurts: a shared egress (corporate NAT, carrier-grade NAT, a VPN exit) looks like one very
+busy IP, and the flag blocks every customer behind it until it expires. The login and checkout
+thresholds are far above a human rate, but a big NAT is the classic way this detector hurts real
+users. The subject of the flag is the IP, so the gate half is keyed on the IP.
 """
 
-from features import WINDOW_RATE
-from stream import PREFIX
+from . import streamlog
+from .features import WINDOW_RATE
+from .pipeline import Check
 
-# requests per WINDOW_RATE seconds, per source IP, before we score
+# requests per WINDOW_RATE seconds, per source IP, before we flag
 THRESHOLDS = {
     "/api/login": 20,
     "/api/register": 10,
@@ -39,12 +40,13 @@ def threshold_for(path):
     return THRESHOLDS["default"]
 
 
-def detect(event, feats, sketches, r):
+def detect(event, feats, sketches, softs, r):
+    """Stream half. Returns (soft score in [0, 1], verdict or None)."""
     ts = float(event["ts"])
     ip, path = event["ip"], event["path"]
-    key = f"{PREFIX}win:{ip}:{path}"
+    key = f"{streamlog.PREFIX}win:{ip}:{path}"
 
-    # Add this request, drop everything older than the window, count what's left.
+    # Add this request, drop everything older than the window, count what is left.
     r.zadd(key, {f"{event['sid']}:{ts}:{feats['n']}": ts})
     r.zremrangebyscore(key, 0, ts - WINDOW_RATE)
     r.expire(key, WINDOW_RATE)
@@ -54,9 +56,12 @@ def detect(event, feats, sketches, r):
     soft = min(1.0, count / thr) if thr else 0.0
     if count > thr:
         return soft, {
-            "sid": event["sid"], "ip": ip, "detector": "window_rate",
-            "signal": "ip_burst", "count": count, "threshold": thr,
-            "endpoint": path, "bot_score": round(min(1.0, (count - thr) / thr + 0.5), 3),
-            "action": "block", "ts": ts,
+            "sid": event["sid"], "ip": ip, "detector": "window_rate", "signal": "ip_burst",
+            "subject": ("ip", ip), "count": count, "threshold": thr, "endpoint": path,
+            "bot_score": round(min(1.0, (count - thr) / thr + 0.75), 3), "action": "block", "ts": ts,
         }
     return soft, None
+
+
+# Gate half: refuse requests from an IP the stream flagged.
+CHECK = Check("window_rate", streamlog.enforcer("window_rate", ("ip",)))

@@ -1,133 +1,89 @@
 """
-W3 Ch3 — Demo store with a live streaming detector (optional)
+Kestrel Outfitters: the demo store the Antibot Workshop Series defends.
 
-This is the shared Flask store, instrumented for streaming. Every request is
-appended to the Redis Stream in an after_request hook (XADD), and a background
-thread runs the detector consumer at DEFENSE_LEVEL, exactly as a sidecar worker
-would in production. Verdicts land at /admin/verdicts so you can watch them
-arrive while you drive traffic.
+    python demo_site/app.py                 # SQLite + in-process Redis, port 5000
+    PORT=8099 DEFENSE_LEVEL=2 python demo_site/app.py
+    docker compose up -d --wait && REDIS_URL=redis://127.0.0.1:6379/0 \
+      DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
 
-You do NOT need this running for the checkpoint — tools/checkpoint.py is
-self-contained. Use the live app for the demo: run it, hit it with an attack's
---live mode or your browser, and watch the verdict stream.
-
-    REDIS_URL=memory:// DEFENSE_LEVEL=2 python demo_site/app.py
-
-memory:// works here because the app and its consumer thread are one process and
-share the same fakeredis. A *separate* consumer process needs real Redis
-(docker compose up -d --wait) so the two share a server.
+Request path:  lab_edge (who is this, really?) -> gate.before_request (Ctx,
+enrichers, ladder, policy) -> route -> gate.after_request (X-Lab-* headers,
+decision log). Chapters add checks under defenses/ and features under
+demo_site/ext/; see workshops/STORE_CONTRACT.md.
 """
 
 import os
 import sys
-import threading
-import time
-from collections import deque
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-for _d in ("demo_site", "defenses"):
-    sys.path.insert(0, os.path.join(ROOT, _d))
+LAB_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if LAB_ROOT not in sys.path:
+    sys.path.insert(0, LAB_ROOT)
 
-from flask import Flask, g, jsonify, request, Response
+from flask import Flask, render_template  # noqa: E402
+from jinja2 import ChoiceLoader, FileSystemLoader  # noqa: E402
+from sqlalchemy import event  # noqa: E402
 
-import store
-import stream
-import consumer
-
-LEVEL = int(os.environ.get("DEFENSE_LEVEL", "0"))
-app = Flask(__name__, static_folder="static", static_url_path="/static")
-r = store.connect()
-stream.reset(r)
-
-_verdicts = deque(maxlen=200)
-_stop = threading.Event()
+from defenses import store  # noqa: E402
+from defenses.decision_log import DecisionLog  # noqa: E402
+from demo_site import ext, gate, hooks  # noqa: E402
+from demo_site.config import STORE_NAME, Config  # noqa: E402
+from demo_site.lab_edge import LabEdge, World  # noqa: E402
+from demo_site.models import Decision, Product, db  # noqa: E402
+from demo_site.routes import api, lab, pages, seo  # noqa: E402
+from demo_site.seed import seed_all  # noqa: E402
 
 
-def _on_verdict(v):
-    _verdicts.appendleft(v)
+def _sqlite_pragmas(dbapi_conn, _record):
+    if "sqlite3" in type(dbapi_conn).__module__:
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=30000")
+        cur.close()
 
 
-if LEVEL >= 1:
-    threading.Thread(target=consumer.serve, args=(r, LEVEL, _on_verdict, _stop),
-                     daemon=True).start()
+def create_app(config=None, seed=True):
+    cfg = config or Config.from_env()
+    here = os.path.dirname(os.path.abspath(__file__))
+    app = Flask("demo_site", template_folder=os.path.join(here, "templates"), static_folder=os.path.join(here, "static"))
+    app.config.update(SECRET_KEY=cfg.secret, SQLALCHEMY_DATABASE_URI=cfg.database_url,
+                      SQLALCHEMY_TRACK_MODIFICATIONS=False, SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
+                      LAB=cfg, STORE_NAME=STORE_NAME)
+    app.jinja_loader = ChoiceLoader([FileSystemLoader(os.path.join(here, "ext", "templates")), app.jinja_loader])
+    app.jinja_env.globals.update(slot=hooks.render_slot, store_name=STORE_NAME)
 
-PRODUCTS = [{"id": i, "name": f"Sneaker {i}", "price": 90 + i} for i in range(1, 9)]
+    db.init_app(app)
+    with app.app_context():
+        event.listen(db.engine, "connect", _sqlite_pragmas)
+        db.create_all()
+        if seed:
+            seed_all(cfg.lab_seed, cfg.drop_stock, cfg.hash_iters)
 
+    app.extensions["lab_redis"] = store.get_redis(cfg.redis_url)
+    app.extensions["lab_world"] = World(cfg.world_file)
+    app.extensions["decision_log"] = DecisionLog(app, db, Decision, cfg.decision_log)
+    app.wsgi_app = LabEdge(app.wsgi_app, app.extensions["lab_world"])
 
-@app.before_request
-def _start():
-    g.t0 = time.time()
-    g.sid = request.cookies.get("sid") or f"web-{int(time.time()*1000)}-{os.getpid()}"
+    gate.install(app)
+    for bp in (pages.bp, api.bp, seo.bp, lab.bp):
+        app.register_blueprint(bp)
+    ext.load_all(app)
 
+    @app.errorhandler(404)
+    def _404(_e):
+        return render_template("error.html", code=404, message="We looked everywhere. That page is not on the map."), 404
 
-@app.after_request
-def _emit(resp):
-    path = request.path
-    if not path.startswith("/admin"):
-        stream.emit(r, {
-            "ts": time.time(), "sid": g.sid, "ip": request.remote_addr or "127.0.0.1",
-            "path": path, "method": request.method, "status": resp.status_code,
-            "user": (request.form.get("email", "") if request.method == "POST" else ""),
-            "ua": request.headers.get("User-Agent", ""), "actor": "live",
-        })
-    if not request.cookies.get("sid"):
-        resp.set_cookie("sid", g.sid, samesite="Lax")
-    resp.headers["Server-Timing"] = f"app;dur={(time.time()-g.t0)*1000:.1f}"
-    return resp
+    @app.errorhandler(500)
+    def _500(_e):
+        return render_template("error.html", code=500, message="Something went wrong on our side."), 500
 
-
-@app.get("/")
-def index():
-    return Response(
-        "<h1>W3 Ch3 demo store</h1><p>Streaming detection lab. "
-        "Verdicts at <a href='/admin/verdicts'>/admin/verdicts</a>.</p>",
-        mimetype="text/html")
-
-
-@app.get("/api/products")
-def products():
-    return jsonify(PRODUCTS)
-
-
-@app.get("/api/search")
-def search():
-    return jsonify([p for p in PRODUCTS if request.args.get("q", "") in p["name"].lower()])
-
-
-@app.get("/product/<int:pid>")
-def product(pid):
-    return jsonify(next((p for p in PRODUCTS if p["id"] == pid), {}))
-
-
-@app.post("/api/login")
-def login():
-    # Demo rule: the password "correct" succeeds; anything else is a failed login.
-    ok = request.form.get("password") == "correct"
-    return (jsonify({"ok": True}), 200) if ok else (jsonify({"ok": False}), 401)
-
-
-@app.post("/api/register")
-def register():
-    return jsonify({"ok": True}), 200
-
-
-@app.post("/api/checkout")
-def checkout():
-    return jsonify({"ok": True}), 200
-
-
-@app.get("/admin/verdicts")
-def verdicts():
-    return jsonify({"level": LEVEL, "count": len(_verdicts), "recent": list(_verdicts)[:50]})
-
-
-@app.post("/admin/reset")
-def reset():
-    return jsonify({"deleted": stream.reset(r)})
+    return app
 
 
 if __name__ == "__main__":
-    print(f"demo store on http://localhost:5000  (DEFENSE_LEVEL={LEVEL}, "
-          f"store={'memory' if os.environ.get('REDIS_URL','memory://').startswith('memory') else 'redis'})")
-    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", "5000")))
+    application = create_app()
+    cfg = application.config["LAB"]
+    print(f"{STORE_NAME} on http://127.0.0.1:{cfg.port}  level={cfg.defense_level}  "
+          f"db={cfg.database_url.split('://')[0]}  redis={cfg.redis_url.split('://')[0]}  "
+          f"ext={application.extensions['lab_ext']}")
+    application.run(host="127.0.0.1", port=cfg.port, threaded=True, debug=False, use_reloader=False)

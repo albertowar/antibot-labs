@@ -1,93 +1,88 @@
 """
-W3 Ch3 — Shared attacker helpers (rules of engagement built in)
+Shared attacker helpers for Chapter 3.
 
-Every attack and the legitimate-traffic simulator build *events*: dicts that
-become one entry in the Redis Stream. Nothing here touches the network by
-default — the unit of study in this chapter is the event log, so the generators
-write synthetic events straight into your local stream. The optional --live
-mode (see each script) replays the same events as real HTTP against the local
-Flask site, and only then does the localhost guard apply.
+Every attack in this chapter is a credential-stuffing campaign told as a schedule: a list of
+timed requests, each from a rented source address, executed in order against the local store.
+Timing matters here (a streaming detector reacts to the rate and the shape of events as they
+arrive), so `execute()` sends each step at its scheduled second, on one thread, which also makes
+the counts repeatable.
 
-Rules, enforced here:
-  - target() only returns http(s)://localhost / 127.0.0.1 / ::1 and exits on
-    anything else. These scripts never point at a site you do not own.
-  - Every IP is from a documentation range (RFC 5737: 192.0.2.0/24,
-    198.51.100.0/24, 203.0.113.0/24). No real proxy, no proxy list, no third
-    party. Humans and bots use disjoint ranges so the ground truth is clean.
-  - Usernames, sessions and timings are synthetic and seeded, so every run is
-    reproducible.
+An attack ends by printing ONE JSON line (the checkpoint's contract):
 
-The `actor` field on each event is ground truth ("human:..." or "bot:..."). It
-is the one thing only the scoreboard is allowed to read; the detectors never
-see it.
+    attempted                   login attempts sent
+    succeeded                   attempts the store served (it answered 401, not a refusal)
+    sessions / caught           sessions in the campaign / sessions that met at least one refusal
+    served_before_first_block   attempts served before the first refusal: the price of detection latency
+    first_block_after_s         seconds from the campaign's start to the first refusal (None if never)
+    duration_s                  how long the campaign ran: what a session-end (batch) scorer waits for
+
+Rules of engagement are enforced by tools/labclient.py (it imports the labnet guard): the target
+is this machine, and source addresses come from data/world.json, never invented.
 """
 
+import json
 import os
 import sys
+import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target as _target, require_local, require_local_env  # noqa: E402
-BASE_URL = _target("DEMO_URL", "http://localhost:5000")
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [os.path.join(HERE, "..", "tools"), os.path.join(HERE, "..")]
 
+from labclient import BASE_URL, LabClient, world_pool  # noqa: E402,F401
+from demo_site.seed import username  # noqa: E402,F401
 
-def target():
-    """The guarded demo-store URL (see labnet.py)."""
-    return BASE_URL
-
-
-# A fixed base time so windows, sketch buckets and CVs are identical every run.
-BASE_TS = 1_700_000_000.0
-
-HUMAN_NET = "203.0.113."       # TEST-NET-3, legitimate customers
-BOT_NET_A = "198.51.100."      # TEST-NET-2, bot IPs
-BOT_NET_B = "192.0.2."         # TEST-NET-1, more bot IPs
-
-ASSET_MARKERS = ("/static/", ".js", ".css", ".png", ".woff", ".ico")
+CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+REFUSED = (403, 429)
 
 
-def make_event(ts, sid, ip, path, status=200, method="GET", user="", actor="", ua="python-lab"):
-    """Build one HTTP event for the stream. ts is event time (epoch seconds)."""
-    is_asset = any(m in path.lower() for m in ASSET_MARKERS)
+def wrong_password(n):
+    """A guess that is not in the seed's top-100 list and not any account's password."""
+    return f"Winter2026-{n:04d}!"
+
+
+def login(sec_t, key, ip, email, password):
+    return (sec_t, key, ip, "POST", "/api/login", {"email": email, "password": password}, True)
+
+
+def page(sec_t, key, ip, path):
+    return (sec_t, key, ip, "GET", path, None, False)
+
+
+def execute(plan, actor, ua):
+    """
+    Run a plan: [(t, session key, ip, method, path, json body or None, is_login)], t in seconds from now.
+    Each session key gets its own client (own cookie jar), so it is its own session at the store.
+    """
+    clients, sess = {}, {}
+    t0 = time.time()
+    attempted = served = before = 0
+    first_block, blocked_seen = None, False
+    for t, key, ip, method, path, body, is_login in sorted(plan, key=lambda s: s[0]):
+        wait = t0 + t - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        c = clients.get(key) or clients.setdefault(key, LabClient(actor, ip=ip))
+        r = c.request(method, path, headers=[("User-Agent", ua), ("Accept", "application/json" if body else "text/html")],
+                      json=body)
+        refused = r.status_code in REFUSED
+        s = sess.setdefault(key, {"refused": 0})
+        if refused:
+            s["refused"] += 1
+            if first_block is None:
+                first_block = time.time() - t0
+        if is_login:
+            attempted += 1
+            served += 0 if refused else 1
+            if first_block is None:
+                before += 1
     return {
-        "ts": round(float(ts), 3), "sid": sid, "ip": ip, "path": path,
-        "method": method, "status": str(status), "user": user,
-        "ua": ua, "is_asset": "1" if is_asset else "0", "actor": actor,
+        "attempted": attempted, "succeeded": served, "sessions": len(sess),
+        "caught": sum(1 for s in sess.values() if s["refused"]),
+        "served_before_first_block": before,
+        "first_block_after_s": round(first_block, 2) if first_block is not None else None,
+        "duration_s": round(time.time() - t0, 1),
     }
 
 
-def bot_ip(index):
-    """Map a bot index to a distinct documentation IP across two /24 ranges."""
-    if index < 254:
-        return f"{BOT_NET_A}{index + 1}"
-    return f"{BOT_NET_B}{(index - 254) % 254 + 1}"
-
-
-def replay_live(events):
-    """Optional --live mode: replay generated events as real HTTP to the local site."""
-    import httpx
-    base = target()
-    with httpx.Client(base_url=base, timeout=5.0) as c:
-        for e in sorted(events, key=lambda x: float(x["ts"])):
-            data = None
-            if e["method"] == "POST":
-                pw = "wrong" if str(e["status"]) in ("401", "403") else "correct"
-                data = {"email": e.get("user", ""), "password": pw}
-            try:
-                c.request(e["method"], e["path"], data=data, cookies={"sid": e["sid"]})
-            except Exception:
-                pass
-
-
-def deliver(events, summary_line):
-    """Write events to the local stream, or (with --live) replay them over HTTP."""
-    if "--live" in sys.argv:
-        replay_live(events)
-        print(f"[live] replayed {len(events)} events to {target()} "
-              f"(watch /admin/verdicts)")
-        return
-    import store
-    import stream
-    r = store.connect()
-    for e in events:
-        stream.emit(r, e)
-    print(summary_line)
+def finish(summary):
+    print(json.dumps(summary))

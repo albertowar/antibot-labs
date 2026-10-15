@@ -1,0 +1,4 @@
+# Only for labs whose attacks or shoppers drive a real browser. After installing:
+#   python -m playwright install chromium
+# W2 Ch9 is the documented exception (camoufox needs playwright<1.63) and keeps its own pin.
+playwright==1.63.0

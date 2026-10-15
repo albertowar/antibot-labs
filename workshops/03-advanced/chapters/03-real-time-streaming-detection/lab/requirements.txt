@@ -1,12 +1,13 @@
-# W3 Ch3 — Real-Time Streaming Detection lab
-# Python 3.12+. Pins verified October 2026.
-#
-# The lab runs with no Docker on the memory:// store (fakeredis), which now
-# implements Redis Streams and the probabilistic commands (Count-Min, Top-K,
-# HyperLogLog) under its `probabilistic` extra. Point REDIS_URL at a real
-# Redis 8 to run the same code on the real server.
-
+# W3 Ch3 lab. Python 3.12+. Pins verified October 2026.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 Flask==3.1.3
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.1.4
 redis==8.1.0
-fakeredis[probabilistic]==2.39.0
-httpx==0.28.1            # only for the optional --live attack mode
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+# [probabilistic]: Count-Min, Top-K and HyperLogLog sketches (defenses/features.py); Redis 8 ships them in core
+fakeredis[lua,probabilistic]==2.39.0
+requests==2.34.2
+httpx==0.28.1
+# Docker-backed PostgreSQL path only (docker-compose.yml):
+psycopg[binary]==3.3.6
