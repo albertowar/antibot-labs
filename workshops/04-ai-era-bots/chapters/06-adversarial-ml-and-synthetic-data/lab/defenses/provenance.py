@@ -1,6 +1,5 @@
 """
 Round 3 defense: sanitize the training set  [YOUR FILE]
-Round 3 defense: sanitize the training set
 
 The poisoning attack (attacks/round3_poison.py) injects a burst of honeypot-hitting sessions that are
 shaped like real privacy-browser users. The weak rule labels them "bot" (they really did hit the honeypot),

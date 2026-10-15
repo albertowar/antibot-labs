@@ -18,5 +18,4 @@ lightgbm==4.7.0
 # Round 4: SMOTE (defenses/augment.py)
 imbalanced-learn==0.14.2
 # Unused on the default SQLite path. Only the Docker-backed PostgreSQL path (docker-compose.yml) needs it:
-# uncomment, or `pip install 'psycopg[binary]==3.3.6'`, before starting the store with DATABASE_URL=postgresql+psycopg://...
-# psycopg[binary]==3.3.6
+psycopg[binary]==3.3.6

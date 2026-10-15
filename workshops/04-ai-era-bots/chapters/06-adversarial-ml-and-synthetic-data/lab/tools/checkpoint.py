@@ -25,8 +25,9 @@ customer refused at the purchase; the budget per round is how many you accept lo
 the model check's own time per purchase (`ml_ms` in the decision log); the attacker cost is simulated proxy
 and fingerprint spend per successful purchase.
 
-Before the first round that scores, the checkpoint makes sure the drop-day history exists
-(tools/simulate.py, about 2 minutes, once) and that the models for the level exist (tools/ml_setup.py).
+Before anything runs, each Round's setup hook (tools/ml_setup.py, contract 1.7) makes sure the
+drop-day history exists (tools/simulate.py, about 2 minutes, once), that the models and the
+attacker's surrogate for the level exist, and resets the store with a drop day's stock.
 """
 
 import os
@@ -36,8 +37,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-import ml_setup  # noqa: E402,F401  (wraps labclient.reset and checkpoint_core.catch_up)
-import personas_ch6  # noqa: E402  (swaps in the drop-day cohort and the `drop_day` scenario)
+import ml_setup  # noqa: E402  (each Round.setup: history, models, surrogate, drop-day stock)
+import personas_ch6  # noqa: E402  (the drop-day cohort and the `drop_day` scenario)
 from checkpoint_core import Round, main  # noqa: E402
 import labclient  # noqa: E402
 from shopper import DROP  # noqa: E402
@@ -131,6 +132,7 @@ def labels_audited(board, results, attacks):
 
 def make_round(level, description, attacks, solutions, checks, budget):
     return Round(level=level, description=description, scenario="drop_day",
+                 setup=ml_setup.setup, people=personas_ch6.people,
                  attacks={name: ATTACKS[name] for name in attacks}, humans_hurt_max=budget,
                  extra_checks=[*checks, people, defender_cost], solutions=solutions)
 

@@ -1,21 +1,21 @@
 """
 Everything a round needs that is not a defense: the training history, the surrogate and the models.
 
-tools/checkpoint.py imports this module. It does two things the checkpoint engine has no hook for
-(recorded as a contract gap in TODO.md section 1.2):
+tools/checkpoint.py passes `setup` as each Round's setup hook (contract 1.7:
+`Round.setup(level, caught_up)` runs right after the round's reset). It makes sure the drop-day
+history exists (generated with tools/simulate.py if not), that the models the round's level needs
+exist, and (from Round 2) that the attacker holds a surrogate; it then resets the store again with
+a drop big enough for a drop day (the starter's 50 units would sell out in seconds).
 
-  1. It wraps labclient.reset, which check_round calls right after it sets the round's level. Before the
-     store is reset, `prepare()` makes sure the drop-day history exists (generated with tools/simulate.py
-     if not), that the models the round's level needs exist, and (from Round 2) that the attacker holds a
-     surrogate; the store is then reset with a drop big enough for a drop day (the starter's 50 units
-     would sell out in seconds).
-  2. It wraps checkpoint_core.catch_up. The solution files are installed as usual, and the models are
-     then TRAINED by the reference code, once per process, in the order the chapter tells it:
+With `--catch-up` the solution files are installed by the engine as usual; the first setup call
+then throws away any stale surrogate (the attacker's clone is rebuilt against the reference
+guard), and the models are TRAINED by the reference code, once per process, in the order the
+chapter tells it:
 
-         drop day -> baseline model v2 -> (Round 2) extraction, evasion wave, model v3
-                  -> (Round 3) poisoning wave, model v4 -> (Round 4) rare-class wave, model v5
+    drop day -> baseline model v2 -> (Round 2) extraction, evasion wave, model v3
+             -> (Round 3) poisoning wave, model v4 -> (Round 4) rare-class wave, model v5
 
-     Without --catch-up your own models are used and a missing one is a clear message.
+Without --catch-up your own models are used and a missing one is a clear message.
 """
 
 import os
@@ -26,12 +26,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 
-import checkpoint_core  # noqa: E402
 import labclient  # noqa: E402
 from defenses import history, models, waves  # noqa: E402
 
 DROP_STOCK = 20000
-STATE = {"catch_up": False, "trained": set()}
+STATE = {"cleaned": False, "trained": set()}
 SURROGATE = os.path.join(LAB, "data", "surrogate_patient.txt")
 
 
@@ -93,9 +92,17 @@ def train_for(level):
         STATE["trained"].add(name)
 
 
-def prepare(level):
+def setup(level, caught_up=False):
+    """Round.setup: history, models and surrogate for `level`, then a reset with a drop day's stock."""
+    if caught_up and not STATE["cleaned"]:
+        STATE["cleaned"] = True
+        for name in ("surrogate_patient", "surrogate_cheap"):      # the attacker's clone is rebuilt against the reference guard
+            for ext in (".txt", ".json"):
+                path = os.path.join(LAB, "data", name + ext)
+                if os.path.exists(path):
+                    os.remove(path)
     ensure_history()
-    if STATE["catch_up"]:
+    if caught_up:
         train_for(level)
     else:
         if models.missing(level):
@@ -103,29 +110,4 @@ def prepare(level):
                              f"robust_train, provenance, augment), or run with --catch-up.")
         if level >= 2:
             ensure_surrogate()
-
-
-_reset = labclient.reset
-
-
-def reset(mode="state", **params):
-    prepare(labclient.admin("GET", "/lab/status")["level"])
-    return _reset(mode, **{"stock": DROP_STOCK, **params})
-
-
-labclient.reset = reset
-
-_catch_up = checkpoint_core.catch_up
-
-
-def catch_up(rounds, upto):
-    _catch_up(rounds, upto)
-    STATE["catch_up"] = True
-    for name in ("surrogate_patient", "surrogate_cheap"):          # the attacker's clone is rebuilt against the reference guard
-        for ext in (".txt", ".json"):
-            path = os.path.join(LAB, "data", name + ext)
-            if os.path.exists(path):
-                os.remove(path)
-
-
-checkpoint_core.catch_up = catch_up
+    labclient.reset(stock=DROP_STOCK)
