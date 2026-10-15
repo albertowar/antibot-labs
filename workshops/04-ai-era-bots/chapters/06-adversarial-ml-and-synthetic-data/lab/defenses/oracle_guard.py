@@ -1,67 +1,60 @@
 """
-W4 Ch6 — Round 1 Defense: deny the extraction oracle  [STUDENT FILE]
+Round 1 defense: deny the extraction oracle (reference solution)
 
-A per-/24 query budget. A clone needs many labelled queries, and a cheap
-extractor sends them from a handful of datacenter /24s. Count scored
-checkouts per /24 in the recent window; once a /24 is over BUDGET, stop
-answering truthfully and return a CONSTANT block. A constant answer carries
-no information, so the extra probes teach the clone nothing — worse, they
-teach it that genuinely-allowed configs are blocked, so its fidelity falls.
-To rebuild fidelity the attacker must spread across many /24s, which means
-buying residential proxies: exactly the spend cohort features (W2 Ch7) see.
+A per-address query budget. A clone needs many labelled queries, and a cheap extractor sends them from a
+handful of boxes. Count the purchase attempts from each exit address in the recent window; once an address
+is over its budget, stop answering truthfully and return a CONSTANT refusal. A constant answer carries no
+information, so the extra probes teach the clone nothing. Worse for the attacker, they teach it that
+configs the model really allows are refused, so the clone's idea of the allowed region shrinks.
 
-Bonus (not required for the round to pass): add boundary randomized response
-— within BAND of the threshold, flip the verdict with probability FLIP_P,
-keyed deterministically on the session id so a real customer gets a stable
-answer. It blunts probing right at the decision line. Left out here to keep
-the budget's effect on fidelity easy to read.
+The check runs BEFORE the model (defenses/ladder.py), for two reasons: a probe over its budget never costs a
+model evaluation, and its refusal is identical whatever the model thought. The answer is a hard `block`
+verdict, so the store refuses the purchase before any order is written.
 
-Cost, paid by real users and reported by the checkpoint: a CGNAT /24 with
-many real phones behind it can exceed the budget on a busy drop and get
-soft-denied. Tune BUDGET against your own mobile volume, and prefer
-challenging over blocking when you can.
+Who pays, and what it does not stop:
+  - Shared addresses. A carrier-grade NAT puts dozens of real phones behind one address, and an office or a
+    campus puts hundreds of people behind four; a flat budget would refuse the busiest of them on a drop day.
+    Addresses on a mobile or corporate network get NAT_FACTOR times the budget (netinfo reads the kind of
+    network from the feeds). An attacker who buys exits there inherits the allowance, and mobile proxies are
+    the most expensive kind.
+  - Rotation. The budget is per address. An extractor that rotates through every exit its provider sells
+    spreads the same probes thin and never trips it (attacks/round1_extract.py --patient). The guard raises
+    the attacker's cost and slows the lazy one; it does not make the oracle safe. The model has to survive
+    being copied: Round 2.
 
-TODO (Round 1): decide() below. _recent_from_ip24() is given.
-Fell behind? python tools/checkpoint.py --round 1 --catch-up
+Bonus (not required): add randomized response at the boundary. Within a small band of the threshold, flip
+the verdict with probability FLIP_P, keyed deterministically on the session id so a real customer gets a
+stable answer. It blunts probing right at the decision line, at the price of refusing or admitting a few
+sessions at random.
 """
 
-import os
-import sys
-import time
+from . import models, netinfo, store
+from .pipeline import Check, Signal, Verdict
 
-from sqlalchemy import text
-
-sys.path.insert(0, os.path.dirname(__file__))
-
-from netinfo import ip24  # noqa: E402
-from store import LAB_TIME_SCALE  # noqa: E402
-
-WINDOW_S = 3600
-BUDGET = 20              # scored checkouts per /24 before the oracle goes constant
+WINDOW_S = 3600          # virtual seconds: models.time_scale() real seconds per virtual second
+BUDGET = 6               # purchase attempts per address per window before the oracle goes constant
+NAT_FACTOR = 8           # carrier or office NAT: many people, one address
 
 
-def _allow(order_id):
-    return 200, {"order_id": order_id, "status": "confirmed"}, "confirmed"
+def attempts(ctx):
+    """Record this purchase attempt and return how many the address has made in the window (including it)."""
+    window = max(1, round(WINDOW_S * models.time_scale()))     # real seconds (Redis wants an integer)
+    return store.Counters(ctx.redis).hit("oracle", ctx.ip, window=window)
 
 
-def _block(order_id, reason="blocked"):
-    return 403, {"error": reason}, "blocked"
+def budget(ctx):
+    """The attempts one address may make per window. Carriers and offices share an address among many people."""
+    kind = netinfo.lookup(ctx.ip)["asn_type"]
+    return BUDGET * NAT_FACTOR if kind in ("mobile", "corporate") else BUDGET
 
 
-def _recent_from_ip24(conn, prefix24, since):
-    row = conn.execute(text(
-        "SELECT COUNT(*) FROM orders o JOIN sessions s ON o.sid = s.sid "
-        "WHERE s.ip24 = :p AND o.ts >= :since AND o.score IS NOT NULL"),
-        {"p": prefix24, "since": since}).scalar()
-    return int(row or 0)
+def _check(ctx):
+    n = attempts(ctx)
+    ctx.note(oracle_attempts=n)
+    if n > budget(ctx):
+        ctx.note(oracle_guard="constant")
+        return Verdict(action="block", score=100, signals=(Signal("oracle_guard", "over_budget", 0, f"{n} attempts"),))
+    return None
 
 
-def decide(conn, level, sid, ip, risk, order_id):
-    """TODO (Round 1): per-/24 query budget, then the truthful verdict.
-
-    since = now - WINDOW_S * LAB_TIME_SCALE. If _recent_from_ip24(conn, ip24(ip), since)
-    is over BUDGET, return _block(order_id, reason="rate_limited") no matter what
-    risk says: a constant answer leaks nothing to the extractor. Otherwise answer
-    truthfully. Until then: the truthful oracle, which is what the extractor wants.
-    """
-    return _block(order_id) if risk >= 1.0 else _allow(order_id)
+CHECK = Check("oracle_guard", _check, phases=("action:drop_buy",))

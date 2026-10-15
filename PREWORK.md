@@ -45,6 +45,10 @@ python tools/doctor.py
 `doctor.py` must end with `READY`. It checks the Python version, the venv, every dependency, your
 Redis and database URLs, and that `DEMO_URL` points at this machine.
 
+Optional: if you have [uv](https://docs.astral.sh/uv/) installed, `uv venv -p 3.12 .venv` and
+`uv pip install -r requirements.txt` do the same thing much faster — worth it once you are
+creating a venv per chapter. The pip commands above need no extra tools and stay the default.
+
 ## 4. Start the store
 
 ```bash

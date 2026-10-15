@@ -1,139 +1,93 @@
 """
-Chapter 7 — Event store shared by the demo site, training and the tools
+Shared Redis helpers for every defense.
 
-Everything the model learns from is written here by the demo site:
-  sessions   first sighting of each session cookie and its IP
-  requests   one row per HTTP request (the server-side view)
-  telemetry  fingerprint + behavior summaries POSTed by the page collector
-             (the client-side view built in W2 Ch3 and W2 Ch4)
-  logins     which session logged into which account
-  accounts   seeded customer accounts with order history (a label source)
-  orders     checkout attempts, the score they got and the decision
+    REDIS_URL=memory://                   default: in-process fakeredis (single process, lab only)
+    REDIS_URL=redis://localhost:6379/0    docker compose
 
-Storage: PostgreSQL from ../docker-compose.yml by default. Set
-DATABASE_URL=sqlite:///ml_lab.db to run without Docker.
-
-Timestamps are real Unix seconds. Every *duration* the features use is
-divided by LAB_TIME_SCALE (see tools/labclient.py), so the simulators can
-compress a shopping session of minutes into about a second.
+The in-process fallback loses all state on restart and only works because the
+store is the one process talking to it. Production uses the real thing.
 """
 
+import ipaddress
 import os
+import time
 
-from sqlalchemy import (Column, Float, Integer, MetaData, String, Table, Text,
-                        create_engine, event)
+_client = None
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "postgresql+psycopg://workshop:workshop@localhost:5432/shop")
-# Shared by the site, the features and the simulators. Change it and re-run
-# everything: features computed at different scales are not comparable.
-LAB_TIME_SCALE = float(os.environ.get("LAB_TIME_SCALE", "0.02"))
-
-metadata = MetaData()
-
-requests_t = Table(
-    "requests", metadata,
-    Column("id", Integer, primary_key=True),
-    Column("sid", String(40), index=True),
-    Column("ts", Float, index=True),
-    Column("method", String(8)),
-    Column("path", String(200)),
-    Column("status", Integer),
-    Column("ip", String(45)),
-    Column("ua", Text),
-    Column("referer", Text),
-    Column("accept_language", String(200)),
-    Column("sec_fetch_site", String(40)),
-    Column("is_asset", Integer),
-    Column("bytes_out", Integer),
-)
-
-telemetry_t = Table(
-    "telemetry", metadata,
-    Column("id", Integer, primary_key=True),
-    Column("sid", String(40), index=True),
-    Column("ts", Float, index=True),
-    Column("kind", String(8)),          # 'fp' or 'beh'
-    Column("payload", Text),            # JSON
-    Column("fp_hash", String(64), index=True),
-    Column("ip", String(45)),
-)
-
-sessions_t = Table(
-    "sessions", metadata,
-    Column("sid", String(40), primary_key=True),
-    Column("first_ts", Float, index=True),
-    Column("ip", String(45)),
-    Column("ip24", String(45), index=True),
-)
-
-logins_t = Table(
-    "logins", metadata,
-    Column("id", Integer, primary_key=True),
-    Column("sid", String(40), index=True),
-    Column("ts", Float),
-    Column("account", String(40)),
-)
-
-accounts_t = Table(
-    "accounts", metadata,
-    Column("account", String(40), primary_key=True),
-    Column("orders", Integer),
-    Column("age_days", Integer),
-)
-
-orders_t = Table(
-    "orders", metadata,
-    Column("id", Integer, primary_key=True),
-    Column("sid", String(40), index=True),
-    Column("ts", Float, index=True),
-    Column("level", Integer),
-    Column("score", Float),             # supervised model probability
-    Column("anomaly", Float),           # anomaly score (level >= 3)
-    Column("decision", String(12)),     # allow | block | pending
-    Column("status", String(12)),       # confirmed | blocked | pending | cancelled
-    Column("review_at", Float),
-    Column("score_ms", Float),
-)
+TOKEN_BUCKET_LUA = """
+local key      = KEYS[1]
+local capacity = tonumber(ARGV[1])
+local refill   = tonumber(ARGV[2])
+local now      = tonumber(ARGV[3])
+local state  = redis.call('HMGET', key, 'tokens', 'ts')
+local tokens = tonumber(state[1]) or capacity
+local ts     = tonumber(state[2]) or now
+tokens = math.min(capacity, tokens + (now - ts) * refill)
+local allowed = 0
+if tokens >= 1 then
+  tokens = tokens - 1
+  allowed = 1
+end
+redis.call('HSET', key, 'tokens', tokens, 'ts', now)
+redis.call('EXPIRE', key, math.ceil(capacity / refill) + 1)
+return allowed
+"""
+_scripts = {}
 
 
-def make_engine(url=None):
-    url = url or DATABASE_URL
-    if url.startswith("sqlite"):
-        engine = create_engine(url, connect_args={"timeout": 30, "check_same_thread": False})
-
-        @event.listens_for(engine, "connect")
-        def _sqlite_pragmas(conn, _):
-            # WAL lets the simulators write while training reads
-            cur = conn.cursor()
-            cur.execute("PRAGMA journal_mode=WAL")
-            cur.execute("PRAGMA synchronous=NORMAL")
-            cur.close()
-        return engine
-    return create_engine(url, pool_size=20, max_overflow=20)
+def get_redis(url=None):
+    global _client
+    if _client is None:
+        url = url or os.environ.get("REDIS_URL", "memory://")
+        if url.startswith(("memory://", "fakeredis://")):
+            import fakeredis
+            _client = fakeredis.FakeStrictRedis(decode_responses=True)
+        else:
+            import redis
+            _client = redis.Redis.from_url(url, decode_responses=True)
+    return _client
 
 
-def seed_accounts(conn, n=400):
-    """Deterministic customer base: user0000..user0399 with order history."""
-    if conn.execute(accounts_t.select().limit(1)).first():
-        return
-    rows = []
-    for i in range(n):
-        # Every 3rd account is a long-standing customer with several orders
-        loyal = i % 3 != 2
-        rows.append({"account": f"user{i:04d}",
-                     "orders": 3 + i % 9 if loyal else i % 2,
-                     "age_days": 120 + i if loyal else 5 + i % 30})
-    conn.execute(accounts_t.insert(), rows)
+def token_bucket(redis, bucket, key, limits=None):
+    """Take one token from `bucket` for `key`. Atomic in Lua. True if allowed."""
+    from . import policy
+    capacity, refill = (limits or policy.RATE_LIMITS)[bucket]
+    script = _scripts.get(id(redis))
+    if script is None:
+        script = _scripts[id(redis)] = redis.register_script(TOKEN_BUCKET_LUA)
+    return bool(script(keys=[f"lab:rl:{bucket}:{key}"], args=[capacity, refill, time.time()]))
 
 
-def init_db(engine):
-    metadata.create_all(engine)
-    with engine.begin() as conn:
-        seed_accounts(conn)
+def prefix_of(ip):
+    """The /24 (IPv4) or /64 (IPv6) an address belongs to: the unit of cheap rotation."""
+    addr = ipaddress.ip_address(ip)
+    bits = 24 if addr.version == 4 else 64
+    return str(ipaddress.ip_network(f"{ip}/{bits}", strict=False))
 
 
-def reset_db(engine):
-    """Drop every event: used by `tools/checkpoint.py --reset`."""
-    metadata.drop_all(engine)
-    init_db(engine)
+class Counters:
+    """Windowed counters: how many times did `key` do `event` in the last `window` seconds."""
+
+    def __init__(self, redis, prefix="lab:c"):
+        self.redis, self.prefix = redis, prefix
+
+    def hit(self, event, key, window=60):
+        k = f"{self.prefix}:{event}:{key}"
+        now = time.time()
+        p = self.redis.pipeline()
+        p.zadd(k, {f"{now}": now})
+        p.zremrangebyscore(k, 0, now - window)
+        p.zcard(k)
+        p.expire(k, window + 1)
+        return p.execute()[2]
+
+    def count(self, event, key, window=60):
+        k = f"{self.prefix}:{event}:{key}"
+        now = time.time()
+        self.redis.zremrangebyscore(k, 0, now - window)
+        return self.redis.zcard(k)
+
+
+def flush_lab_state(redis):
+    for k in redis.scan_iter("lab:*"):
+        redis.delete(k)

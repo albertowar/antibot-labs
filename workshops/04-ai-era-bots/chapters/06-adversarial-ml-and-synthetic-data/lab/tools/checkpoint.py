@@ -1,264 +1,156 @@
 """
-W4 Ch6 — Round checkpoint: measure both sides of the adversarial-ML arms race
+Round checkpoint for W4 Ch6 (Adversarial ML & Synthetic Data). Declares the rounds and hands over to
+checkpoint_core.
 
-Run at the end of every round against the demo site at DEFENSE_LEVEL=1 (the
-deployed stack: model + anomaly + oracle guard). Round 0 collects the base
-data at DEFENSE_LEVEL=0 (log only). Each round has its own metric:
+    python tools/checkpoint.py --round 3              # set level 3, run this round's attackers next to 200 real customers
+    python tools/checkpoint.py --round 3 --level 2    # the same attackers against Round 2's model (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 AND train the reference models
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-  Round 1  surrogate fidelity   how well an extractor clones the model
-  Round 2  evasion success      transfer evasion from the clone
-  Round 3  privacy block rate   poisoning turned the retrain on real users
-  Round 4  rare-class success   the barely-labelled family
+Round N runs at DEFENSE_LEVEL N (level 0 is the bare store: the event log is written, nothing is scored).
+Level L scores with model v(L+1); the oracle guard (Round 1) sits in front of it from level 1. Each round
+runs the attackers that matter at that level, plus the earlier ones to prove they are still dead:
 
-Every round also reports real users blocked (the cost) and the attacker's
-simulated spend.
+    round  attacker                         defense                        what you should see
+    -----  -------------------------------  -----------------------------  -----------------------------------------
+      0    baseline scalpers                none (log only); labels audited  all succeed · 0 wrong labels
+      1    cheap and patient extractors     per-address oracle budget      cheap clone collapses · patient clone intact
+      2    evasion from the clone           adversarial training, monotone evasion ~0
+      3    (the poisoning wave retrains)    provenance sanitization        privacy-browser customers back under budget
+      4    slow mobile reseller             SMOTE for the rare class       reseller ~0 at an honest cost
 
-Fell behind, or want the reference defense? --catch-up rebuilds this round's
-state with the solution code (copies solutions/round{1..N}/* into defenses/,
-retrains the model, injects the round's traffic), then tells you to restart:
+Next to the attackers, 200 real customers shop (tools/personas_ch6.py), in six cohorts. `hurt` is a
+customer refused at the purchase; the budget per round is how many you accept losing. The defender cost is
+the model check's own time per purchase (`ml_ms` in the decision log); the attacker cost is simulated proxy
+and fingerprint spend per successful purchase.
 
-    python tools/checkpoint.py --round 2 --catch-up
-    DEFENSE_LEVEL=1 python demo_site/app.py        # restart to load the model/guard
-    python tools/checkpoint.py --round 2
-
-Start completely fresh (wipes the database, labels, truth, models, surrogate):
-
-    python tools/checkpoint.py --reset
+Before the first round that scores, the checkpoint makes sure the drop-day history exists
+(tools/simulate.py, about 2 minutes, once) and that the models for the level exist (tools/ml_setup.py).
 """
 
-import argparse
-import glob
-import json
 import os
-import random
-import shutil
-import subprocess
+import statistics
 import sys
-import urllib.request
-from collections import defaultdict
 
-import labclient  # noqa: E402,F401  (puts defenses/ on sys.path)
-import scoreboard
-import shopper
-import simulate
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "defenses"))
+import ml_setup  # noqa: E402,F401  (wraps labclient.reset and checkpoint_core.catch_up)
+import personas_ch6  # noqa: E402  (swaps in the drop-day cohort and the `drop_day` scenario)
+from checkpoint_core import Round, main  # noqa: E402
+import labclient  # noqa: E402
+from shopper import DROP  # noqa: E402
 
-LAB = os.path.join(os.path.dirname(__file__), "..")
-PY = sys.executable
-SOLUTIONS = os.path.join(LAB, "solutions")
-DEFENSES = os.path.join(LAB, "defenses")
-QUERIES = 160   # extractor probe budget in Round 1
-
-# Pass criteria per round (the newest attack must be contained).
-EXPECT = {
-    1: {"metric": "surrogate fidelity", "max": 0.80},
-    2: {"metric": "evasion success", "max": 0.20},
-    3: {"metric": "privacy_browser blocked", "max": 0.15},
-    4: {"metric": "rare-class success", "max": 0.25},
+ATTACKS = {
+    "baseline": "attacks/round0_baseline.py --n 20",
+    "cheap": "attacks/round1_extract.py",
+    "patient": "attacks/round1_extract.py --patient",
+    "evade": "attacks/round2_evade.py --n 40 --seed 131",
+    "reseller": "attacks/round4_rareclass.py --n 40 --seed 141",
 }
-# Share of simulated real users you accept blocking overall, per round.
-HUMAN_BUDGET = {0: 1.0, 1: 0.05, 2: 0.05, 3: 0.08, 4: 0.08}
+ML_MS_MEDIAN_MAX = 250.0        # defender cost: median time of the model check under a 16-thread flood (one purchase alone: a few ms)
+PRIVACY_MAX = 0.15              # Round 3 and 4: the share of privacy-browser customers you accept refusing
 
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
+def rate(attacks, name):
+    out = attacks.get(name) or {}
+    return out.get("succeeded", 0) / out["attempted"] if out.get("attempted") else None
 
 
-def status():
-    with urllib.request.urlopen(f"{labnet.target()}/lab/status", timeout=5) as r:
-        return json.loads(r.read())
+def attackers(**want):
+    """want: name -> (lo, hi) share of purchases that succeeded. Prints the lines the README table is made of."""
+    def check(board, results, attacks):
+        bad = []
+        print("\nattackers                  purchases   succeeded   expected      attacker cost")
+        for name, (lo, hi) in want.items():
+            got = rate(attacks, name)
+            out = attacks.get(name) or {}
+            n, k = out.get("attempted", 0), out.get("succeeded", 0)
+            per = f"${out.get('usd', 0) / k:.2f} per success" if k else "no successful purchase"
+            print(f"  {name:<22}{n:>6}{k:>11}  {'' if got is None else f'{got:>6.0%}'}   {lo:.0%}-{hi:.0%}   {per}")
+            if got is None or not lo <= got <= hi:
+                bad.append(f"{name}: {'no result' if got is None else f'{got:.0%}'} of purchases succeeded, expected {lo:.0%}-{hi:.0%}")
+        return (not bad, "; ".join(bad))
+    return check
 
 
-def step(title, *cmd):
-    print(f"\n▶ {title}: {' '.join(cmd)}", flush=True)
-    subprocess.run([PY, *cmd], cwd=LAB, check=True)
+def clones(cheap, patient):
+    """Round 1: how much of the allowed region each extractor's surrogate recovered (of the 16 configs that really pass)."""
+    def check(board, results, attacks):
+        bad = []
+        print("\nextractors                 fidelity   allowed region found   expected      attacker cost")
+        for name, (lo, hi) in (("cheap", cheap), ("patient", patient)):
+            out = attacks.get(name) or {}
+            got = out.get("allowed_found")
+            print(f"  {name:<22}{out.get('fidelity', 0):>8.0%}{'' if got is None else f'{got:>16.0%}'}{lo:>12.0%}-{hi:.0%}   ${out.get('usd', 0):.2f} for {out.get('queries', 0)} probes")
+            if got is None or not lo <= got <= hi:
+                bad.append(f"{name}: clone found {'nothing' if got is None else f'{got:.0%}'} of the allowed region, expected {lo:.0%}-{hi:.0%}")
+        return (not bad, "; ".join(bad))
+    return check
 
 
-def load(name):
-    return simulate.load_attack(name)
+def people(board, results, attacks):
+    """The false-positive accounting, per cohort (the budget itself is Round.humans_hurt_max)."""
+    rows = personas_ch6.summarize(results)
+    print("\nreal customers (cohort)    n  refused")
+    for cohort, r in sorted(rows.items()):
+        print(f"  {cohort:<22}{r['people']:>4}{r['hurt']:>8}   ({r['hurt'] / r['people']:.0%})")
+    total = sum(r["people"] for r in rows.values())
+    print(f"  total {sum(r['hurt'] for r in rows.values())}/{total}")
+    return (True, "")
 
 
-def copy_solutions(rnd):
-    installed = labnet.catch_up(LAB, rnd)
-    print(f"  installed solutions/round1..{rnd} -> " + ", ".join(installed) + "   (your versions kept as .bak; --restore puts them back)")
+def privacy_share(board, results, attacks):
+    """Rounds 3 and 4: the cohort the poisoning attack was aimed at."""
+    row = personas_ch6.summarize(results).get("privacy_browser")
+    if not row:
+        return (True, "")
+    share = row["hurt"] / row["people"]
+    return (share <= PRIVACY_MAX, f"privacy_browser customers refused: {row['hurt']}/{row['people']} ({share:.0%}) > {PRIVACY_MAX:.0%}")
 
 
-def n_orders():
-    from store import make_engine
-    with make_engine().connect() as conn:
-        return conn.exec_driver_sql("SELECT COUNT(*) FROM orders").scalar()
+def defender_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "path": f"/drop/{DROP}"})["items"]
+    ms = [d["extra"]["ml_ms"] for d in rows if d["method"] == "POST" and "ml_ms" in d.get("extra", {})]
+    if not ms:
+        return (True, "")                                    # level 0: nothing is scored
+    median = statistics.median(ms)
+    p95 = statistics.quantiles(ms, n=20)[-1] if len(ms) > 1 else ms[0]
+    print(f"\ndefender cost (the model check, while the attackers run)\n  ml check per purchase: median {median:.1f} ms, p95 {p95:.1f} ms over {len(ms)} purchases")
+    return (median < ML_MS_MEDIAN_MAX, f"model check median {median:.1f} ms > {ML_MS_MEDIAN_MAX} ms")
 
 
-def catch_up(rnd):
-    """Rebuild this round's reference state with the solution code, then stop."""
-    if n_orders() < 600:
-        step("Round 0 traffic (real users + baseline bots)", "tools/simulate.py")
-    step("Base model", "defenses/baseline_model.py")
-    step("Anomaly detector", "defenses/anomaly.py")
-    if rnd >= 1:
-        copy_solutions(rnd)
-    if rnd >= 2:
-        print("\n▶ Round 1 extraction (build the surrogate)")
-        load("round1_extract").run(seed=61, queries=QUERIES, quiet=True)
-        print("▶ Round 2 evasion (capture adversarial examples)")
-        load("round2_evade").run(n=40, seed=72, quiet=True)
-        step("Robust model v3 (adversarial + monotone)", "defenses/robust_train.py")
-    if rnd >= 3:
-        print("\n▶ Round 3 poisoning (inject the privacy-lookalike burst)")
-        load("round3_poison").run(n=120, seed=83, quiet=True)
-        step("Sanitized model v4 (provenance)", "defenses/provenance.py")
-    if rnd >= 4:
-        print("\n▶ Round 4 rare-class traffic (a few get labelled)")
-        load("round4_rareclass").run(n=60, seed=94, quiet=True)
-        step("Augmented model v5 (SMOTE)", "defenses/augment.py")
-    print(f"\n✅ Caught up for Round {rnd}. Restart the site so it loads the "
-          f"new model and guard, then re-run the checkpoint:\n"
-          f"     DEFENSE_LEVEL={min(rnd,1)} python demo_site/app.py\n"
-          f"     python tools/checkpoint.py --round {rnd}")
+def labels_audited(board, results, attacks):
+    """Round 0: the weak labels are never wrong, and they cover only part of the bots (the bias to discuss)."""
+    import audit
+    a = audit.audit_labels()
+    ok = a["wrong"] == 0 and 0.2 <= a["bot_coverage"] <= 0.85
+    return (ok, f"weak labels: {a['wrong']} wrong, {a['bot_coverage']:.0%} of bots covered (want 0 wrong, 20%-85%)")
 
 
-def reset():
-    from store import make_engine, reset_db
-    reset_db(make_engine())
-    gone = [shopper.TRUTH_FILE,
-            os.path.join(LAB, "data", "surrogate.txt"),
-            os.path.join(LAB, "data", "surrogate.json"),
-            os.path.join(LAB, "data", "adversarial.parquet"),
-            *glob.glob(os.path.join(LAB, "artifacts", "*"))]
-    for path in gone:
-        if os.path.basename(path) != ".gitkeep" and os.path.exists(path):
-            os.remove(path)
-    print("Database, truth, models, surrogate and adversarial captures wiped.")
+def make_round(level, description, attacks, solutions, checks, budget):
+    return Round(level=level, description=description, scenario="drop_day",
+                 attacks={name: ATTACKS[name] for name in attacks}, humans_hurt_max=budget,
+                 extra_checks=[*checks, people, defender_cost], solutions=solutions)
 
 
-def human_block(results):
-    """{cohort: [blocked, total]} for simulated real users."""
-    h = defaultdict(lambda: [0, 0])
-    for r in results:
-        if r["is_bot"] or str(r["final"]).startswith("error"):
-            continue
-        c = h[r["cohort"]]
-        c[0] += not shopper.succeeded(r)
-        c[1] += 1
-    return h
-
-
-def pct(n, d):
-    return f"{n}/{d} ({n / d:.0%})" if d else "-"
-
-
-def run_check(rnd, seed):
-    # Real users (+ a few baseline bots for context) at the round's level
-    personas = simulate.legit_personas(200, seed=seed)
-    personas += load("round0_baseline").personas(n_each=12, seed=seed)
-    random.Random(seed).shuffle(personas)
-    print(f"Sending {len(personas)} sessions (200 real users + baseline bots)...")
-    results = shopper.run_sessions(personas, seed=seed, run=f"checkpoint-{rnd}")
-
-    failures = 0
-    attack_usd = 0.0
-    metric_name = EXPECT[rnd]["metric"]
-    metric_cap = EXPECT[rnd]["max"]
-
-    if rnd == 1:
-        print("Extracting the model (concentrated datacenter probes)...")
-        st = load("round1_extract").run(seed=seed + 300, queries=QUERIES, quiet=True)
-        metric_val, attack_usd = st["fidelity"], st["usd"]
-        extra = f"{st['queries']} queries, ${attack_usd:.2f}"
-    elif rnd == 2:
-        print("Running the transfer evasion from the surrogate...")
-        load("round2_evade").run(n=40, seed=seed + 300, quiet=True)
-        st = load("round2_evade").run.stats
-        metric_val, attack_usd = st["ok"] / st["n"], st["usd"]
-        extra = " ".join(f"{k}={st['config'][k]}" for k in ("pool", "js", "behavior"))
-    elif rnd == 3:
-        pb = human_block(results)["privacy_browser"]
-        metric_val = pb[0] / pb[1] if pb[1] else 0.0
-        extra = f"{pb[0]}/{pb[1]} real privacy-browser users blocked"
-    else:  # rnd == 4
-        print("Running the rare mobile-reseller family...")
-        load("round4_rareclass").run(n=40, seed=seed + 300, quiet=True)
-        st = load("round4_rareclass").run.stats
-        metric_val, attack_usd = st["ok"] / st["n"], st["usd"]
-        extra = f"{st['ok']}/{st['n']} checkouts confirmed"
-
-    good = metric_val <= metric_cap
-    failures += not good
-    print(f"\n{'✅' if good else '❌'} {metric_name}: {metric_val:.0%}   "
-          f"(target ≤ {metric_cap:.0%}; {extra})")
-
-    # Real-user cost, always
-    h = human_block(results)
-    print("\nReal users (simulated cohorts)      blocked")
-    tb = tt = 0
-    for cohort, (b, n) in sorted(h.items()):
-        tb += b
-        tt += n
-        flag = "  ⚠️" if n and b / n > 0.15 else ""
-        print(f"     {cohort:<22} {pct(b, n)}{flag}")
-    budget = HUMAN_BUDGET[rnd]
-    hb_ok = tt == 0 or tb / tt <= budget
-    failures += not hb_ok
-    print(f"  {'✅' if hb_ok else '❌'} total {pct(tb, tt)}   (budget ≤ {budget:.0%})")
-
-    lat = scoreboard.latency(results)
-    if lat:
-        print(f"\nDefender cost   ML scoring: median {lat[0]:.1f} ms, p95 {lat[1]:.1f} ms")
-    if attack_usd:
-        print(f"Attacker cost   ≈ ${attack_usd:.2f} simulated proxy/fingerprint spend")
-    return failures
-
-
-def main():
-    parser = argparse.ArgumentParser(description="W4 Ch6 round checkpoint.")
-    parser.add_argument("--round", type=int, choices=range(0, 5))
-    parser.add_argument("--catch-up", action="store_true",
-                        help="rebuild this round's state with the solution code, then stop")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    parser.add_argument("--reset", action="store_true", help="wipe all lab state and exit")
-    parser.add_argument("--seed", type=int, default=None)
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-
-    if args.reset:
-        reset()
-        return 0
-    if args.round is None:
-        parser.error("--round is required")
-
-    try:
-        st = status()
-    except OSError:
-        print(f"❌ Demo site not reachable on {labnet.target()}. Is it running?")
-        return 1
-
-    if args.catch_up:
-        catch_up(args.round)
-        return 0
-
-    want = min(args.round, 1)
-    print(f"=== Checkpoint: Round {args.round} (server at DEFENSE_LEVEL={st['level']}, "
-          f"scoring {st['scoring']}) ===\n")
-    if st["level"] != want:
-        print(f"❌ Expected DEFENSE_LEVEL={want}. Restart the demo site with:")
-        print(f"     DEFENSE_LEVEL={want} python demo_site/app.py")
-        return 1
-    if args.round == 0:
-        print("Round 0 is data collection: run tools/simulate.py, then move to Round 1.")
-        return 0
-    if st["scoring"].get("missing"):
-        print(f"❌ Missing model files {st['scoring']['missing']}. Run with --catch-up.")
-        return 1
-
-    failures = run_check(args.round, args.seed if args.seed is not None else 100 + args.round)
-    print(f"\n{'✅' if not failures else '❌'} Round {args.round} checkpoint "
-          f"{'passed' if not failures else f'failed ({failures} expectation(s))'}.")
-    return 1 if failures else 0
-
+ROUNDS = {
+    0: make_round(0, "log only: the bare store, labels audited", ["baseline"], (),
+                  [attackers(baseline=(0.9, 1.0)), labels_audited], 0),
+    1: make_round(1, "L1 baseline model v2 behind the oracle guard", ["baseline", "cheap", "patient"],
+                  ("defenses/oracle_guard.py",),
+                  [attackers(baseline=(0.0, 0.10)), clones(cheap=(0.0, 0.5), patient=(0.9, 1.0))], 6),
+    2: make_round(2, "L2 model v3: adversarial training + monotone constraints", ["baseline", "evade"],
+                  ("defenses/robust_train.py",),
+                  [attackers(baseline=(0.0, 0.10), evade=(0.0, 0.20))], 10),
+    3: make_round(3, "L3 model v4: provenance-sanitized training set", ["baseline", "evade"],
+                  ("defenses/provenance.py",),
+                  [attackers(baseline=(0.0, 0.10), evade=(0.0, 0.20)), privacy_share], 10),
+    4: make_round(4, "L4 model v5: SMOTE for the rare class", ["baseline", "evade", "reseller"],
+                  ("defenses/augment.py",),
+                  [attackers(baseline=(0.0, 0.10), evade=(0.0, 0.20), reseller=(0.0, 0.25)), privacy_share], 12),
+}
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main(ROUNDS)

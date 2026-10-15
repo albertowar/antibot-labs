@@ -1,53 +1,54 @@
 """
-Chapter 7 — Session features: ONE function for training and serving (Section 7.2)
+Session features: ONE function for training and serving (W2 Ch7's feature set, unchanged)
 
-`compute()` turns a session's raw events into a flat feature dict. The
-demo site calls it at checkout (online), and `build_dataset()` calls it for
-every historical checkout (offline). Same code, same inputs, same "as of"
-time. That is the cheapest insurance against training/serving skew, the bug
-where the model was trained on features computed one way and served on
-features computed another.
+`compute()` turns a session's raw events into a flat feature dict. The store calls it at checkout
+(online, from defenses/ml_check.py), and `build_dataset()` calls it for every historical purchase
+attempt (offline, from the training history). Same code, same inputs, same "as of" time. That is
+the cheapest insurance against training/serving skew, the bug where the model was trained on
+features computed one way and served on features computed another.
 
-Point-in-time correctness: every feature only uses events with
-ts <= as_of. A cohort count that peeks at sessions *after* the checkout
-leaks the future into training and inflates offline metrics.
+Point-in-time correctness: every feature only uses events with ts <= as_of. A cohort count that
+peeks at sessions *after* the purchase leaks the future into training and inflates offline metrics.
 
 Feature families
-  request   server-side log: pacing, assets, navigation, header basics
-  network   ASN type from the simulated edge (defenses/netinfo.py)
-  client    fingerprint + behavior summary from the page collector
-            (W2 Ch3 / W2 Ch4). Absent for clients that never run JS.
-  consistency  do the client's claims agree with each other and the network?
-  cohort    population counts in a sliding window (Round 2, see cohort.py)
+  request      server log: pacing, assets, navigation, header basics
+  network      ASN type from the feeds (defenses/netinfo.py)
+  client       fingerprint + behaviour summaries the page collectors POST to /api/telemetry
+               (W2 Ch3 / W2 Ch4). Absent for clients that never run JS.
+  consistency  do the client's claims agree with each other and with the network?
+  cohort       population counts in a sliding window (see cohort.py)
 
-LEAKY features are derived from the same events as the weak labels
-(defenses/labels.py). They are logged for analysts but must never be
-model inputs: see `python defenses/train.py --include-leaky`.
+LEAKY features are derived from the same events as the weak labels (defenses/labels.py). They are
+logged for analysts but must never be model inputs: a model that is handed them just relearns the label rule
+(W2 Ch7 shows it).
+
+Time. Timestamps are real seconds; every DURATION is divided by LAB_TIME_SCALE (default 0.02), so a
+shopper who "thinks" for 6 s sleeps 0.12 s and the features still read 6 s. Change it and every
+trained model is stale: retrain.
 """
 
-import json
 import os
 import re
 import statistics
-import sys
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
 
-sys.path.insert(0, os.path.dirname(__file__))
+from . import cohort, netinfo
 
-import cohort  # noqa: E402
-from netinfo import ASN_TYPES, lookup  # noqa: E402
-from store import LAB_TIME_SCALE  # noqa: E402
+LAB_TIME_SCALE = float(os.environ.get("LAB_TIME_SCALE", "0.02"))
 
-HONEYPOT_PATHS = ("/specials-archive", "/api/v0/")
-PRODUCT_PAGE = re.compile(r"^/product/\d+$")
+HONEYPOT_PATHS = ("/archive", "/partner-feed")
+# Requests that SOURCE a label (honeypot hits, sign-ins) are kept out of the pacing features: a bot that
+# hit the honeypot would otherwise carry an extra page view and an extra gap, and the model would learn
+# the label from that side effect instead of from the bot.
+LABEL_SOURCE_PATHS = HONEYPOT_PATHS + ("/api/login", "/login")
+PRODUCT_PAGE = re.compile(r"^/product/p\d+$")
 
 REQUEST_FEATURES = [
     "n_pages", "asset_ratio", "gap_median_s", "gap_cv", "gap_min_s",
-    "duration_s", "referer_ratio", "products_viewed", "cart_to_checkout_s",
+    "duration_s", "referer_ratio", "products_viewed", "drop_to_buy_s",
     "ua_is_library", "no_accept_language", "sec_fetch_ratio",
 ]
 NETWORK_FEATURES = ["asn_type"]
@@ -66,7 +67,7 @@ LEAKY_FEATURES = ["honeypot_hits", "logged_in"]
 PER_SESSION_FEATURES = REQUEST_FEATURES + NETWORK_FEATURES + CLIENT_FEATURES + CONSISTENCY_FEATURES
 CATEGORICAL = ["asn_type"]
 
-# Feature set per model version (train.py --round N)
+# Feature sets (W2 Ch7's v1 and v2). The deployed models of this chapter all use set 2, see retrain.FEATURES.
 FEATURE_SETS = {
     1: PER_SESSION_FEATURES,
     2: PER_SESSION_FEATURES + COHORT_FEATURES,
@@ -78,6 +79,11 @@ TZ_COUNTRY = {
     "America/Los_Angeles": "US", "Europe/Berlin": "DE", "Europe/London": "GB",
     "Europe/Amsterdam": "NL", "Asia/Tokyo": "JP", "UTC": "??",
 }
+
+
+def is_buy(row):
+    """The purchase attempt: the request this chapter scores (POST /drop/<sku> or POST /api/buy)."""
+    return row["method"] == "POST" and (row["path"] == "/api/buy" or row["path"].startswith("/drop/"))
 
 
 def _os_from_ua(ua):
@@ -137,26 +143,25 @@ def fingerprint_consistency(fp, header_ua, ip_country):
     }
 
 
-def compute(req, tel, logins, as_of, cohort_window=None):
+def compute(req, tel, logged_in, as_of, cohort_window=None):
     """
-    Feature dict for ONE session. Plain Python on purpose: easy to read, and
-    fast enough to run inline on every checkout.
+    Feature dict for ONE session. Plain Python on purpose: easy to read, and fast enough to run
+    inline on every purchase.
 
-    req       this session's requests: list of dicts (ts, method, path, ip, ua, ...)
-    tel       this session's telemetry: list of dicts (ts, kind, payload, fp_hash, ip)
-    logins    number of logins by this session
-    as_of     only events with ts <= as_of are used
+    req        this session's request events: list of dicts (ts, method, path, ip, ua, ...)
+    tel        this session's telemetry rows: list of dicts (ts, kind, payload, fp_hash, ip)
+    logged_in  whether this session signed in to an account
+    as_of      only events with ts <= as_of are used
     cohort_window  cohort.Window with population rows, or None (no cohort features)
     """
-    # The checkout POST is logged after it is scored: never part of its own features
-    req = sorted((r for r in req if r["ts"] <= as_of and r["path"] != "/checkout"),
-                 key=lambda r: r["ts"])
+    # The purchase attempt is scored before it is logged: never part of its own features
+    req = sorted((r for r in req if r["ts"] <= as_of and not is_buy(r)), key=lambda r: r["ts"])
     tel = sorted((t for t in tel if t["ts"] <= as_of), key=lambda t: t["ts"])
     f = {}
 
     # --- request features -------------------------------------------------
     assets = [r for r in req if r["is_asset"]]
-    actions = [r for r in req if not r["is_asset"] and not r["path"].startswith("/api/telemetry")]
+    actions = [r for r in req if not r["is_asset"] and not r["path"].startswith(("/api/telemetry",) + LABEL_SOURCE_PATHS)]
     pages = [r for r in actions if r["method"] == "GET"]
     gaps = [(b["ts"] - a["ts"]) / LAB_TIME_SCALE for a, b in zip(actions, actions[1:])]
     f["n_pages"] = len(pages)
@@ -167,8 +172,8 @@ def compute(req, tel, logins, as_of, cohort_window=None):
     f["duration_s"] = (as_of - req[0]["ts"]) / LAB_TIME_SCALE if req else 0.0
     f["referer_ratio"] = (sum(bool(p["referer"]) for p in pages) / len(pages)) if pages else 0.0
     f["products_viewed"] = len({p["path"] for p in pages if PRODUCT_PAGE.match(p["path"])})
-    cart = [r["ts"] for r in actions if r["path"] == "/cart/add"]
-    f["cart_to_checkout_s"] = (as_of - max(cart)) / LAB_TIME_SCALE if cart else np.nan
+    drop_page = [r["ts"] for r in pages if r["path"].startswith("/drop/")]
+    f["drop_to_buy_s"] = (as_of - max(drop_page)) / LAB_TIME_SCALE if drop_page else np.nan
     first = req[0] if req else {}
     ua = first.get("ua") or ""
     f["ua_is_library"] = int("Mozilla/" not in ua)
@@ -177,14 +182,14 @@ def compute(req, tel, logins, as_of, cohort_window=None):
 
     # --- network ------------------------------------------------------------
     ip = first.get("ip") or ""
-    net = lookup(ip)
-    f["asn_type"] = ASN_TYPES.index(net["asn_type"])
+    net = netinfo.lookup(ip)
+    f["asn_type"] = netinfo.ASN_TYPES.index(net["asn_type"])
 
     # --- client telemetry -------------------------------------------------
     fp_rows = [t for t in tel if t["kind"] == "fp"]
     beh_rows = [t for t in tel if t["kind"] == "beh"]
-    fp = json.loads(fp_rows[-1]["payload"]) if fp_rows else None
-    beh = json.loads(beh_rows[-1]["payload"]) if beh_rows else None
+    fp = fp_rows[-1]["payload"] if fp_rows else None
+    beh = beh_rows[-1]["payload"] if beh_rows else None
     f["has_fp"] = int(fp is not None)
     f["has_beh"] = int(beh is not None)
     f["webdriver"] = int(bool(fp and fp.get("webdriver")))
@@ -206,9 +211,9 @@ def compute(req, tel, logins, as_of, cohort_window=None):
 
     # --- leaky (label-source) features: logged, never trained on --------------
     f["honeypot_hits"] = sum(r["path"].startswith(HONEYPOT_PATHS) for r in req)
-    f["logged_in"] = int(logins > 0)
+    f["logged_in"] = int(bool(logged_in))
 
-    # --- cohort features (Round 2) -------------------------------------------
+    # --- cohort features -------------------------------------------
     fp_hash = fp_rows[-1]["fp_hash"] if fp_rows else None
     f["fp_hash"] = fp_hash   # not a model input: for analysts and cluster labeling
     if cohort_window is not None:
@@ -216,51 +221,45 @@ def compute(req, tel, logins, as_of, cohort_window=None):
     return f
 
 
-def _records(conn, sql):
-    return [dict(r) for r in conn.execute(text(sql)).mappings()]
-
-
-def build_dataset(conn, with_cohort=True):
+def build_dataset(hist, with_cohort=True):
     """
-    One row per checkout attempt, features computed as of the checkout time.
-    Columns: sid, ts, ip, account, <features>.
+    One row per session that tried to buy, features computed as of that attempt.
+    `hist` is defenses.history.load(). Columns: sid, ts, ip, account, <features>.
     """
-    orders = _records(conn, "SELECT sid, ts FROM orders ORDER BY ts")
-    if not orders:
-        return pd.DataFrame()
     req_by, tel_by = defaultdict(list), defaultdict(list)
-    for r in _records(conn, "SELECT * FROM requests"):
+    for r in hist["events"]:
         req_by[r["sid"]].append(r)
-    telemetry = _records(conn, "SELECT * FROM telemetry")
-    for t in telemetry:
+    for t in hist["telemetry"]:
         tel_by[t["sid"]].append(t)
-    login_by = {}
-    for row in _records(conn, "SELECT sid, account FROM logins ORDER BY ts"):
-        login_by.setdefault(row["sid"], row["account"])
-    index = (cohort.PopulationIndex(_records(conn, "SELECT * FROM sessions"), telemetry)
-             if with_cohort else None)
-
-    rows, seen = [], set()
-    for o in orders:
-        if o["sid"] in seen:      # first checkout per session is the decision we model
-            continue
-        seen.add(o["sid"])
-        req = req_by.get(o["sid"], [])
-        window = index.window(o["ts"]) if index is not None else None
-        f = compute(req, tel_by.get(o["sid"], []), int(o["sid"] in login_by), o["ts"], window)
-        f.update({"sid": o["sid"], "ts": o["ts"], "account": login_by.get(o["sid"]),
-                  "ip": req[0]["ip"] if req else ""})
+    attempts = {}
+    for sid, rows in req_by.items():
+        buys = [r["ts"] for r in rows if is_buy(r)]
+        if buys:
+            attempts[sid] = min(buys)
+    if not attempts:
+        return pd.DataFrame()
+    first_seen = [{"sid": sid, "first_ts": min(r["ts"] for r in rows), "ip": min(rows, key=lambda r: r["ts"])["ip"]}
+                  for sid, rows in req_by.items()]
+    index = cohort.PopulationIndex(first_seen, hist["telemetry"]) if with_cohort else None
+    rows = []
+    for sid, as_of in sorted(attempts.items(), key=lambda kv: kv[1]):
+        req = req_by[sid]
+        first = min(req, key=lambda r: r["ts"])
+        ip = first["ip"]
+        fp_rows = sorted((t for t in tel_by.get(sid, []) if t["kind"] == "fp" and t["ts"] <= as_of), key=lambda t: t["ts"])
+        window = index.window(as_of, ip, fp_rows[-1]["fp_hash"] if fp_rows else None) if index is not None else None
+        f = compute(req, tel_by.get(sid, []), hist["logins"].get(sid), as_of, window)
+        f.update({"sid": sid, "ts": as_of, "account": hist["logins"].get(sid), "ip": ip})
         rows.append(f)
     return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":
-    from store import make_engine
-    with make_engine().connect() as conn:
-        df = build_dataset(conn)
+    from . import history
+    df = build_dataset(history.load())
     if df.empty:
-        print("No checkouts yet. Run tools/simulate.py first.")
+        print("No purchase attempts in the history yet. Run: python tools/simulate.py")
     else:
         pd.set_option("display.width", 200)
-        print(f"{len(df)} checkout sessions, {len(df.columns)} columns")
+        print(f"{len(df)} purchase attempts, {len(df.columns)} columns")
         print(df[PER_SESSION_FEATURES + COHORT_FEATURES].describe().T.round(2))
