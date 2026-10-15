@@ -1,156 +1,93 @@
 """
-W3 Ch1 — Round checkpoint
+Round checkpoint for W3 Ch1 (Mobile Apps, Attestation & MitM). Declares the rounds and hands over to
+checkpoint_core.
 
-Run at the end of every round to see where you stand, measuring BOTH sides:
+    python tools/checkpoint.py --round 3              # set level 3, run this round's attacker next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same attacker against Round 2's defense (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 over your files (.bak kept)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-    bots:    this round's attack — how many pairs it buys
-    humans:  the 12 simulated customers (tools/legit_traffic.py) — allowed,
-             challenged or blocked
-    cost:    defender scoring time (Server-Timing) per action
+This lab is WIRE-IT: Rounds 1-4 each ship one stub with a TODO (Round 1 is client code, Rounds 2-4 are checks
+already wired into defenses/ladder.py), and solutions/round<N>/ holds the finished file. The provider mock
+(defenses/mobile_core.py) is infrastructure, not a TODO.
 
-A round passes when the attack is handled as that round expects AND no
-legitimate customer is BLOCKED. Challenged customers are reported as friction,
-not failure — Round 4's whole lesson is that the signal which stops the farm
-also adds friction for rooted / custom-ROM / old devices.
+    round  level  defense you write                          attacker                       gets through the stub?
+    -----  -----  -----------------------------------------  -----------------------------  -----------------------
+      1    1      certificate pinning (pinned_client.py)     intercept and replay           yes (the pin is checked separately)
+      2    2      require a provider verdict                 no verdict / a forged one      yes, until the check exists
+      3    3      bind it: hash, fresh, single-use nonce     a lifted genuine verdict       yes, until the check exists
+      4    4      integrity + device/address velocity        an emulator farm               yes, until the check exists
 
-Round 1 is the exception: the attack is SUPPOSED to get through at L0 (that is
-the vulnerability), and the round's defense — certificate pinning — is checked
-separately (does a pinned client refuse an intercepted certificate?).
-
-Fell behind, or want to see the finished defense? Each round's TODO lives in one
-module. `--catch-up` installs the reference solutions for rounds 1..N over your files
-(saving a .bak first).
-
-Run (store running at the round's level):
-    python tools/checkpoint.py --round 2
-    python tools/checkpoint.py --round 3 --catch-up
+A round passes when the attacker gets what the round expects AND no shopper is refused outright. Round 4
+refuses the three GrapheneOS customers at checkout (the challenge band is enforced as a refusal because the
+store has no step-up flow): the checkpoint lists them as the cost instead of failing, and fails if anyone else
+is touched. Defender cost is the median gate time of the shoppers' buys (Server-Timing: gate).
 """
 
-import argparse
-import importlib
 import os
-import shutil
 import statistics
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "attacks"))
-import legit_traffic  # noqa: E402
-from lab import BASE_URL, admin, ensure_local, server_status  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+import personas_ch1  # noqa: E402,F401  (registers the ch1_mobile scenario)
+import population  # noqa: E402
+import labclient  # noqa: E402
+from checkpoint_core import Round, main  # noqa: E402
+
+GATE_MEDIAN_MAX_MS = 25.0           # median gate time per shopper buy (in-process Redis)
+GATE_MEDIAN_MAX_MS_REDIS = 250.0    # with a real Redis every check costs a network round trip
+FRICTION_PERSONA = "consumer_vpn"   # the three GrapheneOS customers
+
+
+def pin_holds(board, results, attacks):
+    held = bool((attacks.get("intercept") or {}).get("pin_refuses"))
+    print(f"\ncertificate pinning (defenses/pinned_client.py)\n  an intercepted certificate is {'refused' if held else 'ACCEPTED'}")
+    return held, "the pinned client accepted a proxy's certificate: implement check_pin"
+
+
+def friction(expected):
+    """The shoppers the gate answered with its challenge band: exactly `expected` personas, nobody else."""
+    def check(board, results, attacks):
+        got = sorted({r["persona"] for r in results if r.get("outcome") == "challenged"})
+        n = sum(1 for r in results if r.get("outcome") == "challenged")
+        bought = sum(1 for r in results if r.get("outcome") == "bought")
+        print(f"\nthe people: {len(results)} shoppers · bought {bought} · challenged {n}" + (f" ({', '.join(got)})" if got else ""))
+        want = sorted(expected)
+        return got == want, f"challenged personas {got}, expected {want}"
+    return check
+
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "actor": "human:", "path": "/api/mobile/buy"})["items"]
+    ms = [d["ms"] for d in rows]
+    if not ms:
+        return False, "no shopper buys in the decision log"
+    redis_url = labclient.admin("GET", "/lab/config")["redis_url"]
+    limit = GATE_MEDIAN_MAX_MS if redis_url.startswith("memory") else GATE_MEDIAN_MAX_MS_REDIS
+    p95 = statistics.quantiles(ms, n=20)[-1] if len(ms) > 1 else ms[0]
+    median = statistics.median(ms)
+    print(f"\ndefender cost (the shoppers' buys)\n  gate per buy: median {median:.2f} ms, p95 {p95:.2f} ms over {len(ms)} buys")
+    return median < limit, f"gate median {median:.2f} ms > {limit} ms"
+
+
+def make_round(level, description, attack, name, expect, checks=(), **kw):
+    return Round(level=level, description=description, scenario="ch1_mobile", attacks={name: attack}, expect={name: expect},
+                 extra_checks=[*checks, gate_cost], **kw)
+
 
 ROUNDS = {
-    1: {"attack": "round1_intercept", "kwargs": {"sessions": 6}, "level": 0, "expect": "through"},
-    2: {"attack": "round2_unpin", "kwargs": {"sessions": 6}, "level": 1, "expect": "blocked"},
-    3: {"attack": "round3_replay", "kwargs": {"sessions": 6}, "level": 2, "expect": "blocked"},
-    4: {"attack": "round4_farm", "kwargs": {"sessions": 12}, "level": 3, "expect": "blocked"},
+    1: make_round(1, "pin the certificate: the proxy can no longer read the app", "attacks/round1_intercept.py", "intercept", "full",
+                  [pin_holds, friction([])], solutions=("defenses/pinned_client.py",)),
+    2: make_round(2, "require a provider verdict: no verdict, no pair", "attacks/round2_unpin.py", "unpin", "blocked",
+                  [friction([])], solutions=("defenses/attestation.py",)),
+    3: make_round(3, "bind it to the request: hash, freshness, single-use nonce", "attacks/round3_replay.py", "replay", "blocked",
+                  [friction([])], solutions=("defenses/request_signing.py",)),
+    4: make_round(4, "score the device: integrity and velocity stop the farm", "attacks/round4_farm.py", "farm", "blocked",
+                  [friction([FRICTION_PERSONA])], solutions=("defenses/device_verdict.py",)),
 }
-SOLUTIONS = {1: "pinned_client.py", 2: "attestation.py", 3: "request_signing.py", 4: "device_verdict.py"}
 
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
-
-
-def catch_up(rnd):
-    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB_DIR, rnd)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print("   Restart the demo site for the change to take effect.\n")
-
-
-def run_attack(spec):
-    module = importlib.import_module(spec["attack"])
-    importlib.reload(module)
-    return module, module.run(**spec["kwargs"])
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(ROUNDS))
-    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    parser.add_argument("--skip-bot", action="store_true", help="only measure the legitimate users")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-    ensure_local()
-    spec = ROUNDS[args.round]
-
-    if args.catch_up:
-        catch_up(args.round)
-
-    try:
-        status = server_status()
-    except Exception:
-        print(f"❌ Demo store not reachable on {BASE_URL}. Start it: python demo_site/app.py")
-        return 1
-    level = status["level"]
-    print(f"=== Checkpoint: Round {args.round} (store at DEFENSE_LEVEL={level}) ===\n")
-    if level != spec["level"]:
-        print(f"❌ This round needs DEFENSE_LEVEL={spec['level']}. Restart the store:")
-        print(f"     DEFENSE_LEVEL={spec['level']} REDIS_URL=memory:// python demo_site/app.py")
-        return 1
-
-    admin("POST", "/admin/reset")  # clear the drop + counters so counts start from zero
-    failures = 0
-
-    if not args.skip_bot:
-        module, result = run_attack(spec)
-        got = result["succeeded"]
-        if spec["expect"] == "through":
-            ok = got > 0
-            verb = "got through (the Round 1 vulnerability)"
-        else:
-            ok = got == 0
-            verb = f"stopped at level {spec['level']}"
-        failures += not ok
-        print("Bot traffic")
-        print(f"  {'✅' if ok else '❌'} {spec['attack']:<20} {got}/{result['attempts']} pairs ({verb})")
-        for reason in result["top_reasons"]:
-            print(f"       - {reason}")
-        print(f"  attacker cost: {result['wall_s_per_attempt']} s wall per attempt "
-              f"({result['wall_s']} s total)")
-        if args.round == 1:
-            blocks = module.pin_demo()
-            print(f"  {'✅' if blocks else '❌'} certificate pinning {'refuses' if blocks else 'does NOT refuse'} "
-                  f"an intercepted certificate (defenses/pinned_client.py)")
-            failures += not blocks
-        print()
-
-    print("Legitimate users (12 simulated customers)")
-    legit = legit_traffic.run()
-    blocked = [r for r in legit if r["outcome"] == "block"]
-    challenged = [r for r in legit if r["outcome"] == "challenge"]
-    errors = [r for r in legit if r["outcome"] not in ("allow", "block", "challenge")]
-    allowed = len(legit) - len(blocked) - len(challenged) - len(errors)
-    failures += bool(blocked) + bool(errors)
-    print(f"  {'✅' if not (blocked or errors) else '❌'} {allowed}/{len(legit)} allowed, "
-          f"{len(challenged)} challenged, {len(blocked)} blocked, {len(errors)} errored")
-    for r in blocked + errors:
-        print(f"       ❌ {r['persona']:<20} {r['stage']:<6} {r['reasons'][:2]}")
-    if challenged:
-        personas = sorted({r["persona"] for r in challenged})
-        print(f"       ⚠️  challenged (friction): {', '.join(personas)}")
-
-    timings = [r["score_ms"] for r in legit if r["score_ms"] is not None]
-    if timings:
-        p95 = statistics.quantiles(timings, n=20)[-1] if len(timings) >= 2 else timings[0]
-        print(f"\nDefender cost: scoring median {statistics.median(timings):.2f} ms, p95 {p95:.2f} ms per buy")
-
-    print()
-    if failures:
-        print(f"❌ Round {args.round}: {failures} check(s) differ from what this round expects.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    main(ROUNDS)

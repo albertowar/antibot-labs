@@ -1,11 +1,14 @@
-# W3 Ch1 optional extra: the live interception demo (Round 1/2, instructor-driven).
+# W3 Ch1 optional extra: the live interception demo (Round 1/2, optional).
 #
 #   pip install -r requirements-mitmproxy.txt      # after requirements.txt, same venv
 #
 # mitmproxy 12.2.3 requires cryptography<=48.1 (and pyOpenSSL<=27), so this file
 # downgrades cryptography from the series baseline (50.0.2) inside this venv.
-# The store and the attacks only use HMAC/Ed25519 through APIs that are
-# identical in 48 and 50. Keep this out of the shared baseline on purpose.
+# The lab uses ECDSA P-256 signing and verification (defenses/mobile_core.py)
+# and X.509 / SPKI serialization (tools/make_cert.py, defenses/pinned_client.py),
+# all of which are the same API in 48 and 50. Keep this out of the shared
+# baseline on purpose. The resolver also prints a harmless typing_extensions
+# conflict warning (mitmproxy pins 4.14, anyio wants 4.16).
 #
 # Known advisories (pip-audit, Oct 2026): mitmproxy 12.2.3 also caps tornado at
 # 6.5.5, which carries GHSA-3hv7-mjh2-fv65, GHSA-wwv5-g3v4-889x and

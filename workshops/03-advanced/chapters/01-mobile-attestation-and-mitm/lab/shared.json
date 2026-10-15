@@ -1,0 +1,4 @@
+{
+  "defenses/ja4.py": "workshops/02-proficient/chapters/05-tls-and-network-fingerprinting/lab/defenses/ja4.py",
+  "defenses/known_fingerprints.json": "workshops/02-proficient/chapters/05-tls-and-network-fingerprinting/lab/defenses/known_fingerprints.json"
+}

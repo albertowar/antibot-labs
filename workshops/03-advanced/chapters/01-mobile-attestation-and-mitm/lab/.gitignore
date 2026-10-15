@@ -1,7 +1,8 @@
-venv/
 .venv/
-__pycache__/
 instance/
+logs/
+__pycache__/
 *.pyc
 *.bak
+.env
 attacks/data/captured_calls.jsonl

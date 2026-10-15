@@ -1,5 +1,5 @@
 """
-W3 Ch1 — Mobile attestation & signing core (infrastructure, not a TODO for you)
+W3 Ch1: mobile attestation & signing core (infrastructure, not a TODO for you)
 
 This module is the shared machinery the genuine app AND the attacker's
 reverse-engineered SDK both use. In real life:
@@ -30,9 +30,12 @@ Verdict fields mirror Play Integrity's verdict:
     requestHash     : sha256 of the canonical request (standard request binding)
     ts              : epoch ms the verdict was minted
 
-See the README "What the mock leaves out" box for how this differs from the
-real APIs (asymmetric crypto detail, hardware roots of trust, Google/Apple
-round-trips, rate limits on the verdict calls themselves).
+What the mock leaves out: hardware roots of trust and certificate chains, the
+Google/Apple round-trip (the real verdict is decrypted or verified through the
+provider's API, with its own quota), and the provider's rate limits on the
+verdict calls themselves. The README's "What the mock leaves out" box says more.
+
+Run it on its own (from the lab folder):  python -m defenses.mobile_core
 """
 
 import base64
@@ -45,12 +48,24 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.exceptions import InvalidSignature
 
-INSTANCE = os.path.join(os.path.dirname(__file__), "..", "instance")
+INSTANCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "instance")
 PRIV = os.path.join(INSTANCE, "attest_private.pem")
 PUB = os.path.join(INSTANCE, "attest_public.pem")
 
-APP_ID = "com.labstore.runner"          # the genuine app's package name
+APP_ID = "com.labstore.runner"        # the genuine app's package name
 APP_VERSION = "3.2.0"
+APP_UA = f"LabRunner/{APP_VERSION} (Android 14; Pixel 8) okhttp/4.12.0"
+
+# The TLS fingerprint the genuine app's stack puts on the wire. The lab has no TLS edge, so a client
+# CLAIMS it in X-Lab-JA4 (tools/labclient.py) and the gate reads it as a claimed fingerprint (W2 Ch5's
+# measured version needs a real TLS edge). The app is modelled with Chromium/BoringSSL's JA4 from
+# defenses/known_fingerprints.json; a stock Python HTTP client has the library JA4 below.
+APP_JA4 = "t13d1516h2_8daaf6152771_806a8c22fdea"
+PYTHON_LIB_JA4 = "t13d1712h1_ab0a1bf427ad_882d495ac381"
+
+# Redis keys the nonce flow uses. Everything under "lab:" is wiped by POST /lab/reset.
+ISSUED_PREFIX = "lab:ch1:issued:"      # a nonce the server handed out (GET /api/mobile/nonce)
+SPENT_PREFIX = "lab:ch1:spent:"        # a nonce a buy already used (Round 3 writes it)
 
 # Honest verdict per device profile. The attacker cannot pick a better row than
 # the device they actually run on.
@@ -70,7 +85,7 @@ DEVICE_PROFILES = {
 # Provider key (lazy: created on first use, like a real enrolment)
 # --------------------------------------------------------------------------
 
-def _ensure_keys():
+def ensure_keys():
     if os.path.exists(PRIV) and os.path.exists(PUB):
         return
     os.makedirs(INSTANCE, exist_ok=True)
@@ -84,13 +99,13 @@ def _ensure_keys():
 
 
 def _private_key():
-    _ensure_keys()
+    ensure_keys()
     with open(PRIV, "rb") as f:
         return serialization.load_pem_private_key(f.read(), password=None)
 
 
 def _public_key():
-    _ensure_keys()
+    ensure_keys()
     with open(PUB, "rb") as f:
         return serialization.load_pem_public_key(f.read())
 

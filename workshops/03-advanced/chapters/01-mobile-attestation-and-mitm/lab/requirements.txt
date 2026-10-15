@@ -1,21 +1,14 @@
-# W3 Ch1 Mobile Apps, Attestation & MitM lab. Python 3.12+. Pins verified October 2026.
-#
-# Core store + attacker + tools. The lab runs with no Docker: the store defaults
-# to SQLite and an in-memory Redis (fakeredis). Install PostgreSQL/Redis only if
-# you want the production-shaped path (see the README).
+# W3 Ch1 lab. Python 3.12+. Pins verified October 2026.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.1.4
-cryptography==50.0.2
+redis==8.1.0
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+fakeredis[lua]==2.39.0
 requests==2.34.2
 httpx==0.28.1
-fakeredis==2.39.0
-redis==8.1.0
-
-# Live interception demo only (Round 1/2): mitmproxy lives in
-# requirements-mitmproxy.txt because mitmproxy 12.2.3 requires cryptography<=48.1
-# and this file follows the series baseline (cryptography 50). The scripted
-# rounds and tools/checkpoint.py do NOT need it. See the README.
-
-# Optional production-shaped path (PostgreSQL). Uncomment if you run docker compose.
-# psycopg[binary]==3.3.6
+# The provider mock (defenses/mobile_core.py) signs verdicts with an EC key; pinning (defenses/pinned_client.py) reads a certificate's SPKI.
+cryptography==50.0.2
+# Docker-backed PostgreSQL path only (docker-compose.yml):
+psycopg[binary]==3.3.6

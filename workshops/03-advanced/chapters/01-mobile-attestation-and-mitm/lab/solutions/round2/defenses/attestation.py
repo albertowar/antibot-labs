@@ -1,15 +1,25 @@
 """
-W3 Ch1 — L1 defense: require a valid app-attestation token  (Round 2, reference)
+Round 2 defense (level 2): require a valid app-attestation verdict. (Reference solution.)
+
+The provider's signature was verified before this check runs (ctx.attrs["attest"] is the decoded verdict, or
+None). The policy is two lines: no verdict, or a verdict signed for another app, is a block-sized signal.
+
+Who it hurts: almost nobody on its own. A weak device (rooted, GrapheneOS, uncertified) still gets a *signed*
+verdict, so it passes this layer; separating those from the farm is Round 4. A client that cannot reach the
+provider at all (no Play services, an old iOS) has no verdict and is stopped here: budget a fallback.
 """
 
-from mobile_core import APP_ID
+from .mobile_core import APP_ID
+from .pipeline import Check, Signal
 
 
-def score(ctx, verdict):
-    if not ctx["path"].startswith("/api/mobile/"):
-        return 0, []
+def _check(ctx):
+    verdict = ctx.attrs.get("attest")
     if verdict is None:
-        return 60, ["No valid attestation: missing or unsigned by the provider"]
+        return [Signal("attestation", "no_verdict", 80, "missing, forged or not signed by the provider")]
     if verdict.get("appId") != APP_ID:
-        return 60, [f"Attestation signed for a different app: {verdict.get('appId')!r}"]
-    return 0, []
+        return [Signal("attestation", "wrong_app", 80, f"signed for {verdict.get('appId')!r}")]
+    return None
+
+
+CHECK = Check("attestation", _check, phases=("action:mobile_buy",))

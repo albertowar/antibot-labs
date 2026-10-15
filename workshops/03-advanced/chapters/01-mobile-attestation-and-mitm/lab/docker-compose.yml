@@ -1,46 +1,20 @@
-# W3 Ch1 — OPTIONAL production-shaped path (Redis + PostgreSQL).
-#
-# The lab runs with NO Docker by default: the store uses SQLite and an in-memory
-# Redis (fakeredis). Use this only to see the store on the same stack it would
-# run on in production.
-#
-#   docker compose up -d --wait     # start both, bound to 127.0.0.1 only
-#   docker compose down -v          # stop and wipe
-#
-# Then run the store against them:
-#   DATABASE_URL=postgresql+psycopg://workshop:workshop@localhost:5432/shop \
-#   REDIS_URL=redis://127.0.0.1:6379/0 python demo_site/app.py
-# (uncomment psycopg in requirements.txt first).
-
-name: w3-ch01-mobile
-
+# Optional. The store runs without Docker (SQLite + an in-process Redis). Bring these up to
+# run the production-shaped stack the series uses everywhere else:
+#   docker compose up -d --wait
+#   REDIS_URL=redis://127.0.0.1:6379/0 \
+#   DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
+name: kestrel-starter
 services:
   redis:
     image: redis:8.10.2-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "127.0.0.1:6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 3s
-      retries: 15
-
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 2s, timeout: 2s, retries: 15}
   postgres:
     image: postgres:18.6-alpine
-    environment:
-      POSTGRES_USER: workshop
-      POSTGRES_PASSWORD: workshop
-      POSTGRES_DB: shop
-    ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U workshop -d shop"]
-      interval: 2s
-      timeout: 3s
-      retries: 15
-
+    environment: {POSTGRES_USER: workshop, POSTGRES_PASSWORD: workshop, POSTGRES_DB: shop}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql"]   # the 18 image keeps PGDATA under this mount
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U workshop -d shop"], interval: 2s, timeout: 2s, retries: 15}
 volumes:
-  pgdata:
+  pgdata: {}

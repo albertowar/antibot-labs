@@ -1,5 +1,9 @@
 """
-W3 Ch1 — Round 1 defense (client side): certificate pinning  (reference)
+Round 1 defense (client side): certificate pinning. (Reference solution.)
+
+The pin is the hash of the certificate's public key (SPKI), not of the certificate, so a renewed certificate
+on the same key still matches. Who it hurts: nobody who is honest, until the server rotates its KEY without a
+backup pin shipped in the app (every installed copy then refuses the real server). Ship a second pin.
 """
 
 import base64
