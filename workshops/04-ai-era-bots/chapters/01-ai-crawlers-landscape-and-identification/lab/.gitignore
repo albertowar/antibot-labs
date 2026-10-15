@@ -1,9 +1,7 @@
 .venv/
+instance/
+logs/
 __pycache__/
 *.pyc
-# Generated at first start; regenerate, never commit.
-data/shop.db
-data/shop.db-wal
-data/shop.db-shm
-# checkpoint --catch-up backups of your own defenses
-defenses/_backup/
+*.bak
+.env

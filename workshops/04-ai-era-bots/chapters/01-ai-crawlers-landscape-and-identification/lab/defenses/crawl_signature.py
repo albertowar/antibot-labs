@@ -7,17 +7,22 @@ features() is given. It turns one address's recent request history (plus one
 collective signal) into numbers:
 
   n_requests, n_pages, n_assets   evidence so far (non-asset requests, pages, assets)
-  asset_ratio        assets per page: browsers ~3 here (css + js + logo), parsers 0
+  asset_ratio        assets per page: browsers load the stylesheet, script and images, parsers 0
   cadence_cv         coefficient of variation of gaps between pages: loops ~0, people ~1
   sitemap_order      share of consecutive product fetches in ascending SKU order
   cookie_continuity  share of pages sent with our session cookie
   coverage           distinct products fetched by this address / catalog size
-  asn_class          isp / mobile / cloud / hosting / operator
+  asn_type           residential / mobile / corporate / datacenter (defenses/netinfo.py: VPNs,
+                     privacy relays, cloud and hosting ranges all read "datacenter")
   cluster_cov        catalog share fetched by ALL cookie-less clients sharing this
                      client's (User-Agent, ASN) pair, i.e. one crawler on many addresses
   robots_fetched     whether this address ever asked for /robots.txt
 
-score(features) is yours: return (points, reasons). The store labels a browser-like
+The history is recorded by demo_site/ext/crawl.py, because static files and images never
+reach the gate: the store only learns that a client "loaded the page like a browser" if
+something watches the paths the gate skips.
+
+score(features) is yours: return (points, reasons). The check labels a browser-like
 client "undeclared-crawler" at or above THRESHOLD. Two rules to keep:
 
   * Do not judge on thin evidence. Below MIN_EVIDENCE requests an address is not a
@@ -26,26 +31,29 @@ client "undeclared-crawler" at or above THRESHOLD. Two rules to keep:
   * Collective signals may fire earlier than individual ones: a cluster that has
     already fetched a third of the catalog is a crawler whatever this address did.
 
-Check the cost in tools/checkpoint.py: humans (including the two on cloud egress
-addresses), the RSS reader, the link unfurler, the uptime monitor and the developer
-with curl must all stay at 0 blocked.
+Check the cost in tools/checkpoint.py: the shoppers (including the ones on VPN and privacy-relay
+addresses), the RSS reader, the link unfurler, the uptime monitor and the developer with curl
+must all stay at 0 blocked.
 """
 
 from __future__ import annotations
 
 import statistics
 
+from . import crawl, netinfo
+from .pipeline import Check
+
 MIN_EVIDENCE = 4        # non-asset requests from one address before we judge it
 THRESHOLD = 60          # score at or above this = undeclared crawler
 CLUSTER_TRIP = 0.35     # catalog share a cookie-less (UA, ASN) cluster may fetch
 
 
-def features(history: list[dict], catalog_size: int, cluster_cov: float, asn_class: str) -> dict:
+def features(history: list[dict], catalog_size: int, cluster_cov: float, asn_type: str) -> dict:
     pages = [h for h in history if h["kind"] == "page"]
     assets = [h for h in history if h["kind"] == "asset"]
     n_pages = len(pages)
     f = {"n_requests": sum(1 for h in history if h["kind"] != "asset"), "n_pages": n_pages,
-         "n_assets": len(assets), "asn_class": asn_class, "cluster_cov": cluster_cov,
+         "n_assets": len(assets), "asn_type": asn_type, "cluster_cov": cluster_cov,
          "robots_fetched": any(h["kind"] == "robots" for h in history)}
     f["asset_ratio"] = len(assets) / n_pages if n_pages else 0.0
     gaps = [b["t"] - a["t"] for a, b in zip(pages, pages[1:])]
@@ -71,7 +79,24 @@ def score(f: dict) -> tuple[float, list[str]]:
     #     sitemap_order >= 0.9                          +20
     #     cookie_continuity < 0.2                       +15
     #     coverage >= 0.25                              +25
-    #     asn_class in (cloud, hosting)                 +15
+    #     asn_type == "datacenter"                      +15
     #   Ask of every weight: which real client could it hurt, and is it enough on its
-    #   own to cross THRESHOLD? A Private Relay user is "cloud" and nothing else.
+    #   own to cross THRESHOLD? A VPN or Private Relay user is "datacenter" and nothing else.
     return 0.0, []
+
+
+def _check(ctx):
+    """Given: score every client that is neither verified nor a proven impersonator."""
+    if not crawl.is_page(ctx):
+        return None
+    st = crawl.state(ctx)
+    if st["identity"] not in (crawl.DECLARED_VERIFIED, crawl.IMPERSONATOR):
+        feats = features(ctx.attrs.get("crawl_history", []), ctx.attrs.get("crawl_catalog", 0),
+                         ctx.attrs.get("crawl_cluster", 0.0), netinfo.lookup(ctx.ip)["asn_type"])
+        st["score"], st["reasons"] = score(feats)
+        if st["identity"] == crawl.BROWSER_LIKE and st["score"] >= THRESHOLD:
+            st["identity"] = crawl.UNDECLARED_CRAWLER
+    return crawl.enforce(ctx, THRESHOLD)
+
+
+CHECK = Check("crawl_signature", _check)

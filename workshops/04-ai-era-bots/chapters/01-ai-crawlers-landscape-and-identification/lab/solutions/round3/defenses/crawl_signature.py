@@ -1,51 +1,64 @@
-"""Round 3 (reference solution): does an unclaimed client behave like a crawler?
+"""Round 3: does an unclaimed client behave like a crawler?
 
-The stealth crawler of Round 2 claims nobody. It sends a browser User-Agent from a
-rented cloud address, so neither the registry nor verification has anything to say.
-What it cannot hide is *how* it fetches. From this address's own request history
-(up to 15 minutes) and one collective signal, we compute:
+The stealth crawler claims nobody: a browser User-Agent from a rented cloud address.
+Registry and verification have nothing to say. What it cannot hide is how it fetches.
 
-  asset_ratio        assets fetched per page. Browsers load CSS, JS and images with
-                     every page; HTML-only clients are parsers.
-  cadence_cv         coefficient of variation of the gaps between page requests.
-                     People are bursty; loops are metronomes.
-  sitemap_order      share of consecutive product fetches in ascending SKU order.
-                     Sitemap walkers go p001, p002, ...; shoppers do not.
-  cookie_continuity  share of page requests carrying our session cookie. Browsers keep
-                     it; stateless fetchers drop it.
-  coverage           distinct products this address fetched / catalog size.
-  asn_class          cloud / hosting addresses are where crawlers are rented.
-  cluster_cov        catalog share fetched by all cookie-less clients sharing this
-                     client's (User-Agent, ASN) pair. One crawler spread over thirty
-                     addresses is still one client on one network.
+features() is given. It turns one address's recent request history (plus one
+collective signal) into numbers:
 
-score() adds points per signal and THRESHOLD turns the sum into a verdict. The
-evidence gate matters as much as the weights: a client with fewer than MIN_EVIDENCE
-requests is not scored at all. A link previewer, an uptime check or a developer with
-curl never makes enough requests to be judged, and does not need to be. A crawler has
-to, because it wants the whole catalog.
+  n_requests, n_pages, n_assets   evidence so far (non-asset requests, pages, assets)
+  asset_ratio        assets per page: browsers load the stylesheet, script and images, parsers 0
+  cadence_cv         coefficient of variation of gaps between pages: loops ~0, people ~1
+  sitemap_order      share of consecutive product fetches in ascending SKU order
+  cookie_continuity  share of pages sent with our session cookie
+  coverage           distinct products fetched by this address / catalog size
+  asn_type           residential / mobile / corporate / datacenter (defenses/netinfo.py: VPNs,
+                     privacy relays, cloud and hosting ranges all read "datacenter")
+  cluster_cov        catalog share fetched by ALL cookie-less clients sharing this
+                     client's (User-Agent, ASN) pair, i.e. one crawler on many addresses
+  robots_fetched     whether this address ever asked for /robots.txt
 
-Where it fails (on purpose, see Round 3's evolved attacks): a crawler that fetches
-assets, jitters, follows links, holds cookies and spreads itself over residential
-addresses scores like a person. At the HTTP level that is the end of the road; W4 Ch2
-makes the good ones prove who they are and W4 Ch3 makes the rest pay for every page.
+The history is recorded by demo_site/ext/crawl.py, because static files and images never
+reach the gate: the store only learns that a client "loaded the page like a browser" if
+something watches the paths the gate skips.
+
+score(features) is yours: return (points, reasons). The check labels a browser-like
+client "undeclared-crawler" at or above THRESHOLD. Two rules to keep:
+
+  * Do not judge on thin evidence. Below MIN_EVIDENCE requests an address is not a
+    crawler, it is a link preview, an uptime check or someone with curl. Scrapers
+    must make many requests; previewers never do.
+  * Collective signals may fire earlier than individual ones: a cluster that has
+    already fetched a third of the catalog is a crawler whatever this address did.
+
+This is the reference solution; the residual it leaves is the chapter's point. A polite crawler
+spread over residential-looking addresses that keeps a session cookie scores like a crowd of
+shoppers: at the HTTP level that is the end of the road. W4 Ch2 makes the good ones prove who
+they are and W4 Ch3 makes the rest pay for every page.
+
+Check the cost in tools/checkpoint.py: the shoppers (including the ones on VPN and privacy-relay
+addresses), the RSS reader, the link unfurler, the uptime monitor and the developer with curl
+must all stay at 0 blocked.
 """
 
 from __future__ import annotations
 
 import statistics
 
+from . import crawl, netinfo
+from .pipeline import Check
+
 MIN_EVIDENCE = 4        # non-asset requests from one address before we judge it
 THRESHOLD = 60          # score at or above this = undeclared crawler
 CLUSTER_TRIP = 0.35     # catalog share a cookie-less (UA, ASN) cluster may fetch
 
 
-def features(history: list[dict], catalog_size: int, cluster_cov: float, asn_class: str) -> dict:
+def features(history: list[dict], catalog_size: int, cluster_cov: float, asn_type: str) -> dict:
     pages = [h for h in history if h["kind"] == "page"]
     assets = [h for h in history if h["kind"] == "asset"]
     n_pages = len(pages)
     f = {"n_requests": sum(1 for h in history if h["kind"] != "asset"), "n_pages": n_pages,
-         "n_assets": len(assets), "asn_class": asn_class, "cluster_cov": cluster_cov,
+         "n_assets": len(assets), "asn_type": asn_type, "cluster_cov": cluster_cov,
          "robots_fetched": any(h["kind"] == "robots" for h in history)}
     f["asset_ratio"] = len(assets) / n_pages if n_pages else 0.0
     gaps = [b["t"] - a["t"] for a, b in zip(pages, pages[1:])]
@@ -85,7 +98,24 @@ def score(f: dict) -> tuple[float, list[str]]:
     if f["coverage"] >= 0.25:
         s += 25
         reasons.append("catalog coverage")
-    if f["asn_class"] in ("cloud", "hosting"):
+    if f["asn_type"] == "datacenter":
         s += 15
         reasons.append("datacenter address")
     return s, reasons
+
+
+def _check(ctx):
+    """Given: score every client that is neither verified nor a proven impersonator."""
+    if not crawl.is_page(ctx):
+        return None
+    st = crawl.state(ctx)
+    if st["identity"] not in (crawl.DECLARED_VERIFIED, crawl.IMPERSONATOR):
+        feats = features(ctx.attrs.get("crawl_history", []), ctx.attrs.get("crawl_catalog", 0),
+                         ctx.attrs.get("crawl_cluster", 0.0), netinfo.lookup(ctx.ip)["asn_type"])
+        st["score"], st["reasons"] = score(feats)
+        if st["identity"] == crawl.BROWSER_LIKE and st["score"] >= THRESHOLD:
+            st["identity"] = crawl.UNDECLARED_CRAWLER
+    return crawl.enforce(ctx, THRESHOLD)
+
+
+CHECK = Check("crawl_signature", _check)

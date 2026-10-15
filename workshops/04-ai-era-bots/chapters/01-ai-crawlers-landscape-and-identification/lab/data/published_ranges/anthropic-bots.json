@@ -1,9 +1,9 @@
 {
-  "_comment": "LAB SNAPSHOT. Stands in for https://claude.com/crawling/bots.json (one combined list for ClaudeBot, Claude-User and Claude-SearchBot). Prefixes are RFC 5737 documentation space, not Anthropic's.",
+  "_comment": "LAB SNAPSHOT. Shape mirrors https://claude.com/crawling/bots.json. Prefixes are slices of this lab's existing simulated cloud_gcp pool (RFC 5737 documentation space), not Anthropic's real ones.",
   "creationTime": "2026-10-01T00:00:00.000000",
   "prefixes": [
     {
-      "ipv4Prefix": "203.0.113.192/28"
+      "ipv4Prefix": "198.51.100.104/29"
     }
   ]
 }

@@ -1,179 +1,127 @@
-"""Round checkpoint: measure both sides, pass or fail, and catch up if you fell behind.
+"""
+Round checkpoint for W4 Ch1 (AI Crawlers: Landscape & Identification). Declares the rounds and
+hands over to checkpoint_core.
 
-    python tools/checkpoint.py --round N              # test your defenses at DEFENSE_LEVEL=N
-    python tools/checkpoint.py --round N --catch-up   # install the reference solutions for rounds 1..N
+    python tools/checkpoint.py --round 3              # set level 3, run this round's crawlers next to the cohort
+    python tools/checkpoint.py --round 3 --level 2    # the same crawlers against Round 2's defenses (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 first (your files kept as .bak)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-For round N it (1) checks the store runs at DEFENSE_LEVEL=N, (2) resets the store and
-runs the legitimate cohort, (3) resets again and runs every attack up to round N, then
-prints what each side achieved and a verdict:
+Round N runs at DEFENSE_LEVEL N (level 0 is the bare store). Each round runs the crawler that beats
+the PREVIOUS round's defense, plus the earlier crawlers to prove they are still stopped:
 
-  PASS when no person and no verified crawler is blocked or challenged, and every
-  attack from earlier rounds stays under its ceiling. The current round's attack is
-  shown but not judged: it is supposed to get through. That is the next round.
+    round  defense added                           crawlers run                          what you should see
+    -----  --------------------------------------  ------------------------------------  ---------------------------------
+      0    none                                    honest GPTBot                         takes the whole catalog
+      1    registry + published robots.txt         honest GPTBot, GPTBot ignoring        both get nothing; the OAI-SearchBot
+                                                   robots.txt, impersonated search bot   impersonator takes everything
+      2    verification (ranges, FCrDNS)           + fake-PTR Googlebot, stealth Chrome  impersonators get nothing; the
+                                                                                         stealth crawler takes everything
+      3    behaviour signature                     + polite 30-address crawler           stealth stopped; the polite crawler
+                                                                                         gets some; LocalSearchBot refused
+      4    identity x purpose policy               same crawlers                         LocalSearchBot limited, not refused
 
-Catch-up copies solutions/round{1..N}/ over defenses/ (and Round 1's robots.txt over
-demo_site/robots.txt), keeping each of your files once as .bak (--restore puts them back).
-The store reloads defense files on the fly; only DEFENSE_LEVEL needs a restart.
+Next to the crawlers, the starter's 40 shoppers browse and buy, and nine automated clients you want
+to keep run too (tools/personas_ch1.py): four non-browser tools and five declared crawlers, one of them
+a small search engine that cannot prove who it is. `hurt` is a client that met a 403; `limited` is a 429
+(friction you chose). LocalSearchBot's refusal at Round 3 is the chapter's documented false positive.
+
+Defender cost: the median and p95 gate time of the shoppers' catalog requests from the decision log,
+while the crawlers hammer the same store (history recording, parsing, signature and policy).
 """
 
-from __future__ import annotations
-
-import argparse
-import importlib
 import os
-import shutil
 import statistics
 import sys
-import time
-
-import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB_DIR, "attacks"))
 sys.path.insert(0, HERE)
-from _common import BASE_URL, require_local  # noqa: E402
-import legit_traffic  # noqa: E402
+
+import personas_ch1  # noqa: E402  (swaps in the chapter's cohort and the `crawl_mix` scenario)
+from checkpoint_core import Round, main  # noqa: E402
+import labclient  # noqa: E402
 
 ATTACKS = {
-    0: ("round0_declared_crawler", {}, "round0 declared GPTBot (honours robots.txt)"),
-    1: ("round1_impersonate_searchbot", {}, "round1 impersonated OAI-SearchBot"),
-    2: ("round2_stealth_chrome", {}, "round2 stealth Chrome, 4 cloud IPs"),
-    3: ("round3_polite_distributed", {}, "round3 polite crawler, 30 ISP IPs"),
+    "gptbot": "attacks/round0_declared_crawler.py",
+    "gptbot_ignores": "attacks/round0_declared_crawler.py --ignore-robots",
+    "impersonator": "attacks/round1_impersonate_searchbot.py",
+    "fake_ptr": "attacks/round1_impersonate_searchbot.py --token Googlebot --fake-ptr",
+    "stealth": "attacks/round2_stealth_chrome.py",
+    "polite": "attacks/round3_polite_distributed.py",
+    "polite_cookies": "attacks/round3_polite_distributed.py --cookies --pool home_eu",
 }
-# level -> {attack round: max coverage % that counts as stopped; None = shown, not judged}
-EXPECT = {
-    0: {0: None},
-    1: {0: 0, 1: None},
-    2: {0: 0, 1: 0, 2: None},
-    3: {0: 0, 1: 0, 2: 15, 3: 60},
-    4: {0: 0, 1: 0, 2: 15, 3: 60},
+GATE_MEDIAN_MAX_MS = 25.0           # defender-cost threshold: median gate time per shopper request (in-process Redis)
+GATE_MEDIAN_MAX_MS_REDIS = 250.0    # with a real Redis: a few network round trips per request under a crawler flood
+KEEP = ("verified_googlebot", "verified_oai_searchbot", "verified_gptbot", "verified_claudebot")
+
+
+def welcome(localsearch):
+    """The nine automated clients you keep: tools and declared crawlers. localsearch: 'ok' | 'refused' | 'limited'."""
+    def check(board, results, attacks):
+        rows = {r["persona"]: r for r in results if r["actor"].startswith("legit:")}
+        print("\nwelcome automation (not shoppers)      served  limited  refused")
+        bad = []
+        for name, r in sorted(rows.items()):
+            extra = f"   (robots.txt: skipped {r['skipped']})" if r.get("skipped") else ""
+            print(f"  {name:<34}{r.get('served', 0):>6}{r.get('limited', 0):>9}{r.get('blocked', 0):>9}{extra}")
+        for name in KEEP:
+            if rows[name].get("limited"):
+                bad.append(f"{name} was rate-limited {rows[name]['limited']}x: a verified crawler should not meet a budget")
+        ls = rows["localsearchbot"]
+        got = "refused" if ls.get("blocked") else ("limited" if ls.get("limited") else "ok")
+        if localsearch == "refused" and got != "refused":
+            bad.append(f"localsearchbot was {got}; the blunt Round 3 mapping should refuse it (the documented false positive)")
+        if localsearch == "limited" and got != "limited":
+            bad.append(f"localsearchbot was {got}; Round 4 should give it a budget (limited, never refused)")
+        return (not bad, "; ".join(bad))
+    return check
+
+
+def crawlers(**want):
+    """want: attack name -> 'full' | 'partial' | 'blocked' (printed beside what each crawler took)."""
+    def check(board, results, attacks):
+        print("\ncrawlers                  product pages taken   expected")
+        for name in want:
+            out = attacks.get(name) or {}
+            print(f"  {name:<22}{out.get('succeeded', '?'):>6} /{out.get('attempted', '?'):<4} ({out.get('coverage', '?')}%)   {want[name]}")
+        return (True, "")
+    return check
+
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "actor": "human:"})["items"]
+    ms = [d["ms"] for d in rows]
+    if not ms:
+        return (False, "no shopper requests in the decision log")
+    median = statistics.median(ms)
+    p95 = statistics.quantiles(ms, n=20)[-1] if len(ms) > 1 else ms[0]
+    limit = GATE_MEDIAN_MAX_MS if labclient.admin("GET", "/lab/config")["redis_url"].startswith("memory") else GATE_MEDIAN_MAX_MS_REDIS
+    print(f"\ndefender cost (the shoppers' requests, while the crawlers run)\n  gate per request: median {median:.2f} ms, p95 {p95:.2f} ms over {len(ms)} requests")
+    return (median < limit, f"gate median {median:.2f} ms > {limit} ms")
+
+
+def rnd(level, description, attacks, expect, solutions, welcome_check, **kw):
+    return Round(level=level, description=description, scenario="crawl_mix",
+                 attacks={name: ATTACKS[name] for name in attacks}, expect=expect, solutions=solutions,
+                 extra_checks=[crawlers(**expect), welcome_check, gate_cost], **kw)
+
+
+ROUNDS = {
+    0: rnd(0, "bare store: nobody asks who is crawling", ["gptbot"], {"gptbot": "full"}, (), welcome("ok")),
+    1: rnd(1, "L1 registry + published robots.txt", ["gptbot", "gptbot_ignores", "impersonator"],
+           {"gptbot": "blocked", "gptbot_ignores": "blocked", "impersonator": "full"},
+           ("defenses/ladder.py", "defenses/crawler_registry.py", "data/crawl_policy.robots"), welcome("ok")),
+    2: rnd(2, "L2 verification: published ranges + forward-confirmed rDNS", ["gptbot_ignores", "impersonator", "fake_ptr", "stealth"],
+           {"gptbot_ignores": "blocked", "impersonator": "blocked", "fake_ptr": "blocked", "stealth": "full"},
+           ("defenses/ladder.py", "defenses/crawler_verify.py"), welcome("ok")),
+    3: rnd(3, "L3 behaviour signature", ["impersonator", "stealth", "polite", "polite_cookies"],
+           {"impersonator": "blocked", "stealth": "blocked", "polite": "partial", "polite_cookies": "full"},
+           ("defenses/ladder.py", "defenses/crawl_signature.py"), welcome("refused"), allowed_fp=("localsearchbot",)),
+    4: rnd(4, "L4 identity x purpose policy", ["impersonator", "stealth", "polite", "polite_cookies"],
+           {"impersonator": "blocked", "stealth": "blocked", "polite": "partial", "polite_cookies": "full"},
+           ("defenses/ladder.py", "defenses/crawl_policy.py"), welcome("limited")),
 }
-SOLUTION_FILES = {1: ["crawler_registry.py"], 2: ["crawler_verify.py"],
-                  3: ["crawl_signature.py"], 4: ["policy.py"]}
-
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
-
-
-def catch_up(upto):
-    """Install the reference solutions for rounds 1..upto (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB_DIR, upto)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print(f"[catch-up] make sure the store runs at DEFENSE_LEVEL={upto}: DEFENSE_LEVEL={upto} python demo_site/app.py")
-
-
-def reset(base):
-    requests.post(f"{base}/lab/reset", timeout=5)
-
-
-def latency(base):
-    rows = requests.get(f"{base}/lab/decisions", timeout=10).json()
-    lat = sorted(r["latency_ms"] for r in rows)
-    if not lat:
-        return None
-    return statistics.median(lat), lat[int(0.95 * (len(lat) - 1))]
-
-
-def run(round_: int, base: str = BASE_URL) -> bool:
-    require_local(base)
-    try:
-        status = requests.get(f"{base}/admin/status", timeout=3).json()
-    except Exception:
-        raise SystemExit(f"Demo store not reachable at {base}. Start it: DEFENSE_LEVEL={round_} python demo_site/app.py")
-    if status["level"] != round_:
-        print(f"❌ The store runs at DEFENSE_LEVEL={status['level']}, this checkpoint needs {round_}.\n"
-              f"   Restart it: DEFENSE_LEVEL={round_} python demo_site/app.py")
-        return False
-
-    print(f"\n=== Round {round_} checkpoint (store at DEFENSE_LEVEL={round_}) ===")
-    failures, warnings = [], []
-
-    # 1. Legitimate traffic on a clean store.
-    reset(base)
-    results = legit_traffic.run(base)
-    print("\nLegitimate traffic (14 personas)")
-    for group, label in (("humans", "humans"), ("non-browser", "non-browser legit"), ("crawlers", "declared crawlers")):
-        rows = [r for r in results if r["group"] == group]
-        for r in rows:
-            t = r["tally"]
-            hurt = t["block"] + t["challenge"]
-            name = r["name"]
-            if name == "localsearchbot":
-                if round_ == 3 and hurt:
-                    warnings.append(f"localsearchbot refused after {t['allow']} page(s): unverifiable + crawler behaviour. "
-                                    f"The documented Round 3 false positive; Round 4 turns it into a budget.")
-                    print(f"  ⚠️ {name:<24} blocked {t['block']}  served {t['allow']}   <- documented false positive at L3")
-                    continue
-                if hurt:
-                    failures.append(f"{name} was refused ({t['block']} blocked, {t['challenge']} challenged): "
-                                    f"'we cannot verify it' is not 'it is lying'. Limit it, do not block it.")
-                extra = f"  ⚠️ {t['limit']} limited (budget)" if t["limit"] else ""
-                print(f"  {'❌' if hurt else '✅'} {name:<24} served {t['allow']}/{sum(t.values())}{extra}")
-                continue
-            if hurt:
-                who = "person" if group == "humans" else ("legitimate client" if group == "non-browser" else "verified crawler")
-                failures.append(f"{name} ({who}) refused: {t['block']} blocked, {t['challenge']} challenged")
-            if t["limit"]:
-                warnings.append(f"{name} rate-limited {t['limit']}x (friction)")
-            extra = ""
-            if r.get("skipped"):
-                extra = f"  (robots.txt: skipped {r['skipped']} product URLs voluntarily)"
-            if t["limit"]:
-                extra += f"  ⚠️ {t['limit']} limited"
-            print(f"  {'❌' if hurt else '✅'} {name:<24} served {t['allow']}/{sum(t.values())}{extra}")
-
-    # 2. Attacks, each on a clean store.
-    print(f"\nAttacks (coverage of the product catalog)")
-    for rd, ceiling in EXPECT[round_].items():
-        reset(base)
-        mod_name, kwargs, label = ATTACKS[rd]
-        mod = importlib.import_module(mod_name)
-        importlib.reload(mod)
-        res = mod.run(base=base, **kwargs)
-        cov = res["coverage"]
-        if ceiling is None:
-            mark, note = "⚠️", "gets through: that is the next round"
-            if rd == 3:
-                mark, note = "⚠️", "the residual (try --cookies)"
-        elif cov <= ceiling:
-            mark, note = "✅", f"ceiling {ceiling}%"
-        else:
-            mark, note = "❌", f"over the ceiling of {ceiling}%"
-            failures.append(f"{label}: {cov:.0f}% coverage, ceiling {ceiling}%")
-        print(f"  {mark} {label:<44} {cov:5.0f}%   {note}")
-
-    lat = latency(base)
-    if lat:
-        print(f"\nDefender cost\n  identification: median {lat[0]:.2f} ms, p95 {lat[1]:.2f} ms per page request")
-
-    for w in warnings:
-        print(f"\n⚠️  {w}")
-    if failures:
-        print(f"\n❌ Round {round_} checkpoint failed:")
-        for f in failures:
-            print(f"   - {f}")
-        return False
-    print(f"\n✅ Round {round_} checkpoint passed.")
-    return True
-
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--round", type=int, choices=[0, 1, 2, 3, 4], required="--restore" not in sys.argv)
-    ap.add_argument("--catch-up", action="store_true")
-    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    ap.add_argument("--url", default=BASE_URL)
-    a = ap.parse_args()
-    if a.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        sys.exit(0)
-    if a.catch_up:
-        catch_up(a.round)
-        sys.exit(0)
-    sys.exit(0 if run(a.round, a.url) else 1)
+    main(ROUNDS)

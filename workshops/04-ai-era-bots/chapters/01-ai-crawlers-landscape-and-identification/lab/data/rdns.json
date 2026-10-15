@@ -1,0 +1,35 @@
+{
+  "_comment": "Lab stand-in for DNS. In production: socket.gethostbyaddr(ip)[0] (PTR) and socket.gethostbyname_ex(name)[2] (forward). Keys are addresses/names inside pools that already exist in data/world.json; nothing here is a real record. Addresses with no PTR (carrier NAT, most residential lines, most cloud VMs) are simply absent. 203.0.113.121 has a PTR that CLAIMS googlebot.com but whose forward lookup does not come back to it: it passes a PTR-only check and fails forward confirmation.",
+  "ptr": {
+    "198.51.100.101": "crawl-198-51-100-101.googlebot.com",
+    "198.51.100.102": "crawl-198-51-100-102.googlebot.com",
+    "203.0.113.82": "crawl-203-0-113-82.crawl.commoncrawl.org",
+    "203.0.113.120": "msnbot-203-0-113-120.search.msn.com",
+    "203.0.113.121": "crawl-203-0-113-121.googlebot.com",
+    "203.0.113.30": "vm-30.cloud.example",
+    "203.0.113.31": "vm-31.cloud.example"
+  },
+  "forward": {
+    "crawl-198-51-100-101.googlebot.com": [
+      "198.51.100.101"
+    ],
+    "crawl-198-51-100-102.googlebot.com": [
+      "198.51.100.102"
+    ],
+    "crawl-203-0-113-82.crawl.commoncrawl.org": [
+      "203.0.113.82"
+    ],
+    "msnbot-203-0-113-120.search.msn.com": [
+      "203.0.113.120"
+    ],
+    "crawl-203-0-113-121.googlebot.com": [
+      "198.51.100.99"
+    ],
+    "vm-30.cloud.example": [
+      "203.0.113.30"
+    ],
+    "vm-31.cloud.example": [
+      "203.0.113.31"
+    ]
+  }
+}

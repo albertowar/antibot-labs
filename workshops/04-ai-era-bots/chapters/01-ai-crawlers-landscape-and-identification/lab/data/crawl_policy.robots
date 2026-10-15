@@ -1,0 +1,15 @@
+# YOUR FILE (Round 1): the crawl policy this store publishes, appended to the base robots.txt.
+#
+# Served at /robots.txt from DEFENSE_LEVEL 1 up (nothing is appended at level 0). Lines here
+# continue the base "User-agent: *" group until the first blank line, so "Content-Signal"
+# and "Allow"/"Disallow" lines placed straight below this comment apply to everyone.
+# A blank line starts a new group: list one or more "User-agent:" tokens, then their rules.
+#
+# Round 0 starting state: nothing here, so everybody may fetch everything.
+# solutions/round1/data/crawl_policy.robots is one policy: search and user-action fetchers
+# in, training crawlers out of the catalog.
+#
+# Paths: the catalog is /products, a product page is /product/<sku>; "Disallow: /product"
+# is a prefix match and covers both. Python's urllib.robotparser (and so the lab's check)
+# applies the FIRST matching rule in a group; RFC 9309 says the longest match wins. Keep your
+# groups free of overlapping Allow/Disallow lines and the two readings agree.

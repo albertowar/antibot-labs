@@ -1,62 +1,58 @@
-"""Round 4: identity x purpose -> what the store does.
+"""
+Policy: every number the defender tunes, and how a verdict becomes an HTTP answer.
 
-Rounds 1-3 produced labels. Until now the store's default mapping (demo_site/app.py,
-default_action) turned them into allow or block, which is wrong in both directions:
-it blocks a small search engine that merely cannot prove itself, and it serves a
-verified training crawler as if "verified" meant "welcome".
+pipeline.py decides WHICH checks run; this file decides HOW MUCH each signal
+counts and WHERE the lines are. Chapters tune these values; W2 Ch8 replaces
+decide() with calibrated weights; W3 Ch4 loads them from a hot-reloaded file.
 
-decide() receives:
-    identity    browser-like | declared-unchecked | declared-verified | impersonator |
-                declared-unverifiable | declared-unlisted | undeclared-crawler
-    purpose     search | training | user-action | agent | mixed | undeclared | ""
-    robots_ok   what our robots.txt says to this token for this path
-    score       the Round 3 behaviour score (0 for verified crawlers and impersonators)
-    page_rate   this address's page requests in the current minute
+One scale for every check: 0 (clean) to 100 (certain).
 
-and returns one of allow / limit / challenge / block, or None to keep the default
-mapping. Limit means "serve within a budget, 429 beyond it"; challenge means "ask for
-proof first" (W4 Ch3 turns it into a proof-of-work gate). Only block is a hard no.
+    score >= 75   block       403 (a trap hit answers with a fake success instead)
+    score >= 40   challenge   serve a registered challenge type, else a 403
+    score >= 20   monitor     logged, served
+    otherwise     allow
 
-Questions the policy must answer explicitly:
-  * A verified training crawler on a page robots.txt disallows: it is ignoring the
-    policy it is documented to honour. What now?
-  * A search engine nobody can verify: is "we can't tell" a reason to refuse?
-  * An undeclared crawler: block, or make it prove something?
+Every point you add to a signal moves some real users up a band too. The
+scoreboard reports both sides; a change that catches one more bot and blocks
+two shoppers is a regression.
 """
 
-from __future__ import annotations
+BANDS = {"monitor": 20, "challenge": 40, "block": 75}
 
-from collections import namedtuple
+# The challenge type to serve when a check asks for a challenge without naming one.
+# None in the W1 starter: the challenge band is enforced as a block until a chapter
+# registers a type (W1 Ch6 captcha, W1 Ch7 proof of work, W2 Ch2 JS challenge).
+DEFAULT_CHALLENGE = None
 
-ALLOW, LIMIT, CHALLENGE, BLOCK = "allow", "limit", "challenge", "block"
-BROWSER_LIKE, DECLARED_UNCHECKED, DECLARED_VERIFIED = "browser-like", "declared-unchecked", "declared-verified"
-IMPERSONATOR, DECLARED_UNVERIFIABLE, DECLARED_UNLISTED = "impersonator", "declared-unverifiable", "declared-unlisted"
-UNDECLARED_CRAWLER = "undeclared-crawler"
-Decision = namedtuple("Decision", "action reason")
+# Seconds a cleared challenge stays valid for the session.
+CLEARANCE_TTL = 15 * 60
+
+# Token buckets: name -> (capacity, refill per second). Capacity is the burst you
+# allow; refill is the sustained rate. Used by Ctx.bucket(name, key).
+RATE_LIMITS = {
+    "ip": (60, 2.0),
+    "prefix": (200, 8.0),
+    "login_ip": (10, 0.1),
+    "checkout_ip": (12, 0.2),
+}
+
+# IP reputation points, by feed (data/feeds/*, W1 Ch3).
+IP_POINTS = {
+    "tor_exit": 40,
+    "open_proxy": 40,
+    "datacenter": 40,
+    "hosting_asn": 25,
+    "known_vpn": 40,
+    "privacy_relay": 0,     # paying Safari customers, not bots
+}
 
 
-def allow(reason=""):
-    return Decision(ALLOW, reason)
-
-
-def limit(reason):
-    return Decision(LIMIT, reason)
-
-
-def challenge(reason):
-    return Decision(CHALLENGE, reason)
-
-
-def block(reason):
-    return Decision(BLOCK, reason)
-
-
-UNVERIFIABLE_BUDGET = 10      # page requests per minute per address
-USER_ACTION_BUDGET = 30
-
-
-def decide(identity: str, purpose: str, robots_ok: bool, score: float, page_rate: int) -> Decision | None:
-    # TODO (Round 4): replace the default mapping. Returning None keeps Round 3's
-    #   blunt allow/block behaviour, which the checkpoint will report as a false
-    #   positive on the unverifiable search engine.
-    return None
+def decide(score, signals, level):
+    """Map a total score to a band. `signals` and `level` are here for chapters that override."""
+    if score >= BANDS["block"]:
+        return "block"
+    if score >= BANDS["challenge"]:
+        return "challenge"
+    if score >= BANDS["monitor"]:
+        return "monitor"
+    return "allow"

@@ -1,8 +1,0 @@
-# Workshop Store crawler policy (Round 0 starting state).
-# Everyone may fetch everything. Round 1 turns this into a per-purpose policy.
-User-agent: *
-Allow: /
-Disallow: /cart/
-Disallow: /account/
-
-Sitemap: http://127.0.0.1:5000/sitemap.xml
