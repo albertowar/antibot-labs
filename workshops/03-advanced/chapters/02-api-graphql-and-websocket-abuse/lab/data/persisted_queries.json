@@ -1,0 +1,5 @@
+{
+  "Products": "query Products { products(first: 20) { id sku name price stock } }",
+  "Product": "query Product($id: Int!) { product(id: $id) { id sku name price stock } }",
+  "AccountOrders": "query AccountOrders { users(first: 1) { id email orders { id number totalCents } } }"
+}

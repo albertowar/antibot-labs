@@ -1,55 +1,61 @@
-"""L1 — cost-aware rate limiting for the REST API (Round 1).
+"""
+Round 1 (level 1) - cost-aware rate limiting for the REST API.
 
-Counting requests is the wrong unit for an API. One ``GET /api/v2/products
-?per_page=100`` costs a backend far more than one ``GET /api/v2/products/5``, yet
-a request-counting limiter scores them the same. A bot that walks pagination with
-a large page size, or enumerates ``/products/<id>`` in order, drains the whole
-catalogue while staying under a naive per-minute cap.
+Counting requests is the wrong unit for an API. One ``GET /api/v2/reviews?limit=200`` costs a backend far more
+than one ``GET /api/products/p017``, yet a request-counting limiter scores them the same. A bot that pulls the
+review corpus in oversized pages, or enumerates ``/api/products/<sku>`` in order, drains the data while staying
+under a naive per-minute cap.
 
-Two complementary signals, both keyed on the caller (bearer subject if present,
-else the egress IP), over a short sliding window:
+Two complementary signals, both keyed on the caller (the bearer subject if there is one, else the rented
+source address), over a short sliding window:
 
-  * a **cost budget**: each request spends cost proportional to how much data it
-    asks for, and a caller that overspends the budget is blocked. This catches
-    the fast, large-page walker.
-  * an **enumeration penalty**: a caller that pulls many *sequential* product ids
-    in the window is walking the catalogue by id, which no human browsing session
-    does. This catches the slow walker that stays under the cost budget.
+  * a **cost budget**: each request spends cost proportional to how much data it asks for, and a caller that
+    overspends the budget is told to slow down (429). A page bigger than MAX_PER_PAGE is refused outright.
+  * an **enumeration penalty**: a caller that pulls many *sequential* product ids in the window is walking the
+    catalogue by id, which no human browsing session does. This catches the slow walker that stays under the
+    cost budget.
 
-False positives to keep in mind (see the chapter's "where this stops" section):
-shared egress IPs (CGNAT, a corporate NAT, a mobile carrier) concentrate many
-real users onto one key, so key on an authenticated subject wherever you can and
-keep the IP budget generous. API gateways and server-side rendering fan out to
-your API legitimately; allowlist them rather than tuning the budget down.
+The bookkeeping (classify, request_cost, _spend, _record_id, _looks_sequential) ships done. Your job is
+``score_rest``: decide what a call is worth. The wrapper ``_check`` below turns your (points, reasons) into
+the gate's answer: a reason that starts with "cost budget" is a 429 with Retry-After, any other points are a
+block-band signal.
+
+False positives to keep in mind (see the chapter's "where this stops" section): shared egress addresses (CGNAT,
+a corporate NAT, a mobile carrier) concentrate many real users onto one key, so key on an authenticated subject
+wherever you can and keep the address budget generous. API gateways and server-side rendering fan out to your
+API legitimately; allowlist them rather than tuning the budget down.
 """
 
-from __future__ import annotations
-
 import math
+import re
 import time
 
+from .pipeline import Check, Signal, Verdict
+
 WINDOW_S = 10.0          # sliding window
-COST_BUDGET = 40         # cost units per key per window before we block
-MAX_PER_PAGE = 50        # a page larger than this is clamped and penalised
-ENUM_THRESHOLD = 30      # distinct ids in the window before we look at ordering
+COST_BUDGET = 40         # cost units per key per window before we slow the caller down
+MAX_PER_PAGE = 50        # a page larger than this is refused
+ENUM_THRESHOLD = 8       # distinct ids in the window before we look at their order
 ENUM_SEQ_FRACTION = 0.7  # fraction of consecutive ids that marks a walk
+PAGE_SIZE = 24           # the canonical catalogue page (/api/products, /api/search)
+BLOCK_POINTS = 80        # policy blocks at >= 75
 
-BLOCK_POINTS = 60        # engine blocks at >= 60
+SKU = re.compile(r"^p(\d{3})$")
 
 
-def request_cost(is_list: bool, per_page: int) -> int:
-    """Cost a request spends against the budget: a list of N items costs ~N/10."""
+def request_cost(is_list, per_page):
+    """Cost a request spends against the budget: a list of N items costs ~N/10, a detail costs 1."""
     if is_list:
         return max(1, math.ceil(min(per_page, 500) / 10))
     return 1
 
 
-def _spend(store, key: str, weight: int) -> int:
+def _spend(redis, key, weight):
     """Add ``weight`` cost units to the window and return the window total."""
     nowf = time.time()
-    rkey = f"cost:{key}"
+    rkey = f"lab:ch2:cost:{key}"
     members = {f"{nowf:.6f}:{i}": nowf for i in range(max(1, weight))}
-    pipe = store.pipeline()
+    pipe = redis.pipeline()
     pipe.zremrangebyscore(rkey, 0, nowf - WINDOW_S)
     pipe.zadd(rkey, members)
     pipe.zcard(rkey)
@@ -58,11 +64,11 @@ def _spend(store, key: str, weight: int) -> int:
     return int(total)
 
 
-def _record_id(store, key: str, product_id: int) -> list[int]:
+def _record_id(redis, key, product_id):
     """Record a detail-page id hit and return the distinct ids seen in the window."""
     nowf = time.time()
-    rkey = f"enum:{key}"
-    pipe = store.pipeline()
+    rkey = f"lab:ch2:enum:{key}"
+    pipe = redis.pipeline()
     pipe.zremrangebyscore(rkey, 0, nowf - WINDOW_S)
     pipe.zadd(rkey, {str(product_id): nowf})
     pipe.zrange(rkey, 0, -1)
@@ -71,24 +77,70 @@ def _record_id(store, key: str, product_id: int) -> list[int]:
     return sorted(int(x) for x in ids)
 
 
-def _looks_sequential(ids: list[int]) -> bool:
-    """True when the distinct ids form a near-contiguous walk, like 1,2,3,4,…."""
+def _looks_sequential(ids):
+    """True when the distinct ids form a near-contiguous walk, like 1,2,3,4,..."""
     if len(ids) < ENUM_THRESHOLD:
         return False
     consecutive = sum(1 for a, b in zip(ids, ids[1:]) if b - a == 1)
     return consecutive / (len(ids) - 1) >= ENUM_SEQ_FRACTION
 
 
-def score_rest(ctx: dict, store, count: bool = True) -> tuple[int, list[str]]:
-    """Return (points, reasons) for one REST request.
+def classify(ctx):
+    """What kind of REST call is this? None means the request is not metered (pages, GraphQL, login)."""
+    p = ctx.path
+    if p in ("/api/products", "/api/search"):
+        return {"is_list": True, "is_detail": False, "per_page": PAGE_SIZE}
+    if p == "/api/v2/reviews":
+        try:
+            n = int(ctx.args.get("limit", 20))
+        except ValueError:
+            n = 20
+        return {"is_list": True, "is_detail": False, "per_page": max(1, n)}
+    if p.startswith("/api/products/"):
+        m = SKU.match(p.rsplit("/", 1)[1])
+        return {"is_list": False, "is_detail": True, "per_page": 1, "product_id": int(m.group(1)) if m else None}
+    if p.startswith("/api/v2/") and not p.startswith("/api/v2/auth/"):
+        return {"is_list": False, "is_detail": False, "per_page": 1}
+    return None
 
-    ``ctx`` carries: key, is_list, per_page, is_detail, product_id.
+
+def caller_key(ctx):
+    """Who is spending: the bearer subject when there is one, else the source address."""
+    bearer = ctx.attrs.get("bearer")
+    return f"sub:{bearer['sub']}" if bearer else f"ip:{ctx.ip}"
+
+
+def score_rest(call, redis):
+    """Return (points, reasons) for one REST call.
+
+    ``call`` carries: key, is_list, is_detail, per_page, product_id (a detail of p017 has product_id 17).
     """
     # TODO (Round 1): implement cost-aware rate limiting.
-    #   - spend request_cost(is_list, per_page) against a per-key budget
-    #     (COST_BUDGET units per WINDOW_S) using _spend(store, key, weight);
-    #   - add points for an oversized page (per_page > MAX_PER_PAGE);
-    #   - add an enumeration penalty when _looks_sequential(_record_id(...)).
+    #   - add BLOCK_POINTS for an oversized page (a list with per_page > MAX_PER_PAGE);
+    #   - spend request_cost(call["is_list"], call["per_page"]) against the caller's budget with
+    #     _spend(redis, call["key"], weight); over COST_BUDGET adds BLOCK_POINTS and a reason that starts
+    #     with "cost budget:" (the wrapper turns it into a 429);
+    #   - for a detail with a product_id, add BLOCK_POINTS when _looks_sequential(_record_id(...)).
+    #   - write each reason as "<short name>: <detail>", e.g. "oversized page: limit=200 (cap 50)": the short
+    #     name becomes the signal in X-Lab-Signals.
     # Until you do, the REST API is unprotected even at DEFENSE_LEVEL=1.
     # Catch up with: python tools/checkpoint.py --round 1 --catch-up
     return 0, []
+
+
+def _check(ctx):
+    call = classify(ctx)
+    if call is None:
+        return None
+    call["key"] = caller_key(ctx)
+    points, reasons = score_rest(call, ctx.redis)
+    if not points:
+        return None
+    signals = tuple(Signal("rate_cost", r.split(":")[0].replace(" ", "_"), points if i == 0 else 0, r) for i, r in enumerate(reasons))
+    ctx.note(rest_cost_reasons=reasons)
+    if any(r.startswith("cost budget") for r in reasons):
+        return Verdict("rate_limit", signals=signals, retry_after=int(WINDOW_S))
+    return signals
+
+
+CHECK = Check("rate_cost", _check, phases=("request",))

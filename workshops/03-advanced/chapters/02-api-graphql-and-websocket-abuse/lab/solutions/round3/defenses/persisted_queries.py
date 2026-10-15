@@ -1,4 +1,4 @@
-"""L3 — persisted queries / trusted documents, and fragment-aware cost (Round 3).
+"""Round 3 (level 3) - persisted queries / trusted documents, and fragment-aware cost.
 
 Round 2's alias limiter counts aliases without following fragment spreads. An
 attacker defines one small fragment with a handful of aliased fields and spreads
@@ -26,6 +26,9 @@ performance win (small payloads, GET-cacheable) but **no** security, because the
 server accepts whatever the client first sends. Security comes only from a strict,
 build-time allowlist, which is what this module enforces.
 
+How the gate sees it: like Round 2, this check runs in the ``request`` phase on ``POST /graphql`` and reads the
+operations from ``ctx.json``. ``score_query`` is yours; ``_check`` ships done.
+
 False positives: an allowlist can only cover clients whose operations you know
 ahead of time. A public GraphQL API with third-party consumers cannot use it;
 there you fall back to fragment-aware depth/alias/cost limits and accept the
@@ -41,14 +44,15 @@ import os
 
 from graphql import parse
 
-from graphql_limits import _fragments, alias_count, depth
+from . import graphql_limits as limits
+from .pipeline import Check
 
 DATA = os.path.join(os.path.dirname(__file__), "..", "data")
 ALLOWLIST_PATH = os.path.join(DATA, "persisted_queries.json")
 
 MAX_DEPTH = 6
 MAX_ALIASES = 15
-BLOCK_POINTS = 60
+BLOCK_POINTS = 80         # policy blocks at >= 75
 
 _allow_cache: set[str] | None = None
 
@@ -63,6 +67,7 @@ def query_hash(query: str) -> str:
 
 
 def load_allowlist() -> set[str]:
+    """The hashes of the trusted documents the first-party client ships (data/persisted_queries.json)."""
     global _allow_cache
     if _allow_cache is None:
         try:
@@ -74,29 +79,43 @@ def load_allowlist() -> set[str]:
     return _allow_cache
 
 
-def score_query(query: str, provided_hash: str | None = None) -> tuple[int, list[str]]:
+def score_query(query: str) -> tuple[int, list[str]]:
     """Return (points, reasons) for the persisted-query + fragment-aware layer."""
     # >>> SOLUTION round3 (allowlist + fragment-aware counting)
-    allow = load_allowlist()
-    h = provided_hash or query_hash(query)
-    if h not in allow:
-        return BLOCK_POINTS, ["query not in persisted-operation allowlist"]
-
-    # Defence in depth: measure amplification even for an allowlisted document,
-    # counting *through* fragment spreads (the bypass Round 2's naive count missed).
+    if query_hash(query) not in load_allowlist():   # hash the text we were sent, never a hash the client claims
+        return BLOCK_POINTS, ["not allowlisted: query is not a trusted document"]
+    # Defence in depth: measure amplification even for an allowlisted document, counting *through*
+    # fragment spreads (the bypass Round 2's naive count missed).
     try:
         doc = parse(query)
     except Exception as exc:
-        return BLOCK_POINTS, [f"unparseable query: {exc}"]
-    frags = _fragments(doc)
+        return BLOCK_POINTS, [f"unparseable: {exc}"]
+    frags = limits._fragments(doc)
     for defn in doc.definitions:
         if defn.__class__.__name__ != "OperationDefinitionNode":
             continue
-        a = alias_count(defn.selection_set, frags, expand=True)
+        a = limits.alias_count(defn.selection_set, frags, expand=True)
         if a > MAX_ALIASES:
             return BLOCK_POINTS, [f"alias amplification: {a} aliases after fragment expansion (cap {MAX_ALIASES})"]
-        d = depth(defn.selection_set, frags, expand=True)
+        d = limits.depth(defn.selection_set, frags, expand=True)
         if d > MAX_DEPTH:
-            return BLOCK_POINTS, [f"query too deep after fragment expansion: {d} (cap {MAX_DEPTH})"]
-    # <<< SOLUTION round3
+            return BLOCK_POINTS, [f"too deep after fragment expansion: depth {d} (cap {MAX_DEPTH})"]
     return 0, []
+    # <<< SOLUTION round3
+
+
+def _check(ctx):
+    found = []
+    for query, _ext in limits.operations(ctx):
+        points, reasons = score_query(query)
+        if points:
+            found.append((points, reasons))
+    if not found:
+        return None
+    points = max(p for p, _ in found)
+    reasons = [r for _, rs in found for r in rs]
+    ctx.note(graphql_reasons=reasons)
+    return limits.signals_for("persisted_queries", points, reasons)
+
+
+CHECK = Check("persisted_queries", _check, phases=("request",))

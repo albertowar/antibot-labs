@@ -1,32 +1,33 @@
-"""L2 — GraphQL query limits (Round 2).
+"""
+Round 2 (level 2) - GraphQL query limits.
 
-Request-count rate limiting is blind to GraphQL: one HTTP request can ask for an
-unbounded amount of work. Four cheap, static checks on the query document raise
-the floor before a resolver ever runs:
+Request-count rate limiting is blind to GraphQL: one HTTP request can ask for an unbounded amount of work. Four
+cheap, static checks on the query document raise the floor before a resolver ever runs:
 
-  * **introspection off** — reject any query touching ``__schema`` / ``__type``.
-    Introspection is a developer convenience that hands an attacker the entire
-    API contract in one request. ``__typename`` stays allowed; Apollo and other
-    clients send it on normal operations.
-  * **depth limit** — reject queries nested past ``MAX_DEPTH``. This stops the
-    circular ``order -> user -> orders -> user`` fan-out.
-  * **alias limit** — reject queries with more than ``MAX_ALIASES`` aliases. Alias
-    batching ( ``a: product(id:1) b: product(id:2) …`` ) packs many fetches into
-    one operation and slips past a per-request limiter.
-  * **token limit** — reject absurdly large documents outright.
+  * **introspection off** - reject any query touching ``__schema`` / ``__type``. Introspection is a developer
+    convenience that hands an attacker the entire API contract in one request. ``__typename`` stays allowed;
+    Apollo and other clients send it on normal operations.
+  * **depth limit** - reject queries nested past ``MAX_DEPTH``. This stops the circular
+    ``order -> user -> orders -> user`` fan-out.
+  * **alias limit** - reject queries with more than ``MAX_ALIASES`` aliases. Alias batching
+    (``a: product(id:1) b: product(id:2) ...``) packs many fetches into one operation and slips past a
+    per-request limiter.
+  * **token limit** - reject absurdly large documents outright.
 
-These mirror Strawberry's built-in ``QueryDepthLimiter``, ``MaxAliasesLimiter`` and
-``MaxTokensLimiter`` extensions, which you would use in production. We implement
-them by hand here so the mechanism — and, in Round 3, the way a *naive* alias
-count is bypassed — is visible rather than hidden in a dependency.
+These mirror Strawberry's built-in ``QueryDepthLimiter``, ``MaxAliasesLimiter`` and ``MaxTokensLimiter``
+extensions, which you would use in production. We implement them by hand here so the mechanism - and, in
+Round 3, the way a *naive* alias count is bypassed - is visible rather than hidden in a dependency.
 
-Note the alias counter here does **not** follow fragment spreads. That is the
-deliberate weakness Round 3 exploits; see persisted_queries.py for the fix.
+How the gate sees GraphQL: ``POST /graphql`` is an ordinary request, so this check runs in the ``request`` phase
+and reads the operations from ``ctx.json`` (one object, or an array when the client batches). ``score_query``
+is yours; ``_check`` and the helpers ship done.
 
-False positives: a legitimate first-party app can write a genuinely deep or
-alias-heavy query. Set the caps from your real client's largest operation plus
-headroom, and prefer the persisted-query allowlist (Round 3) for first-party
-traffic so these numeric caps only have to catch unknown callers.
+Note the alias counter here does **not** follow fragment spreads. That is the deliberate weakness Round 3
+exploits; see persisted_queries.py for the fix.
+
+False positives: a legitimate first-party app can write a genuinely deep or alias-heavy query. Set the caps from
+your real client's largest operation plus headroom, and prefer the persisted-query allowlist (Round 3) for
+first-party traffic so these numeric caps only have to catch unknown callers.
 """
 
 from __future__ import annotations
@@ -42,10 +43,12 @@ from graphql.language.lexer import Lexer
 from graphql.language.source import Source
 from graphql.language.token_kind import TokenKind
 
+from .pipeline import Check, Signal
+
 MAX_DEPTH = 6
 MAX_ALIASES = 15
 MAX_TOKENS = 1500
-BLOCK_POINTS = 60
+BLOCK_POINTS = 80         # policy blocks at >= 75
 
 
 def _fragments(doc) -> dict:
@@ -119,34 +122,60 @@ def token_count(query: str) -> int:
     return n
 
 
-def score_query(query: str) -> tuple[int, list[str]]:
-    """Return (points, reasons). A violation returns a blocking score."""
-    reasons: list[str] = []
+def operations(ctx):
+    """The (query, extensions) of every operation in a POST /graphql body, or [] for any other request."""
+    if ctx.path != "/graphql" or ctx.method != "POST" or ctx.json is None:
+        return []
+    ops = ctx.json if isinstance(ctx.json, list) else [ctx.json]
+    return [((op.get("query") or ""), (op.get("extensions") or {})) if isinstance(op, dict) else ("", {})
+            for op in ops]
 
+
+def score_query(query):
+    """Return (points, reasons). A violation should return BLOCK_POINTS."""
     # >>> SOLUTION round2 (parse + the four static limits)
     try:
         doc = parse(query)
     except Exception as exc:
-        return BLOCK_POINTS, [f"unparseable query: {exc}"]
-
-    frags = _fragments(doc)
+        return BLOCK_POINTS, [f"unparseable: {exc}"]
     ntok = token_count(query)
     if ntok > MAX_TOKENS:
         return BLOCK_POINTS, [f"query too large: {ntok} tokens (cap {MAX_TOKENS})"]
-
+    frags = _fragments(doc)
+    reasons = []
     for defn in doc.definitions:
         if not isinstance(defn, OperationDefinitionNode):
             continue
         if has_introspection(defn.selection_set, frags):
-            return BLOCK_POINTS, ["introspection is disabled on this server"]
+            return BLOCK_POINTS, ["introspection: disabled on this server"]
         d = depth(defn.selection_set, frags, expand=True)
         if d > MAX_DEPTH:
             reasons.append(f"query too deep: depth {d} (cap {MAX_DEPTH})")
-        a = alias_count(defn.selection_set, frags, expand=False)  # naive: no fragments
+        a = alias_count(defn.selection_set, frags, expand=False)  # naive: fragment spreads are not followed
         if a > MAX_ALIASES:
             reasons.append(f"too many aliases: {a} (cap {MAX_ALIASES})")
+    return (BLOCK_POINTS, reasons) if reasons else (0, [])
     # <<< SOLUTION round2
 
-    if reasons:
-        return BLOCK_POINTS, reasons
-    return 0, []
+
+def signals_for(layer, points, reasons):
+    """(points, reasons) -> Signals. Only the first carries the points, so one violation is one flag."""
+    return tuple(Signal(layer, r.split(":")[0].replace(" ", "_"), points if i == 0 else 0, r)
+                 for i, r in enumerate(reasons))
+
+
+def _check(ctx):
+    found = []
+    for query, _ext in operations(ctx):
+        points, reasons = score_query(query)
+        if points:
+            found.append((points, reasons))
+    if not found:
+        return None
+    points = max(p for p, _ in found)
+    reasons = [r for _, rs in found for r in rs]
+    ctx.note(graphql_reasons=reasons)
+    return signals_for("graphql_limits", points, reasons)
+
+
+CHECK = Check("graphql_limits", _check, phases=("request",))

@@ -1,20 +1,21 @@
-# W3 Ch2 lab — API, GraphQL & WebSocket abuse. Python 3.12+. Pins verified October 2026.
+# W3 Ch2 lab. Python 3.12+. Pins verified October 2026.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.1.4
-# WebSocket route on the Flask app itself (one process, one port).
+redis==8.1.0
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+fakeredis[lua]==2.39.0
+requests==2.34.2
+httpx==0.28.1
+# The WebSocket feed runs on the Flask app itself (one process, one port); websockets is the attacker's and the shoppers' client.
 flask-sock==0.7.0
 simple-websocket==1.1.0
-# GraphQL engine. >=0.316 clears CVE-2026-47707 (alias-amplification bypass).
+websockets==17.2
+# GraphQL engine. >=0.316 clears CVE-2026-47707 (alias-amplification bypass in MaxAliasesLimiter).
 strawberry-graphql==0.333.0
 graphql-core==3.3.0
-# HTTP + WS clients for the attack scripts and the legitimate-traffic simulator.
-httpx==0.28.1
-websockets==17.2
 # Bearer tokens for the versioned API (Round 5).
 PyJWT==2.15.1
-# Redis client + an in-process fake so the lab runs with no Redis server.
-redis==8.1.0
-fakeredis==2.39.0
-# Only needed if you opt into the Dockerised PostgreSQL backend (DATABASE_URL).
+# Docker-backed PostgreSQL path only (docker-compose.yml):
 psycopg[binary]==3.3.6

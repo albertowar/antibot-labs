@@ -1,56 +1,79 @@
-"""L5 — HMAC request signing (Round 5).
-
-A bearer token alone is a bearer instrument: whoever holds it can use it. Harvest
-one — from a man-in-the-middled mobile session (W3 Ch1), a leaked log, an
-infostealer (W2 Ch6) — and you can replay it from anywhere. Signing binds each
-request to a secret the first-party client holds and never transmits, so holding
-the token is not enough; you must also be able to sign.
-
-At login the server issues, alongside the bearer token, a per-session signing
-secret delivered once over the authenticated channel. Every protected request
-carries ``X-Timestamp`` and ``X-Signature``, where the signature is
-HMAC-SHA256(secret) over a canonical string of method, path, timestamp and a hash
-of the body. The server recomputes it and rejects a missing, malformed, stale or
-mismatched signature. A replayed bearer token with no secret cannot produce a
-valid signature, and the timestamp plus a short skew window stops signature replay.
-
-This is request signing as AWS SigV4 and many mobile APIs do it. It is not a bot
-detector; it is an authentication hardening that makes a stolen token far less
-useful. Pair it with token binding (coarse client signals) so even a leaked
-secret is constrained to the client it was issued to.
-
-False positives: clock skew is the classic one — a client with a wrong clock
-fails the timestamp check, so size the window for real-world drift (a few
-minutes), and return a clear, retryable error. Secret rotation must be handled
-(accept the previous secret for a grace period) or every in-flight request fails
-at rotation.
 """
+Round 5 (level 5) - HMAC request signing.
 
-from __future__ import annotations
+A bearer token alone is a bearer instrument: whoever holds it can use it. Harvest one - from a man-in-the-middled
+mobile session (W3 Ch1), a leaked log, an infostealer (W2 Ch6) - and you can replay it from anywhere. Signing
+binds each request to a secret the first-party client holds and never transmits, so holding the token is not
+enough; you must also be able to sign.
+
+At login the server issues, alongside the bearer token, a per-token signing secret delivered once over the
+authenticated channel (``api_secret``). Every protected request carries ``X-Timestamp`` and ``X-Signature``,
+where the signature is HMAC-SHA256(secret) over a canonical string of method, path-and-query, timestamp and a
+hash of the body. The server recomputes it and rejects a missing, malformed, stale or mismatched signature. A
+replayed bearer token with no secret cannot produce a valid signature, and the timestamp plus a short skew
+window stops signature replay.
+
+This is request signing as AWS SigV4 and many mobile APIs do it. It is not a bot detector; it is an
+authentication hardening that makes a stolen token far less useful. It pairs with token binding
+(token_binding.py: coarse client signals, shipped done) - layers, not substitutes: binding catches a replay even
+when the attacker omits signing entirely, and signing catches a replay even when the attacker spoofs the coarse
+client signals. ``sign`` and ``_check`` ship done; ``verify`` is yours.
+
+Where it runs: the protected /api/v2/ reads call the ladder in the phases ``action:api2_orders`` and
+``action:api2_inventory``, so this check (phases ``action:api2_*``) runs on those two reads only.
+
+False positives: clock skew is the classic one - a client with a wrong clock fails the timestamp check, so size
+the window for real-world drift (a few minutes), and return a clear, retryable error. Secret rotation must be
+handled (accept the previous secret for a grace period) or every in-flight request fails at rotation.
+"""
 
 import hashlib
 import hmac
 
+from .pipeline import Check, Signal
+
 MAX_SKEW_S = 300
-BLOCK_POINTS = 60
+BLOCK_POINTS = 80          # policy blocks at >= 75
 
 
-def canonical(method: str, path: str, ts: str, body: bytes) -> str:
+def canonical(method, path, ts, body):
     body_hash = hashlib.sha256(body or b"").hexdigest()
     return f"{method.upper()}\n{path}\n{ts}\n{body_hash}"
 
 
-def sign(secret: str, method: str, path: str, ts: str, body: bytes) -> str:
+def sign(secret, method, path, ts, body):
     msg = canonical(method, path, ts, body).encode()
     return hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
 
 
-def verify(method: str, path: str, headers, body: bytes, secret: str, now: float) -> tuple[int, list[str]]:
+class _Headers(dict):
+    """Case-insensitive lookup over the request headers."""
+
+    def get(self, name, default=None):
+        return super().get(name.lower(), default)
+
+
+def verify(method, path, headers, body, secret, now):
     """Return (points, reasons). Zero points means a valid signature."""
     # TODO (Round 5): verify the HMAC signature and timestamp.
-    #   - require X-Signature and X-Timestamp;
+    #   - require X-Signature and X-Timestamp (headers.get("X-Signature"));
     #   - reject a skew > MAX_SKEW_S;
-    #   - recompute sign(secret, method, path, ts, body) and compare with
-    #     hmac.compare_digest. Return (BLOCK_POINTS, [reason]) on failure.
+    #   - recompute sign(secret, method, path, ts, body) and compare with hmac.compare_digest.
+    # Return (BLOCK_POINTS, ["<short name>: <detail>"]) on failure.
     # Catch up with: python tools/checkpoint.py --round 5 --catch-up
     return 0, []
+
+
+def _check(ctx):
+    bearer = ctx.attrs.get("bearer")
+    headers = _Headers((k.lower(), v) for k, v in ctx.headers)
+    points, reasons = verify(ctx.method, ctx.attrs["target"], headers, ctx.attrs["body"],
+                             bearer["secret"] if bearer else "", ctx.attrs["now"])
+    if not points:
+        return None
+    ctx.note(signing_reasons=reasons)
+    return tuple(Signal("request_signing", r.split(":")[0].replace(" ", "_"), points if i == 0 else 0, r)
+                 for i, r in enumerate(reasons))
+
+
+CHECK = Check("request_signing", _check, phases=("action:api2_*",))

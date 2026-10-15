@@ -1,134 +1,99 @@
-"""Checkpoint — run one round end to end and say whether it passes.
+"""
+Round checkpoint for W3 Ch2 (API, GraphQL & WebSocket Abuse). Declares the rounds and hands over to
+checkpoint_core.
 
-    python tools/checkpoint.py --round 1          # with the server at DEFENSE_LEVEL=1
-    python tools/checkpoint.py --round 3 --catch-up   # apply the reference solution
+    python tools/checkpoint.py --round 3              # set level 3, run this round's attackers next to the 40 shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same attackers against Round 2's defense (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 over your files (.bak kept)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-Each round starts from a clean decision log, runs that round's attack and the
-legitimate-traffic simulator against the running server, and prints three blocks:
-what the bot achieved, what it cost real users, and the defender's per-request
-cost. A round passes when the attack is stopped *and* no legitimate client is
-blocked. ``--catch-up`` copies solutions/roundN/ over defenses/ (saving a .bak)
-for anyone who fell behind; restart the server afterwards so it reloads them.
+This lab is WIRE-IT: every round ships one stub with a TODO and the finished file is in solutions/round<N>/. The
+checks are already wired into defenses/ladder.py; the stubs return nothing until you write the TODO.
+
+    round  level  defense you write                       attacker                              gets through the stub?
+    -----  -----  --------------------------------------  ------------------------------------  ----------------------
+      1    1      cost-aware rate limit (rate_cost)       bulk export + id walk                 yes
+      2    2      query limits (graphql_limits)           introspection, alias batch            yes
+      3    3      trusted documents (persisted_queries)   alias amplification via a fragment    yes (and through Round 2's)
+      4    4      connection guard (ws_guard)             CSWSH, anonymous bids, authed flood   yes
+      5    5      request signing (request_signing)       token replay, naive and spoofed       the spoofed one (binding
+                                                                                                 stops the naive one)
+
+A round passes when every attacker is held to what the round expects AND no shopper is refused. The 40 shoppers
+use the store through its three surfaces (tools/personas_ch2.py): REST and persisted GraphQL, the signed mobile
+app, the live feed. Defender cost is the median gate time over their requests (Server-Timing: gate; a WebSocket
+connection logs the cost of an average frame).
 """
 
-from __future__ import annotations
-
-import argparse
-import importlib
 import os
-import shutil
+import statistics
 import sys
 
-import httpx
-
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB_DIR, "attacks"))
-sys.path.insert(0, os.path.join(LAB_DIR, "tools"))
+sys.path.insert(0, HERE)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-import labnet  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+import personas_ch2  # noqa: E402,F401  (registers the ch2_api scenario)
+import labclient  # noqa: E402
+from checkpoint_core import Round, main  # noqa: E402
+
+GATE_MEDIAN_MAX_MS = 25.0           # median gate time per shopper request (in-process Redis)
+GATE_MEDIAN_MAX_MS_REDIS = 250.0    # with a real Redis every check costs a network round trip
+
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "actor": "human:"})["items"]
+    ms = [d["ms"] for d in rows if not d["path"].startswith("/lab")]
+    if not ms:
+        return False, "no shopper requests in the decision log"
+    redis_url = labclient.admin("GET", "/lab/config")["redis_url"]
+    limit = GATE_MEDIAN_MAX_MS if redis_url.startswith("memory") else GATE_MEDIAN_MAX_MS_REDIS
+    p95 = statistics.quantiles(ms, n=20)[-1] if len(ms) > 1 else ms[0]
+    median = statistics.median(ms)
+    print(f"\ndefender cost (the shoppers' requests)\n  gate per request: median {median:.2f} ms, p95 {p95:.2f} ms over {len(ms)} requests")
+    return median < limit, f"gate median {median:.2f} ms > {limit} ms"
+
+
+def the_people(board, results, attacks):
+    roles = {}
+    for r in results:
+        row = roles.setdefault(r.get("role", "?"), [0, 0])
+        row[0] += 1
+        row[1] += r.get("outcome") == "browsed"
+    print("\nthe people: " + " · ".join(f"{role} {ok}/{n} finished" for role, (n, ok) in sorted(roles.items())))
+    return True, ""
+
+
+def poisoned(board, results, attacks):
+    """Round 5: whoever the signature stopped must have been *deceived*, not refused, on the inventory read."""
+    bad = [n for n, out in attacks.items() if not out.get("poisoned")]
+    print("\nresponse deception (defenses/response_deception.py)\n  " +
+          "; ".join(f"{n}: price {out.get('inventory_price')} (real {out.get('real_price')})" for n, out in attacks.items()))
+    return not bad, f"the inventory read was not poisoned for {bad}"
+
+
+def make_round(level, description, attacks, solution, checks=(), **kw):
+    names = {k: v for k, v in attacks.items()}
+    return Round(level=level, description=description, scenario="ch2_api", attacks=names,
+                 expect={k: "blocked" for k in names}, extra_checks=[the_people, *checks, gate_cost],
+                 solutions=(f"defenses/{solution}.py",), **kw)
+
 
 ROUNDS = {
-    1: {"attack": "round1_scrape", "level": 1, "surface": "rest"},
-    2: {"attack": "round2_graphql_batch", "level": 2, "surface": "graphql"},
-    3: {"attack": "round3_fragment_amp", "level": 3, "surface": "graphql"},
-    4: {"attack": "round4_ws_flood", "level": 4, "surface": "ws"},
-    5: {"attack": "round5_token_replay", "level": 5, "surface": "rest"},
+    1: make_round(1, "cost-aware rate limiting: the bulk export and the id walk stop",
+                  {"scrape": "attacks/round1_scrape.py"}, "rate_cost"),
+    2: make_round(2, "query limits: no introspection, no alias batch",
+                  {"introspection": "attacks/round2_graphql_batch.py --only introspection",
+                   "alias_batch": "attacks/round2_graphql_batch.py --only alias_batch"}, "graphql_limits"),
+    3: make_round(3, "trusted documents: the fragment amplification is not on the list",
+                  {"fragment_amp": "attacks/round3_fragment_amp.py"}, "persisted_queries"),
+    4: make_round(4, "connection guard: Origin, auth for bids, a message budget per connection",
+                  {"cswsh": "attacks/round4_ws_flood.py", "anon": "attacks/round4_ws_flood.py --origin-ok",
+                   "authed": "attacks/round4_ws_flood.py --login"}, "ws_guard"),
+    5: make_round(5, "request signing: the stolen token is not enough, and the bot is fed poison",
+                  {"replay": "attacks/round5_token_replay.py", "replay_spoofed": "attacks/round5_token_replay.py --spoof"},
+                  "request_signing", [poisoned]),
 }
-
-# Which defense module each round's solution replaces.
-SOLUTION_FILES = {
-    1: ["rate_cost.py"], 2: ["graphql_limits.py"], 3: ["persisted_queries.py"],
-    4: ["ws_guard.py"], 5: ["request_signing.py"],
-}
-
-
-def catch_up(rnd):
-    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB_DIR, rnd)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print("Restart the demo server so it reloads the defenses.")
-
-
-def verdict(rnd: int, s: dict) -> tuple[bool, str]:
-    if rnd == 1:
-        passed = s["blocked"] > 0 and s["products_scraped"] < 200
-        return passed, f"scraped {s['products_scraped']} products, {s['blocked']} requests blocked"
-    if rnd == 2:
-        passed = s["introspection_blocked"] and s["alias_batch_blocked"]
-        return passed, f"introspection_blocked={s['introspection_blocked']} alias_batch_blocked={s['alias_batch_blocked']}"
-    if rnd == 3:
-        passed = s["blocked"]
-        return passed, f"fragment amplification blocked={s['blocked']} ({s['reason'][:40]})"
-    if rnd == 4:
-        passed = (not s["connected"]) or s["accepted"] < s["sent"]
-        return passed, f"connected={s['connected']} accepted={s['accepted']}/{s['sent']}"
-    if rnd == 5:
-        passed = not s["orders_read"]
-        return passed, f"orders_status={s['orders_status']} deceived={s['deceived']}"
-    return False, "unknown round"
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=[1, 2, 3, 4, 5])
-    ap.add_argument("--base", default=BASE_URL)
-    ap.add_argument("--catch-up", action="store_true")
-    ap.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    args = ap.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-    rnd = args.round
-
-    if args.catch_up:
-        catch_up(rnd)
-        return
-
-    try:
-        status = httpx.get(f"{args.base}/admin/status", timeout=5).json()
-    except Exception:
-        print(f"Cannot reach the demo store at {args.base}. Start it first:\n"
-              f"  DEFENSE_LEVEL={ROUNDS[rnd]['level']} python demo_site/app.py")
-        sys.exit(1)
-    if status["level"] < ROUNDS[rnd]["level"]:
-        print(f"⚠  server is at DEFENSE_LEVEL={status['level']}, round {rnd} needs "
-              f">= {ROUNDS[rnd]['level']}. Restart:\n"
-              f"  DEFENSE_LEVEL={ROUNDS[rnd]['level']} python demo_site/app.py")
-
-    httpx.post(f"{args.base}/admin/reset", timeout=10)
-
-    attack = importlib.import_module(ROUNDS[rnd]["attack"])
-    import legit_traffic
-    atk = attack.run(args.base)
-    legit = legit_traffic.run(args.base)
-
-    passed, detail = verdict(rnd, atk)
-    print(f"\n── Round {rnd} checkpoint (DEFENSE_LEVEL={status['level']}) ──")
-    print(f"🔴 Bot traffic:   {detail}")
-    print(f"🔵 Real users:    {legit['allowed']}/{legit['total']} served, "
-          f"{legit['blocked']} blocked (false positives)")
-    dec = httpx.get(f"{args.base}/admin/decisions", params={"limit": 2000}, timeout=10).json()
-    costs = [d["cost_ms"] for d in dec if d["surface"] == ROUNDS[rnd]["surface"] and d["cost_ms"]]
-    if costs:
-        costs.sort()
-        p50 = costs[len(costs) // 2]
-        print(f"💸 Defender cost: {len(costs)} scored, p50 {p50:.3f} ms/request")
-    legit_ok = legit["blocked"] == 0
-    ok = passed and legit_ok
-    print(f"\n{'✅ PASS' if ok else '❌ FAIL'} — attack {'stopped' if passed else 'NOT stopped'}, "
-          f"{'no' if legit_ok else str(legit['blocked'])} false positives")
-    if not ok and not passed:
-        print(f"Fell behind? Apply the reference defense:\n"
-              f"  python tools/checkpoint.py --round {rnd} --catch-up")
-
 
 if __name__ == "__main__":
-    main()
+    main(ROUNDS)

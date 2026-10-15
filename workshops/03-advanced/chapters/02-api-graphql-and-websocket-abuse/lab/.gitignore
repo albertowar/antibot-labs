@@ -1,7 +1,7 @@
 .venv/
-venv/
+instance/
+logs/
 __pycache__/
 *.pyc
-instance/
 *.bak
-data/persisted_queries.json
+.env

@@ -1,66 +1,55 @@
-"""Scoreboard — read the decision log and show both sides of the arms race.
+"""
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Reads /admin/decisions and summarises, per surface and action, how traffic was
-scored and at what cost. ``actor`` is lab ground truth (set by the attack and
-legit clients), so we can print blocked bots next to blocked real users — the one
-comparison that tells you whether a defense is worth running.
-
-    python tools/scoreboard.py
-    python tools/scoreboard.py --surface graphql
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
-from __future__ import annotations
-
 import argparse
-import os
-import statistics
-import sys
-from collections import Counter, defaultdict
+import json
 
-import httpx
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import require_local, target  # noqa: E402
-
-BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+from labclient import scoreboard
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default=BASE_URL, type=require_local)
-    ap.add_argument("--surface")
-    ap.add_argument("--limit", type=int, default=2000)
-    args = ap.parse_args()
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
+            continue
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
 
-    rows = httpx.get(f"{args.base}/admin/decisions", params={"limit": args.limit}, timeout=10).json()
-    if args.surface:
-        rows = [r for r in rows if r["surface"] == args.surface]
-    if not rows:
-        print("no decisions logged yet")
-        return
 
-    by_key = defaultdict(list)
-    for r in rows:
-        by_key[(r["surface"], r["action"])].append(r)
-
-    print(f"{'surface/action':28} {'allow':>6} {'chal':>5} {'block':>6} {'p50 ms':>7}  top reason")
-    for (surface, action), items in sorted(by_key.items()):
-        outc = Counter(i["outcome"] for i in items)
-        costs = [i["cost_ms"] for i in items if i["cost_ms"]]
-        p50 = round(statistics.median(costs), 2) if costs else 0.0
-        reasons = Counter(rr for i in items for rr in i["reasons"] if not rr.startswith("messages"))
-        top = reasons.most_common(1)[0][0] if reasons else ""
-        print(f"{surface + '/' + action:28} {outc.get('allow', 0):>6} {outc.get('challenge', 0):>5} "
-              f"{outc.get('block', 0):>6} {p50:>7}  {top[:42]}")
-
-    # Bot vs legit, the headline number.
-    bots = [r for r in rows if r["actor"].startswith("bot")]
-    legit = [r for r in rows if r["actor"].startswith("legit")]
-    bot_blocked = sum(1 for r in bots if r["outcome"] in ("block", "challenge"))
-    legit_blocked = sum(1 for r in legit if r["outcome"] in ("block", "challenge"))
-    print(f"\nbot requests stopped: {bot_blocked}/{len(bots)}    "
-          f"legit requests caught (false positives): {legit_blocked}/{len(legit)}")
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block page %}blocked{% endblock %}{% block title %}Access denied · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial">
+  <p class="eyebrow">{% if reason == 'rate_limited' %}Slow down{% else %}Access denied{% endif %}</p>
+  <h1>{% if reason == 'rate_limited' %}Too many requests{% else %}We could not serve that request{% endif %}</h1>
+  <p class="muted">{% if reason == 'rate_limited' %}Try again in a few seconds.{% elif reason == 'challenge_unavailable' %}This request needed a challenge and none is configured, so it was refused.{% else %}If you think this is a mistake, contact support with reference <code>{{ decision.hard_by or decision.action }}</code>.{% endif %}</p>
+</section>
+{% endblock %}
