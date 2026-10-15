@@ -1,6 +1,6 @@
 # Chapter 3 Lab: Real-Time Streaming Detection
 
-Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: a Redis Stream event log and a consumer thread in the store (`demo_site/ext/stream.py`), five streaming detectors with their gate halves (`defenses/`), four credential-stuffing attackers, a shopper scenario with a mistyped password, and a lag tool.
+Starts from: `workshops/03-advanced/starter/` (contract 1.7). Adds: a Redis Stream event log and a consumer thread in the store (`demo_site/ext/stream.py`), five streaming detectors with their gate halves (`defenses/`), four credential-stuffing attackers, a shopper scenario with a mistyped password, and a lag tool.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -20,6 +20,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: a Redis Stre
 **Edits** (student and tuning files):
 
 - `defenses/ladder.py`
+- `defenses/policy.py`
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
@@ -37,7 +38,7 @@ The spine of the chapter: **a streaming verdict stops what comes after it, never
 ## How it fits together
 
 ```
-request -> gate (ladder: the gate halves) -> route -> after_request: XADD event -> lab:stream:events
+request -> gate (ladder: the gate halves) -> route -> on_response: XADD event -> lab:stream:events
                                                                                       |
               consumer thread (XREADGROUP, group "detectors") -- scores with the detect() of every check
               the ladder enables at the current level -- writes a flag  lab:stream:flag:<detector>:<kind>:<value>

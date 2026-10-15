@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from .. import gate, hooks
 from ..models import GiftCard, Order, Product, Review, User, db, utcnow
 from ..seed import check_password, set_password
-from . import Cart, api_error, current_user, guard
+from . import Cart, after_action, api_error, current_user, guard
 from .pages import listing_query, paginate, place_order
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -58,7 +58,7 @@ def post_review():
                  status="published", extra={"sid": g.ctx.session.sid})
     db.session.add(rev)
     db.session.commit()
-    return jsonify(rev.to_dict()), 201
+    return after_action("review", (jsonify(rev.to_dict()), 201), review=rev, product=p)
 
 
 @bp.route("/cart")
@@ -108,7 +108,7 @@ def checkout():
     if problem:
         return api_error("sold_out", problem, 409)
     c.clear()
-    return jsonify(ok=True, order=order.to_dict()), 201
+    return after_action("checkout", (jsonify(ok=True, order=order.to_dict()), 201), order=order)
 
 
 @bp.route("/buy", methods=["POST"])
@@ -140,7 +140,7 @@ def buy():
                                  email, user, {"kind": "drop", "sku": p.sku, "api": True})
     if problem:
         return api_error("sold_out", problem, 410)
-    return jsonify(ok=True, order=order.to_dict()), 201
+    return after_action("drop_buy", (jsonify(ok=True, order=order.to_dict()), 201), order=order)
 
 
 @bp.route("/login", methods=["POST"])
@@ -156,9 +156,11 @@ def login():
         user.last_login_at = utcnow()
         db.session.commit()
         g.ctx.note(login="ok")
-        return jsonify(ok=True, user=user.to_dict())
-    g.ctx.note(login="fail", login_reason="unknown_user" if user is None else "wrong_password")
-    return api_error("invalid_credentials", "Wrong email or password.", 401)
+        return after_action("login", jsonify(ok=True, user=user.to_dict()), user=user, ok=True)
+    reason = "unknown_user" if user is None else "wrong_password"
+    g.ctx.note(login="fail", login_reason=reason)
+    return after_action("login", api_error("invalid_credentials", "Wrong email or password.", 401),
+                        user=user, ok=False, reason=reason)
 
 
 @bp.route("/register", methods=["POST"])
@@ -177,7 +179,7 @@ def register():
     db.session.add(u)
     db.session.commit()
     g.ctx.session.set("uid", u.id)
-    return jsonify(ok=True, user=u.to_dict()), 201
+    return after_action("register", (jsonify(ok=True, user=u.to_dict()), 201), user=u)
 
 
 @bp.route("/logout", methods=["POST"])

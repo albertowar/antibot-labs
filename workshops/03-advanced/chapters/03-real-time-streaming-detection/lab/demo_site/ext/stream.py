@@ -1,18 +1,22 @@
 """
 Chapter 3's extension: the event log, the consumer thread and the lab's streaming routes.
 
-    after every gated response   XADD one event to the Redis Stream (lab:stream:events)
+    after every gated response   XADD one event to the Redis Stream (lab:stream:events), from a
+                                 hooks.on_response observer (contract 1.7)
     a consumer thread            XREADGROUP -> defenses/consumer.py -> flags (the ladder's detectors)
     GET  /lab/stream/status      backlog (pending + lag), consumers, events/s, the detectors live now
     GET  /lab/stream/verdicts    the flags raised, with how late each one was (lag_ms)
     POST /lab/stream/consumer    {"delay_ms": 40, "consumers": 2}: the backpressure knob
 
-Why an after_request hook and not an enricher: enrichers run before the route, and what a
-detector needs most (did this login FAIL?) is only known once the route has answered. The event
-is built from the request's Ctx (edge IP, session, submitted account) and the note the login
-route already leaves (`ctx.notes["login"]`). It never reads the ground-truth actor.
+Why on_response and not an enricher: enrichers run before the route, and what a detector needs
+most (did this login FAIL?) is only known once the route has answered. The event is built from
+the request's Ctx (edge IP, session, submitted account) and the note the login route already
+leaves (`ctx.notes["login"]`). It never reads the ground-truth actor. The gate runs on_response
+hooks just before it stamps the response and counts their time as gate cost, so the emit is
+ordered deterministically and the defender pays for it on the scoreboard.
 
-Ungated paths (/static, /img, /lab) have no Ctx and never reach the stream.
+Ungated paths (/static, /img, /lab) build no Ctx; the observer skips them, so they never reach
+the stream (the lab reads "looks human" from page views, not asset fetches).
 """
 
 import json
@@ -43,17 +47,18 @@ def _event(ctx, response):
     }
 
 
-def _after(response):
-    ctx = getattr(g, "ctx", None)
-    if ctx is None:
-        return response
+def _observe(info):
+    """hooks.on_response: one event per gated response. `emit_ms` stays a note (the checkpoint
+    reads it); the gate adds the hook's time to the Server-Timing `gate` figure itself."""
+    ctx = info.ctx
+    if ctx is None:                # ungated path: no Ctx, no event
+        return
     t0 = time.perf_counter()
     try:
-        streamlog.emit(current_app.extensions["lab_redis"], _event(ctx, response))
+        streamlog.emit(current_app.extensions["lab_redis"], _event(ctx, info.response))
     except Exception as exc:       # the log must never take the store down
         ctx.note(emit_error=repr(exc))
     ctx.note(emit_ms=round((time.perf_counter() - t0) * 1000, 3))
-    return response
 
 
 def _worker(app, name, stop):
@@ -120,7 +125,7 @@ def tune():
 def init(app):
     hooks.ungate("/lab/stream")
     app.register_blueprint(bp)
-    app.after_request(_after)
+    hooks.on_response(_observe)
     CTRL.update(delay_ms=0.0, processed=0, busy_s=0.0)
     _set_consumers(app, 0)             # a second create_app() in one process retires the old workers
     _set_consumers(app, 1)

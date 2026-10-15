@@ -37,7 +37,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import personas_ch3  # noqa: E402,F401  (registers the ch3_shop scenario)
-import checkpoint_core  # noqa: E402
 from checkpoint_core import Round, main  # noqa: E402
 import labclient  # noqa: E402
 
@@ -132,8 +131,11 @@ ATTACKS = {
 
 
 def make_round(level, description, attack, checks, **kw):
+    # teardown drains the consumer (contract 1.7): every flag of the round exists before the board
+    # is read, and the next round's reset cannot race a late one.
     return Round(level=level, description=description, scenario="ch3_shop", attacks={attack: ATTACKS[attack]},
-                 solutions=("defenses/ladder.py",), extra_checks=[stream_state, *checks, people, gate_cost], **kw)
+                 solutions=("defenses/ladder.py",), teardown=lambda level: drain(),
+                 extra_checks=[stream_state, *checks, people, gate_cost], **kw)
 
 
 ROUNDS = {
@@ -148,18 +150,6 @@ ROUNDS = {
     4: make_round(4, "the composite verdict with a global campaign term", "jittered",
                   [attacker("jittered", served=(140, 185), caught=(45, 70))]),
 }
-
-_check_round = checkpoint_core.check_round
-
-
-def check_round(*args, **kwargs):
-    """Every round, judged or not (--level), ends with the consumer drained, so the next reset cannot race a late flag."""
-    out = _check_round(*args, **kwargs)
-    drain()
-    return out
-
-
-checkpoint_core.check_round = check_round
 
 if __name__ == "__main__":
     main(ROUNDS)

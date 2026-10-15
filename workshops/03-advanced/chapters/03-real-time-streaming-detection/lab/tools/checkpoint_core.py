@@ -7,11 +7,17 @@ and calls main(ROUNDS).
                    "replay_share": "attacks/round2_replay.py --share",  #   or a callable returning a dict
                    "pool": "attacks/round3_solver_pool.py"},
           expect={"replay": "partial", "replay_share": "blocked", "pool": "full"},
-          scenario="browse",                     # population scenario run next to the attacks
+          scenario="browse",                     # population scenario run next to the attacks (None: no shoppers)
           allowed_fp=("no_js",),                 # personas a defense MAY stop this round
           bot_success_max=1.0,                   # optional cap on the scoreboard's bot share (see `metric`)
           extra_checks=[fn],                     # fn(board, results, attacks) -> (ok, message)
-          solutions=("defenses/ladder.py",))     # files --catch-up installs from solutions/round<N>/
+          solutions=("defenses/ladder.py",),     # files --catch-up installs from solutions/round<N>/
+          setup=fn,                              # fn(level, caught_up) after the reset, before anything runs
+                                                 #   (train a model, install state; caught_up: --catch-up ran)
+          teardown=fn,                           # fn(level) after attacks and shoppers, before the board is read
+                                                 #   (drain an async consumer)
+          people=[...] or fn,                    # replaces population.personas() for this round
+          threads=1)                             # population thread count (default 8; 1 = deterministic order)
 
 Attack output convention: an attack script prints, as its LAST line, one JSON object with at
 least {"attempted": n, "succeeded": k}; anything else it adds (bits, cpu_s, price) reaches
@@ -64,11 +70,16 @@ class Round:
     scenario: object = "browse"
     bot_success_max: float = 1.0
     humans_hurt_max: int = 0
+    legit_hurt_max: int = 0      # welcome automation (legit: actors) a defense may stop this round
     allowed_fp: tuple = ()
     metric: object = "served"
     solutions: tuple = ("defenses/ladder.py",)
     population_n: int = None
     extra_checks: list = field(default_factory=list)      # fn(board, results[, attacks]) -> (ok, message)
+    setup: object = None                                  # fn(level, caught_up), after reset
+    teardown: object = None                               # fn(level), after attacks + shoppers
+    people: object = None                                 # list or callable -> list, for population.run
+    threads: int = 8                                      # population thread count
 
     def attack_specs(self):
         specs = dict(self.attacks)
@@ -150,19 +161,29 @@ def bot_metric(rnd, board, results, attacks):
     return (s["bot_served"] / s["bot_requests"]) if s["bot_requests"] else 0.0
 
 
-def check_round(rounds, n, markdown=False, reset_store=True, level=None):
+def check_round(rounds, n, markdown=False, reset_store=True, level=None, caught_up=False):
     rnd = rounds[n] if level is None else replace(rounds[n], level=level)
     labclient.wait_for_store()
     print(f"\n== Round {n}: {rnd.description} (level {rnd.level})")
     labclient.set_level(rnd.level)
     if reset_store:
         labclient.reset()
+    if rnd.setup:
+        _call(rnd.setup, rnd.level, caught_up)
     since = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
     results = []
-    t = threading.Thread(target=lambda: results.extend(population.run(rnd.scenario, seed=population.SEED, n=rnd.population_n, quiet=True)))
-    t.start()
+    t = None
+    if rnd.scenario is not None:
+        people = rnd.people() if callable(rnd.people) else rnd.people
+        t = threading.Thread(target=lambda: results.extend(
+            population.run(rnd.scenario, people=people, seed=population.SEED, n=rnd.population_n,
+                           threads=rnd.threads, quiet=True)))
+        t.start()
     attacks = run_attacks(rnd)
-    t.join()
+    if t is not None:
+        t.join()
+    if rnd.teardown:
+        _call(rnd.teardown, rnd.level)
     board = labclient.scoreboard(since)
     print(sb.render(board, markdown))
     population.print_results(results)
@@ -185,6 +206,9 @@ def check_round(rounds, n, markdown=False, reset_store=True, level=None):
     hurt = [r for r in results if r.get("outcome") in population.HURT and r["persona"] not in rnd.allowed_fp]
     if len(hurt) > rnd.humans_hurt_max:
         problems.append(f"{len(hurt)} shoppers stopped who should not be: " + ", ".join(sorted({r['actor'] for r in hurt})))
+    legit_hurt = board["summary"].get("legit_hurt", 0)
+    if judge and legit_hurt > rnd.legit_hurt_max:
+        problems.append(f"{legit_hurt} legit automation actors stopped (false positives), allowed {rnd.legit_hurt_max}")
     for fn in (rnd.extra_checks if judge else []):
         good, msg = _call(fn, board, results, attacks)
         if not good:
@@ -215,7 +239,7 @@ def main(rounds):
     todo = sorted(rounds) if args.all else [args.round]
     if args.catch_up:
         catch_up(rounds, max(todo))
-    out = [check_round(rounds, n, args.markdown, not args.no_reset, args.level) for n in todo]
+    out = [check_round(rounds, n, args.markdown, not args.no_reset, args.level, args.catch_up) for n in todo]
     if args.json:
         print(json.dumps(out, indent=1, default=str))
     sys.exit(0 if all(o["ok"] for o in out) else 1)

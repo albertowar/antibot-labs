@@ -33,6 +33,7 @@ class Config:
     lab_shadow: bool
     lab_shadow_checks: tuple
     lab_reload: bool
+    lab_smoke: bool
     drop_stock: int
     hash_iters: int
     world_file: str
@@ -53,6 +54,9 @@ class Config:
             lab_shadow=os.environ.get("LAB_SHADOW", "0") == "1",
             lab_shadow_checks=tuple(x for x in os.environ.get("LAB_SHADOW_CHECKS", "").split(",") if x),
             lab_reload=os.environ.get("LAB_RELOAD", "1") != "0",
+            # LAB_SMOKE=1: the gate runs an empty ladder at every level, so the contract test
+            # (tools/smoke.py) sees the bare store even when a lab wires a baseline at LADDER[0].
+            lab_smoke=os.environ.get("LAB_SMOKE", "0") == "1",
             drop_stock=_env_int("DROP_STOCK", 50),
             hash_iters=_env_int("LAB_HASH_ITERS", 5000),
             world_file=os.environ.get("WORLD_FILE", os.path.join(LAB_ROOT, "data", "world.json")),

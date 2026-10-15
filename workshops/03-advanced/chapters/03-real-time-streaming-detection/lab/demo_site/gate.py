@@ -56,10 +56,18 @@ def build_ctx(app):
         user = User.query.get(s.user_id)
     headers = [(k, v) for k, v in request.headers if not k.lower().startswith("x-lab-")]
     body = request.get_json(silent=True) if request.is_json else None
+
+    def _cleared(ctype=None):
+        names = [ctype] if ctype else hooks.challenges.names()
+        return any(bool(redis.get(f"lab:s:{s.sid}:clear:{t}")) for t in names)
+
     ctx = Ctx(method=request.method, path=request.path, host=request.host, args=request.args.to_dict(),
               form=request.form.to_dict(), json=body, cookies=request.cookies.to_dict(), headers=headers,
               ua=UserAgent.parse(request.headers.get("User-Agent", "")), edge=_edge_info(), session=s,
               user=user, redis=redis, level=app.config["LAB"].defense_level,
+              route=request.endpoint or "", view_args=dict(request.view_args or {}),
+              query_string=request.query_string.decode("utf-8", "replace"), scheme=request.scheme,
+              resumed=_cleared() if hooks.challenges.types else False, _clearance=_cleared,
               _telemetry=lambda kind: _read_telemetry(redis, s.sid, kind))
     return ctx
 
@@ -100,8 +108,9 @@ def clearance_valid(ctx, ctype):
     return bool(ctx.redis.get(_clear_key(ctx, ctype)))
 
 
-def _spend_clearance(ctx, ctype):
-    """A clearance absorbed one challenge verdict. Counted clearances run out."""
+def spend_clearance(ctx, ctype):
+    """A clearance absorbed one challenge verdict. Counted clearances run out. The downgrade
+    rule calls this; a policy that allows after a solve itself can call it to spend the pass."""
     if ctx.redis.get(_clear_key(ctx, ctype)) in (None, "inf"):
         return
     left = ctx.redis.decr(_clear_key(ctx, ctype))
@@ -109,12 +118,17 @@ def _spend_clearance(ctx, ctype):
         revoke_clearance(ctx, ctype)
 
 
+_spend_clearance = spend_clearance      # pre-1.7 name, kept for existing labs
+
+
 def run_phase(phase, ctx=None):
     """Run the ladder for a phase (routes call this for action:* phases). Returns a Decision."""
     from flask import current_app
     cfg = current_app.config["LAB"]
     ctx = ctx or g.ctx
-    ladder = reloader.ladder() if cfg.lab_reload else _static_ladder()
+    # LAB_SMOKE=1 (tools/verify.py --smoke) tests the bare store: no ladder at any level,
+    # so a lab may wire a permanent baseline at LADDER[0] and smoke still passes.
+    ladder = {} if cfg.lab_smoke else (reloader.ladder() if cfg.lab_reload else _static_ladder())
     t0 = time.perf_counter()
     d = pipeline.run(phase, ctx, ladder, cfg.defense_level, cfg.lab_shadow, cfg.lab_shadow_checks)
     # The downgrade rule: a session holding a valid clearance for the challenge type a verdict
@@ -122,7 +136,7 @@ def run_phase(phase, ctx=None):
     # re-challenge a cleared session must revoke_clearance() first (W1 Ch7's pass budget does).
     if d.action == "challenge" and d.challenge and clearance_valid(ctx, d.challenge):
         d.action, ctx.notes["cleared"] = "monitor", d.challenge
-        _spend_clearance(ctx, d.challenge)
+        spend_clearance(ctx, d.challenge)
     if hasattr(g, "gate_ms"):
         g.gate_ms += (time.perf_counter() - t0) * 1000
     g.decisions.append(d)
@@ -134,10 +148,15 @@ def _static_ladder():
     return ladder.LADDER
 
 
+def wants_json():
+    """Should this request be answered in JSON (API path, JSON body, or no HTML Accept)?"""
+    return request.path.startswith("/api/") or request.is_json or \
+        "text/html" not in request.headers.get("Accept", "text/html")
+
+
 def respond(d, ctx):
     """Turn a Decision into the HTTP answer the client gets, or None to let the route run."""
-    wants_json = request.path.startswith("/api/") or request.is_json or \
-        "text/html" not in request.headers.get("Accept", "text/html")
+    as_json = wants_json()
     if d.action in ("allow", "monitor"):
         return None
     if d.action == "deceive":
@@ -145,7 +164,7 @@ def respond(d, ctx):
         return None
     if d.action == "rate_limit":
         retry = d.retry_after or 5
-        if wants_json:
+        if as_json:
             r = jsonify(error={"code": "rate_limited", "message": "Too many requests."})
         else:
             r = make_response(render_template("blocked.html", reason="rate_limited", decision=d), 429)
@@ -157,17 +176,28 @@ def respond(d, ctx):
         ctype = hooks.challenges.get(d.challenge) if d.challenge else None
         if ctype is None:           # nothing registered: enforced as a block, and visibly so
             g.outcome = "blocked"
-            if wants_json:
+            if as_json:
                 return jsonify(error={"code": "challenge_unavailable", "message": "Access denied."}), 403
             return render_template("blocked.html", reason="challenge_unavailable", decision=d), 403
         g.outcome = "challenged"
         payload = ctype["issue"](ctx)
-        if wants_json:
+        if as_json:
             return jsonify(error={"code": "challenge_required", "challenge": d.challenge, "payload": payload}), 403
         tpl = ctype["render"] or "challenge.html"
-        return render_template(tpl, challenge=d.challenge, payload=payload, decision=d, next=request.full_path), 403
+        # A challenge met on a form POST must not lose the form: the interstitial carries the
+        # submitted fields (echoed back to the client that sent them, nobody else) in a hidden
+        # resubmit form with a fresh csrf, so one click replays the POST after the solve.
+        replay = None
+        if request.method == "POST" and request.form:
+            replay = {k: v for k, v in request.form.items() if k != "csrf"}
+            csrf = ctx.session.get("csrf")
+            if not csrf:
+                csrf = secrets.token_urlsafe(16)
+                ctx.session.set("csrf", csrf)
+        return render_template(tpl, challenge=d.challenge, payload=payload, decision=d, next=request.full_path,
+                               replay=replay, replay_csrf=ctx.session.get("csrf", "") if replay else ""), 403
     g.outcome = "blocked"
-    if wants_json:
+    if as_json:
         return jsonify(error={"code": "blocked", "message": "Access denied."}), 403
     return render_template("blocked.html", reason="blocked", decision=d), 403
 
@@ -178,7 +208,8 @@ def install(app):
         g.t0 = time.perf_counter()
         g.gate_ms = 0.0
         g.decisions, g.outcome, g.deceive = [], None, False
-        if hooks.is_ungated(request.path):
+        mode = hooks.ungate_mode(request.path)
+        if mode == "skip":
             g.ctx = None
             return None
         t_ctx = time.perf_counter()
@@ -190,12 +221,34 @@ def install(app):
             except Exception as e:
                 ctx.note(enricher_error=repr(e))
         g.gate_ms += (time.perf_counter() - t_ctx) * 1000      # Ctx build + enrichers count as gate cost
+        if mode == "session":                                  # hooks.ungate(..., session=True):
+            return None                                        # Ctx, cookie and a log row — no ladder
         d = run_phase("request", ctx)
+        if d.action == "challenge" and request.path in ("/api/challenge", "/api/challenge/verify"):
+            # A client in the challenge band must still be able to fetch and deliver the answer:
+            # the two challenge endpoints are exempt from the challenge band (a block or a rate
+            # limit still applies), or a VPN user scoring 40+ on every request could never solve.
+            d.action = "monitor"
+            ctx.note(challenge_exempt=1)
         return respond(d, ctx)
 
     @app.after_request
     def _stamp(response):
         ctx = getattr(g, "ctx", None)
+        if hooks.RESPONSE_HOOKS:
+            info = hooks.ResponseInfo(ctx=ctx, path=request.path, method=request.method,
+                                      status=response.status_code, response=response,
+                                      edge=request.environ.get("lab.edge") or {"ip": request.remote_addr},
+                                      gated=ctx is not None)
+            t_hooks = time.perf_counter()
+            for fn in hooks.RESPONSE_HOOKS:
+                try:
+                    fn(info)
+                except Exception as e:                   # a broken hook must never take the store down
+                    if ctx is not None:
+                        ctx.note(response_hook_error=repr(e))
+            if ctx is not None and hasattr(g, "gate_ms"):
+                g.gate_ms += (time.perf_counter() - t_hooks) * 1000   # observing is defender cost too
         if ctx is None:
             return response
         cfg = app.config["LAB"]
@@ -206,7 +259,9 @@ def install(app):
                                 max_age=400 * 24 * 3600)
         decisions = getattr(g, "decisions", [])
         final = decisions[-1] if decisions else pipeline.Decision()
-        worst = max(decisions, key=lambda d: d.score) if decisions else final
+        # Most severe decision, score as the tie-break: a zero-score 429 outranks a
+        # high-score monitor (contract 1.7; checkpoints that want the HTTP result read `outcome`).
+        worst = max(decisions, key=lambda d: (pipeline.SEVERITY.get(d.action, 0), d.score)) if decisions else final
         total_ms = (time.perf_counter() - g.t0) * 1000
         ms = getattr(g, "gate_ms", total_ms)          # defender cost: Ctx build + enrichers + every ladder pass
         outcome = g.outcome or ("deceived" if g.deceive else ("purchased" if getattr(g, "purchased", False) else "served"))
