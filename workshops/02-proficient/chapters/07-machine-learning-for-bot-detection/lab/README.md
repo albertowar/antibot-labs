@@ -1,8 +1,36 @@
 # Chapter 7 Lab: Machine Learning for Bot Detection
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a request log, `fp`/`beh` telemetry kinds, a honeypot and deferred orders (`demo_site/ext/ml.py`, `ml_store.py`), the model pipeline (features, weak labels, training, TreeSHAP, a human-only anomaly detector), four stubs you finish (Rounds 1 to 4), four attackers and a 200-customer drop-day cohort.
+Starts from: `workshops/02-proficient/starter/` (contract 1.7). Adds: a request log, `fp`/`beh` telemetry kinds, a honeypot and deferred orders (`demo_site/ext/ml.py`, `ml_store.py`), the model pipeline (features, weak labels, training, TreeSHAP, a human-only anomaly detector), four stubs you finish (Rounds 1 to 4), four attackers and a 200-customer drop-day cohort.
 
 <!-- lab-diff:start -->
+**Adds** (files not in the starter):
+
+- `defenses/anomaly.py`
+- `defenses/cohort.py`
+- `defenses/enforcement.py`
+- `defenses/features.py`
+- `defenses/history.py`
+- `defenses/labels.py`
+- `defenses/ml_check.py`
+- `defenses/models.py`
+- `defenses/train.py`
+- `demo_site/ext/ml.py`
+- `demo_site/ext/ml_store.py`
+- `demo_site/ext/templates/ml/honeypot.html`
+- `tools/analyst.py`
+- `tools/audit.py`
+- `tools/explain.py`
+- `tools/label_cluster.py`
+- `tools/ml_setup.py`
+- `tools/personas_ch7.py`
+- `tools/shopper.py`
+- `tools/simulate.py`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
+- `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
 **Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `../chapter_07_content.md`, §7.6. **Style: wire-it.** Four modules ship as stubs with a `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `--catch-up` installs rounds 1..N (and **trains the reference models**), and `--restore` puts your files back. Everything around the stubs (features, labels, training, the explainer, the simulators) is finished code you read and run.
@@ -199,7 +227,9 @@ The starter's scoreboard counts a customer as hurt when the *last thing the gate
 
 ## Expected results (self-check)
 
-Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) on 2026-10-14 on Linux x86_64 (WSL2) with Python 3.12, Flask 3.1, redis 8.1, fakeredis 2.39, LightGBM 4.7 and the in-process Redis. Every round passed with the reference solutions installed, and every `--level N-1` "before" run reported the round's attacker getting through. Customers are 200 people in six cohorts. "Hurt" is a customer blocked at the purchase or, at level 4, cancelled at review. The models are deterministic, but the customers shop on 16 threads, so which customers land next to a bot wave in a cohort window varies: the hurt count moves by a few between runs (Round 2 landed on 7, 8 and 9 across runs, Round 4 on 6 to 8), which is why the budget from Round 2 on is 10 of 200 (5%). The Docker path (Redis 8.10, PostgreSQL 18) was run for the smoke test and Round 3: it passes (7 of 200 hurt; the model check is slower there, median 33 ms, because the features read Redis over the network).
+Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) on 2026-10-14 on Linux x86_64 (WSL2) with Python 3.12, Flask 3.1, redis 8.1, fakeredis 2.39, LightGBM 4.7 and the in-process Redis. Every round passed with the reference solutions installed, and every `--level N-1` "before" run reported the round's attacker getting through. Customers are 200 people in six cohorts. "Hurt" is a customer blocked at the purchase or, at level 4, cancelled at review. The customers shop on 16 threads, so which customers land next to a bot wave in a cohort window varies: the hurt count moves by a few between runs (Round 2 landed on 7, 8 and 9 across runs, Round 4 on 6 to 8), which is why the budget from Round 2 on is 10 of 200 (5%). The Docker path (Redis 8.10, PostgreSQL 18) was run for the smoke test and Round 3: it passes (7 of 200 hurt; the model check is slower there, median 33 ms, because the features read Redis over the network).
+
+**Known issue.** These tables hold for the history this environment generated. The feature families divide *measured* durations by `LAB_TIME_SCALE`, so a history regenerated on another machine (or under load) trains a measurably different model, and Rounds 2–4 can miss their budgets in either direction. The defect and the fix direction (virtual timestamps, or band-based judging) are in [`../TODO.md`](../TODO.md); it predates the contract 1.7 re-base.
 
 | Round | Level | Attackers run | Succeeded (before → after) | Customers hurt | Model check per purchase, median / p95 |
 |---|---|---|---|---|---|

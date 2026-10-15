@@ -21,12 +21,19 @@ not (a cloud VM is usually also a hosting ASN). W2 Ch8 replaces the sum with
 calibrated weights; the starter keeps it readable.
 """
 
+import inspect
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Optional
 
 HARD_ACTIONS = ("rate_limit", "block", "deceive")
 ACTIONS = ("allow", "monitor", "challenge") + HARD_ACTIONS
+
+# How bad each action is for the client, worst last. The gate reports the most severe
+# decision of a request (X-Lab-Verdict, the log's `action`), not the highest-scoring one:
+# a 429 from a zero-score rate limit must not read "allow" because an earlier pass
+# accumulated points (contract 1.7).
+SEVERITY = {"allow": 0, "monitor": 1, "challenge": 2, "rate_limit": 3, "deceive": 4, "block": 5}
 
 
 @dataclass(frozen=True)
@@ -88,9 +95,33 @@ def _normalise(check, out):
     if out is None:
         return Verdict()
     if isinstance(out, Verdict):
+        if out.action not in HARD_ACTIONS and out.score and not out.signals:
+            # A soft verdict's points only count through its signals, so a bare
+            # Verdict("challenge", 40) would sum to 0 and decide "allow". Carry the
+            # points as one synthesized signal instead (contract 1.7).
+            return Verdict(out.action, out.score, (Signal(check.name, out.action, out.score, "verdict"),),
+                           out.challenge, out.retry_after)
         return out
     sigs = tuple(out)
     return Verdict(action="allow", score=sum(s.points for s in sigs), signals=sigs)
+
+
+_WANTS_CTX = {}
+
+
+def _decide(policy, score, signals, level, ctx):
+    """Call policy.decide, passing ctx only when the override's signature takes it."""
+    fn = policy.decide
+    key = id(fn)
+    if key not in _WANTS_CTX:
+        try:
+            params = inspect.signature(fn).parameters
+            _WANTS_CTX[key] = "ctx" in params or any(p.kind == p.VAR_KEYWORD for p in params.values())
+        except (TypeError, ValueError):
+            _WANTS_CTX[key] = False
+    if _WANTS_CTX[key]:
+        return fn(score, signals, level, ctx=ctx)
+    return fn(score, signals, level)
 
 
 def run(phase, ctx, ladder, level, shadow_enabled=False, shadow_names=(), policy=None):
@@ -128,7 +159,7 @@ def run(phase, ctx, ladder, level, shadow_enabled=False, shadow_names=(), policy
             if v.challenge and not d.challenge:
                 d.challenge = v.challenge
     d.score = min(100, sum(s.points for s in d.signals))
-    d.action = policy.decide(d.score, d.signals, level)
+    d.action = _decide(policy, d.score, d.signals, level, ctx)
     if d.action == "challenge" and not d.challenge:
         d.challenge = policy.DEFAULT_CHALLENGE
     return d

@@ -15,10 +15,10 @@ Labels: some users sign in to long-standing accounts. Those sign-ins are the onl
 defender gets (defenses/labels.py), and they are NOT a random sample: privacy-browser and VPN users
 rarely sign in. Every account is one of the store's seed users (user000..299@example.test).
 
-This module swaps population.personas() for the drop-day cohort, registers the `drop_day` scenario,
-and makes the population wait for deferred orders (Round 4): a customer whose order is cancelled at
-review is counted as hurt, like one who was blocked. checkpoint.py imports it (population.py also
-auto-imports every tools/personas_*.py), so every round runs these people.
+This module provides the drop-day cohort (`people`, each Round's `people=` since contract 1.7),
+registers the `drop_day` scenario, and makes the population wait for deferred orders (Round 4): a
+customer whose order is cancelled at review is counted as hurt, like one who was blocked.
+checkpoint.py imports it (population.py also auto-imports every tools/personas_*.py).
 """
 
 import os
@@ -105,7 +105,6 @@ def scenario_drop_day(p, client, rng):
 
 
 population.SCENARIOS["drop_day"] = scenario_drop_day
-population.personas = people
 population.HURT |= {"cancelled"}                           # wrongly cancelled at review is as bad as blocked
 
 _run = population.run

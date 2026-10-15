@@ -10,19 +10,41 @@ from its init(app). Starter files are never edited by a lab.
                                             a challenge type the policy "challenge" band can serve
     enricher(fn)                            fn(ctx) runs before the checks; fill ctx.attrs
     ungate(prefix)                          paths the gate skips (static assets, your lab routes)
-    on_action(name, fn)                     fn(ctx, result) after a route action (checkout, login, ...)
+    ungate(prefix, session=True)            skip the ladder but still build the Ctx, set the session
+                                            cookie, run enrichers and write a decision row (for a lab
+                                            page that must run a collector or post telemetry)
+    on_action(name, fn)                     fn(ctx, result, response) after a route's write or outcome
+                                            (review/checkout/drop_buy after the row is written;
+                                            register after the account; login after EVERY attempt,
+                                            with result={"user":..., "ok": bool, "reason":...});
+                                            return a replacement response to hold/swap it, or None
+    on_response(fn)                         fn(info) on every response, gated or not, just before the
+                                            gate stamps it; info: ctx (None if ungated), path, method,
+                                            status, response, edge, gated. Time counts as gate cost.
+    on_reset(fn)                            fn(app) after POST /lab/reset clears core state: drop or
+                                            reseed the tables and Redis keys your ext owns
+    stopped_outcome(*names)                 count chapter outcomes (g.outcome values like "paywalled")
+                                            as stops in the scoreboard's stopped column and hurt rule
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
 
 from flask import render_template
 from markupsafe import Markup
 
 SLOTS = defaultdict(list)
 ENRICHERS = []
-UNGATED = ["/static/", "/img/", "/lab/", "/whoami", "/health", "/favicon.ico"]
+UNGATED = [("/static/", "skip"), ("/img/", "skip"), ("/lab/", "skip"), ("/whoami", "skip"),
+           ("/health", "skip"), ("/favicon.ico", "skip")]
 ACTION_HOOKS = defaultdict(list)
+RESPONSE_HOOKS = []
+RESET_HOOKS = []
 ROBOTS = []
+
+# Outcomes the scoreboard counts as a stop (its `stopped` column and the hurt rule).
+# stopped_outcome() lets a chapter add its own (g.outcome values such as "paywalled").
+STOPPED_OUTCOMES = {"blocked", "challenged", "rate_limited", "deceived"}
 
 
 def slot(name, template):
@@ -49,16 +71,56 @@ def enricher(fn):
     return fn
 
 
-def ungate(prefix):
-    UNGATED.append(prefix)
+def ungate(prefix, session=False):
+    """Skip the gate's ladder for `prefix`. With session=True the gate still builds the Ctx
+    (session cookie, enrichers, a decision row), it just never runs checks or blocks."""
+    UNGATED.append((prefix, "session" if session else "skip"))
+
+
+def ungate_mode(path):
+    """None (gated), "skip" or "session" — the longest matching prefix wins."""
+    best = None
+    for p, mode in UNGATED:
+        if (path == p.rstrip("/") or path.startswith(p)) and (best is None or len(p) > len(best[0])):
+            best = (p, mode)
+    return best[1] if best else None
 
 
 def is_ungated(path):
-    return any(path == p.rstrip("/") or path.startswith(p) for p in UNGATED)
+    return ungate_mode(path) is not None
 
 
 def on_action(name, fn):
     ACTION_HOOKS[name].append(fn)
+
+
+@dataclass
+class ResponseInfo:
+    """What an on_response hook sees. `ctx` is None on an ungated path; `edge` is the raw
+    lab-edge dict ({"ip": ..., "asn": ...}), present even when no Ctx was built."""
+    ctx: object
+    path: str
+    method: str
+    status: int
+    response: object
+    edge: dict
+    gated: bool
+
+
+def on_response(fn):
+    """Register fn(info: ResponseInfo): runs on every response (gated and ungated) just before
+    the gate stamps it, in registration order. Its time counts as gate cost when a Ctx exists;
+    an exception is noted on the Ctx, never raised."""
+    RESPONSE_HOOKS.append(fn)
+
+
+def stopped_outcome(*names):
+    STOPPED_OUTCOMES.update(names)
+
+
+def on_reset(fn):
+    """Register fn(app), run after POST /lab/reset clears the core store (reseed/clear ext tables)."""
+    RESET_HOOKS.append(fn)
 
 
 class Telemetry:

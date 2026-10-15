@@ -1,16 +1,12 @@
 """
 Everything a round needs that is not a defense: the training history and the models.
 
-tools/checkpoint.py imports this module. It does two things the checkpoint engine has no hook for
-(recorded as a contract gap in TODO.md section 1.2):
-
-  1. It wraps labclient.reset, which check_round calls right after it sets the round's level. Before the
-     store is reset, `prepare()` makes sure the drop-day history exists (generated with tools/simulate.py
-     if not) and that the models the round's level needs exist; the store is then reset with a drop big
-     enough for a drop day (the starter's 50 units would sell out in seconds).
-  2. It wraps checkpoint_core.catch_up. The solution files are installed as usual, and the models are
-     then TRAINED from the history by the reference code, once per process, so `--catch-up` leaves you
-     a working round. Without it, your own models are used and a missing one is a clear message.
+tools/checkpoint.py passes `setup` as each Round's setup hook (contract 1.7:
+`Round.setup(level, caught_up)` runs right after the round's reset). It makes sure the
+drop-day history exists (generated with tools/simulate.py if not) and that the models the
+round's level needs exist — trained from the history by the reference code when `--catch-up`
+ran, once per process; otherwise a missing model is a clear message. It then resets the store
+again with a drop big enough for a drop day (the starter's 50 units would sell out in seconds).
 """
 
 import os
@@ -21,12 +17,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 
-import checkpoint_core  # noqa: E402
 import labclient  # noqa: E402
 from defenses import history, models  # noqa: E402
 
 DROP_STOCK = 20000
-STATE = {"catch_up": False, "trained": set()}
+STATE = {"trained": set()}
 
 
 def sh(*argv):
@@ -70,31 +65,12 @@ def train_for(level):
         STATE["trained"].add(name)
 
 
-def prepare(level):
+def setup(level, caught_up=False):
+    """Round.setup: history + models for `level`, then a reset with a drop day's stock."""
     ensure_history()
-    if STATE["catch_up"]:
+    if caught_up:
         train_for(level)
     elif models.missing(level):
         raise SystemExit(f"Level {level} needs {', '.join(models.missing(level))}. Train it "
                          f"(python -m defenses.train --round N, python -m defenses.anomaly), or run with --catch-up.")
-
-
-_reset = labclient.reset
-
-
-def reset(mode="state", **params):
-    prepare(labclient.admin("GET", "/lab/status")["level"])
-    return _reset(mode, **{"stock": DROP_STOCK, **params})
-
-
-labclient.reset = reset
-
-_catch_up = checkpoint_core.catch_up
-
-
-def catch_up(rounds, upto):
-    _catch_up(rounds, upto)
-    STATE["catch_up"] = True
-
-
-checkpoint_core.catch_up = catch_up
+    labclient.reset(stock=DROP_STOCK)

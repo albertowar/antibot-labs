@@ -27,10 +27,39 @@ def csrf_ok():
 
 
 def guard(action, **notes):
-    """Run the ladder's action:<name> phase. Returns a response to short-circuit with, or None."""
+    """Run the ladder's action:<name> phase. Returns a response to short-circuit with, or None.
+
+    A `deceive` verdict is answered here for the actions routes/deceive.py knows how to fake
+    (login, register, review, newsletter); checkout and drop_buy keep their fake in the route,
+    which holds the cart the fake confirmation needs (contract 1.7)."""
     g.ctx.note(**notes)
     d = gate.run_phase(f"action:{action}")
-    return gate.respond(d, g.ctx)
+    r = gate.respond(d, g.ctx)
+    if r is None and getattr(g, "deceive", False):
+        from .deceive import fake_response
+        return fake_response(action)
+    return r
+
+
+def after_action(action, response, **result):
+    """Fire the post-write hooks for `action` and return the response.
+
+    The write actions (review/checkout/drop_buy, and register since contract 1.7) call this on
+    their success path, after the row is written, with the row(s) in `result` (e.g. order=order
+    or user=u). `login` calls it on EVERY attempt with result={"user": ..., "ok": bool,
+    "reason": ...}, so a defense can meter failures or step up after a success. Each
+    `hooks.on_action(action, fn)` handler is fn(ctx, result, response); it may mutate the
+    persisted row (hold a review as `pending`, mark an order `pending`, attribute an agent
+    order), take the session back (delete `uid`), and return a replacement response, or None
+    to keep the current one. With nothing registered the response is returned unchanged, so
+    the default store behaviour is identical."""
+    from .. import hooks
+    ctx = getattr(g, "ctx", None)
+    for fn in hooks.ACTION_HOOKS.get(action, []):
+        r = fn(ctx, result, response)
+        if r is not None:
+            response = r
+    return response
 
 
 def api_error(code, message, status=400, **extra):
