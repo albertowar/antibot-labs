@@ -5,7 +5,7 @@ A crawler announces who it is in the User-Agent string:
     Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
     Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.3; +https://openai.com/gptbot)
 
-Workshop 1, Chapter 4 parsed these for the opposite purpose (spotting scripts).
+W1 Ch4 parsed these for the opposite purpose (spotting scripts).
 Here the token is the *claim* the rest of the gate has to verify. At
 DEFENSE_LEVEL=0 the store believes the claim outright, which is how a lot of real
 allowlists still work and why Round 1 takes ten minutes.
@@ -14,12 +14,12 @@ Matching rules that matter in production:
   * match the bare token, case-sensitively where the operator documents a case
     ("bingbot" is lower case, "Googlebot" is not); version numbers change.
   * the first matching token wins; a UA that mentions two operators is already
-    suspicious, but that is a Chapter 1 topic.
+    suspicious, but that is a W4 Ch1 topic.
 """
 
 from __future__ import annotations
 
-from operators import OPERATORS
+from .operators import OPERATORS
 
 
 def claim(user_agent: str) -> str | None:
@@ -32,7 +32,7 @@ def claim(user_agent: str) -> str | None:
     return None
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":          # python -m defenses.ua_claims
     for ua in ("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0 Safari/537.36",
                "Mozilla/5.0 (compatible; GPTBot/1.3; +https://openai.com/gptbot)"):

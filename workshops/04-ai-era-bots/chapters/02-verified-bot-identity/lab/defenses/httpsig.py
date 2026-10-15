@@ -5,8 +5,8 @@ implements just enough of RFC 9421 to sign and verify the way the IETF
 `draft-ietf-webbotauth-httpsig-protocol-00` and Cloudflare's verifier do:
 
   * Ed25519 only (the one algorithm Cloudflare's verifier accepts in 2026).
-  * Derived components `@method`, `@authority`, `@path`, `@target-uri`, plus any
-    header, plus a Dictionary member of a header (`"signature-agent";key="sig1"`,
+  * Derived components `@method`, `@authority`, `@path`, `@query`, `@target-uri`, `@scheme`,
+    plus any header, plus a Dictionary member of a header (`"signature-agent";key="sig1"`,
     the form the working-group draft now requires).
   * Signature parameters `created`, `expires`, `keyid`, `tag`, `nonce`, `alg`.
   * JWK thumbprints (RFC 7638 / RFC 8037) as key ids, and the Ed25519 JWK Set
@@ -199,7 +199,7 @@ class MessageContext:
     path: str
     headers: dict[str, str]              # lower-cased names
     scheme: str = "http"
-    query: str = ""
+    query: str = ""                      # the RAW query string, as sent (Flask's ctx.args is parsed and loses it)
     extra: dict = field(default_factory=dict)
 
     @property
@@ -215,6 +215,8 @@ def component_value(name: str, params: dict, ctx: MessageContext, label: str) ->
         return ctx.authority.lower()
     if name == "@path":
         return ctx.path
+    if name == "@query":
+        return "?" + ctx.query            # RFC 9421 §2.2.7: the raw query with its leading "?" (just "?" if empty)
     if name == "@target-uri":
         return ctx.target_uri
     if name == "@scheme":

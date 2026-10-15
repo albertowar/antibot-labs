@@ -105,7 +105,7 @@ OPERATORS: dict[str, dict] = {
 
 # Which category earns the crawler budget once the identity is verified. Policy, not
 # protocol: a site that sells nothing to AI search can move "ai-search" to anonymous
-# (Workshop 4, Chapter 3 is about exactly that decision).
+# (W4 Ch3 is about exactly that decision).
 CRAWLER_LANE_CATEGORIES = {"search-crawler", "ai-training", "ai-search"}
 
 

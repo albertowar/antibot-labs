@@ -1,6 +1,10 @@
 .venv/
-venv/
+instance/
+logs/
 __pycache__/
 *.pyc
 *.bak
-instance/
+.env
+
+# generated at setup by tools/make_keys.py: the lab's synthetic Ed25519 private seeds, never committed
+tools/fixtures/keys/

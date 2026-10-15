@@ -8,7 +8,8 @@ one process plays all of them, deterministically, from tools/fixtures/:
     GET  /dns/ptr?ip=…                   reverse DNS (PTR) for an address
     GET  /dns/a?name=…                   forward DNS (A) for a name
     PUT  /hosting/ptr   {ip, name}       the attacker's hosting panel: set the PTR of
-                                         an address in the attacker's own 192.0.2.0/24
+                                         an address in the attacker's own allocation
+                                         (203.0.113.64/26, the hosting_asn pool)
     PUT  /hosting/a     {name, addrs}    …and the forward zone the attacker owns
     PUT  /hosting/directory {host, jwks, headers}
                                          publish a key directory for attacker.example
@@ -20,6 +21,12 @@ one process plays all of them, deterministically, from tools/fixtures/:
                                          CDN log would have leaked them
     POST /reset                          forget everything the attacker published
     GET  /stats                          query counters (the defender's DNS bill)
+
+Everything here is loopback only: the process binds 127.0.0.1, the hosting panel refuses
+non-loopback callers, and `labnet.require_local_env("MOCK_URL")` refuses a MOCK_URL that is not
+this machine. The store starts it on a thread by default (demo_site/ext/identity.py); run it by
+hand with `python tools/mock_internet.py` and `MOCK_AUTOSTART=0` on the store to see the
+two-process shape. Its keys come from tools/make_keys.py (generated, never committed).
 
 Latency is simulated (DNS_LATENCY_MS, FETCH_LATENCY_MS) so caching shows up in the
 scoreboard the way it does in production. The hosting endpoints only accept loopback
@@ -40,13 +47,15 @@ from flask import Flask, Response, abort, jsonify, request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-import httpsig  # noqa: E402
+sys.path[:0] = [LAB_DIR, HERE]
+import labnet  # noqa: E402  (the lab-root localhost guard)
+from defenses import httpsig  # noqa: E402
+import make_keys  # noqa: E402
 
 FIXTURES = os.path.join(HERE, "fixtures")
 DNS_LATENCY_MS = float(os.environ.get("DNS_LATENCY_MS", "15"))
 FETCH_LATENCY_MS = float(os.environ.get("FETCH_LATENCY_MS", "30"))
-ATTACKER_NET = ipaddress.ip_network("192.0.2.0/24")
+ATTACKER_NET = ipaddress.ip_network("203.0.113.64/26")      # data/world.json pool hosting_asn
 ATTACKER_ZONES = (".attacker-hosting.example", ".attacker.example", "attacker.example")
 BUILTIN_AGENT = "chatgpt.com"
 
@@ -56,8 +65,7 @@ _lock = threading.Lock()
 with open(os.path.join(FIXTURES, "dns_zones.json")) as fh:
     ZONES = json.load(fh)
 PATTERNS = {ipaddress.ip_network(k): v for k, v in ZONES["patterns"].items() if not k.startswith("_")}
-with open(os.path.join(FIXTURES, "keys", f"{BUILTIN_AGENT}.json")) as fh:
-    AGENT_KEY = json.load(fh)
+AGENT_KEY = make_keys.load(BUILTIN_AGENT)       # generated on first use, never committed
 AGENT_PRIV = httpsig.load_private(AGENT_KEY["seed_hex"])
 
 state = {"ptr": {}, "a": {}, "directories": {}, "stats": {"ptr": 0, "a": 0, "ranges": 0, "dir": 0}}
@@ -203,11 +211,11 @@ def directory(host):
 # ------------------------------------------------------- the leaked requests
 
 def _leak(authority: str, created: int, expires: int, note: str) -> dict:
-    ctx = httpsig.MessageContext("GET", authority, "/product/1",
+    ctx = httpsig.MessageContext("GET", authority, "/product/p001",
                                  {"user-agent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"})
     h = httpsig.agent_headers(AGENT_PRIV, AGENT_KEY["thumbprint"], f"https://{BUILTIN_AGENT}", ctx,
                               created=created, expires=expires)
-    return {"note": note, "method": "GET", "authority": authority, "path": "/product/1",
+    return {"note": note, "method": "GET", "authority": authority, "path": "/product/p001",
             "headers": {"User-Agent": ctx.headers["user-agent"], **h}}
 
 
@@ -251,6 +259,7 @@ def index():
 
 
 if __name__ == "__main__":
+    labnet.require_local_env("MOCK_URL")          # a MOCK_URL that is not this machine is refused
     port = int(os.environ.get("MOCK_PORT", "5001"))
     print(f"mock internet on http://127.0.0.1:{port}  (dns latency {DNS_LATENCY_MS} ms, fetch {FETCH_LATENCY_MS} ms)")
     app.run(host="127.0.0.1", port=port)

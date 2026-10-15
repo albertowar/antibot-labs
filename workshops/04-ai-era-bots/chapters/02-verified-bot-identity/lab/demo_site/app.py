@@ -1,179 +1,89 @@
-"""W4 Ch2 demo store: a catalogue the crawlers want, with a crawler gate in front.
+"""
+Kestrel Outfitters: the demo store the Antibot Workshop Series defends.
 
-The store inherits the Workshop 3 shape (Flask + Redis, JSON catalogue, search) and
-adds the one thing this chapter is about: a *gate* that decides, per request, who
-the client is and which crawl budget it gets.
+    python demo_site/app.py                 # SQLite + in-process Redis, port 5000
+    PORT=8099 DEFENSE_LEVEL=2 python demo_site/app.py
+    docker compose up -d --wait && REDIS_URL=redis://127.0.0.1:6379/0 \
+      DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
 
-    anonymous lane   30 requests / minute / egress IP     (humans never notice)
-    verified lane   600 requests / minute / identity      (the "good bot" fast lane)
-
-A crawler that wants the fast lane has to be *verified* at the current
-DEFENSE_LEVEL (see defenses/crawler_gate.py). Over budget means 429, never a
-block: the lab keeps failed claimants in the anonymous lane so you can see what a
-false negative and a false positive each cost. A detected *replay or forged
-signature* (Round 4) is different and gets a 403.
-
-Lab-only conventions, both honoured only from loopback:
-    X-Lab-Egress   the IP the client "comes from" (RFC 5737 documentation ranges)
-    X-Lab-Actor    ground truth for the scoreboard: bot-*, legit-human, legit-crawler-*
-
-    DEFENSE_LEVEL=0 python demo_site/app.py          # PORT, MOCK_URL, REDIS_URL optional
+Request path:  lab_edge (who is this, really?) -> gate.before_request (Ctx,
+enrichers, ladder, policy) -> route -> gate.after_request (X-Lab-* headers,
+decision log). Chapters add checks under defenses/ and features under
+demo_site/ext/; see workshops/STORE_CONTRACT.md.
 """
 
-from __future__ import annotations
-
-import ipaddress
 import os
 import sys
-import time
-from collections import deque
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-for _d in ("demo_site", "defenses"):
-    sys.path.insert(0, os.path.join(ROOT, _d))
+LAB_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if LAB_ROOT not in sys.path:
+    sys.path.insert(0, LAB_ROOT)
 
-from flask import Flask, Response, g, jsonify, request  # noqa: E402
+from flask import Flask, render_template  # noqa: E402
+from jinja2 import ChoiceLoader, FileSystemLoader  # noqa: E402
+from sqlalchemy import event  # noqa: E402
 
-import crawler_gate  # noqa: E402
-import resolver as resolver_mod  # noqa: E402
-import store  # noqa: E402
-
-LEVEL = int(os.environ.get("DEFENSE_LEVEL", "0"))
-BUDGET = {"anonymous": 30, "verified": 600}       # requests per minute
-UNGATED = ("/admin/", "/robots.txt", "/static/")
-
-app = Flask(__name__)
-r = store.connect()
-resolver = resolver_mod.get_resolver()
-decisions: deque = deque(maxlen=20000)
-
-PRODUCTS = [{"id": i, "name": f"Lab Runner {i}", "price": 80 + (i * 7) % 90, "sku": f"LR-{i:04d}"}
-            for i in range(1, 201)]
+from defenses import store  # noqa: E402
+from defenses.decision_log import DecisionLog  # noqa: E402
+from demo_site import ext, gate, hooks  # noqa: E402
+from demo_site.config import STORE_NAME, Config  # noqa: E402
+from demo_site.lab_edge import LabEdge, World  # noqa: E402
+from demo_site.models import Decision, Product, db  # noqa: E402
+from demo_site.routes import api, lab, pages, seo  # noqa: E402
+from demo_site.seed import seed_all  # noqa: E402
 
 
-def _client_ip() -> str:
-    """The egress IP of the client: the lab header from loopback, else the socket peer."""
-    peer = request.remote_addr or "127.0.0.1"
-    claimed = request.headers.get("X-Lab-Egress")
-    if claimed and ipaddress.ip_address(peer).is_loopback:
-        return claimed
-    return peer
+def _sqlite_pragmas(dbapi_conn, _record):
+    if "sqlite3" in type(dbapi_conn).__module__:
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=30000")
+        cur.close()
 
 
-@app.before_request
-def gate():
-    if request.path.startswith(UNGATED):
-        return None
-    g.t0 = time.perf_counter()
-    ctx = crawler_gate.RequestContext(
-        ip=_client_ip(),
-        method=request.method,
-        authority=request.headers.get("Host", "").lower(),
-        path=request.path,
-        query=request.query_string.decode(),
-        headers={k.lower(): v for k, v in request.headers.items()},
-        actor=request.headers.get("X-Lab-Actor", "you"),
-    )
-    d = crawler_gate.decide(ctx, LEVEL, r, resolver)
-    g.decision = d
+def create_app(config=None, seed=True):
+    cfg = config or Config.from_env()
+    here = os.path.dirname(os.path.abspath(__file__))
+    app = Flask("demo_site", template_folder=os.path.join(here, "templates"), static_folder=os.path.join(here, "static"))
+    app.config.update(SECRET_KEY=cfg.secret, SQLALCHEMY_DATABASE_URI=cfg.database_url,
+                      SQLALCHEMY_TRACK_MODIFICATIONS=False, SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
+                      LAB=cfg, STORE_NAME=STORE_NAME)
+    app.jinja_loader = ChoiceLoader([FileSystemLoader(os.path.join(here, "ext", "templates")), app.jinja_loader])
+    app.jinja_env.globals.update(slot=hooks.render_slot, store_name=STORE_NAME)
 
-    status, outcome = 200, "allow"
-    if d.block:
-        status, outcome = 403, "block"
-    else:
-        key = f"budget:{d.lane}:{d.identity if d.lane == 'verified' else ctx.ip}"
-        n = r.incr(key)
-        if n == 1:
-            r.expire(key, 60)
-        if n > BUDGET[d.lane]:
-            status, outcome = 429, "budget"
-    decisions.append({
-        "ts": time.time(), "actor": ctx.actor, "ip": ctx.ip, "path": ctx.path,
-        "claim": d.claim, "identity": d.identity, "method": d.method, "lane": d.lane,
-        "outcome": outcome, "status": status, "reasons": d.reasons, "cost_ms": round(d.cost_ms, 3),
-    })
-    if status != 200:
-        body = {"error": "crawl budget exceeded" if status == 429 else "request rejected",
-                "lane": d.lane, "identity": d.identity, "reasons": d.reasons}
-        return jsonify(body), status
-    return None
+    db.init_app(app)
+    with app.app_context():
+        event.listen(db.engine, "connect", _sqlite_pragmas)
+        db.create_all()
+        if seed:
+            seed_all(cfg.lab_seed, cfg.drop_stock, cfg.hash_iters)
 
+    app.extensions["lab_redis"] = store.get_redis(cfg.redis_url)
+    app.extensions["lab_world"] = World(cfg.world_file)
+    app.extensions["decision_log"] = DecisionLog(app, db, Decision, cfg.decision_log)
+    app.wsgi_app = LabEdge(app.wsgi_app, app.extensions["lab_world"])
 
-@app.after_request
-def timing(resp):
-    d = getattr(g, "decision", None)
-    if d is not None:
-        resp.headers["Server-Timing"] = f"gate;dur={d.cost_ms:.3f}"
-        resp.headers["X-Lane"] = d.lane
-    return resp
+    gate.install(app)
+    for bp in (pages.bp, api.bp, seo.bp, lab.bp):
+        app.register_blueprint(bp)
+    ext.load_all(app)
 
+    @app.errorhandler(404)
+    def _404(_e):
+        return render_template("error.html", code=404, message="We looked everywhere. That page is not on the map."), 404
 
-@app.get("/")
-def index():
-    return Response("<h1>Lab Runner store</h1><p>200 products. <a href='/api/products'>/api/products</a>, "
-                    "<a href='/robots.txt'>/robots.txt</a>, <a href='/admin/status'>/admin/status</a></p>",
-                    mimetype="text/html")
+    @app.errorhandler(500)
+    def _500(_e):
+        return render_template("error.html", code=500, message="Something went wrong on our side."), 500
 
-
-@app.get("/robots.txt")
-def robots():
-    # Always served, never gated: a crawler that can't read robots.txt can't obey it.
-    return Response("User-agent: *\nDisallow: /admin/\nDisallow: /api/search\n", mimetype="text/plain")
-
-
-@app.get("/api/products")
-def products():
-    page = max(1, int(request.args.get("page", 1)))
-    per = min(50, max(1, int(request.args.get("per_page", 20))))
-    items = PRODUCTS[(page - 1) * per: page * per]
-    return jsonify({"page": page, "per_page": per, "total": len(PRODUCTS), "items": items})
-
-
-@app.get("/product/<int:pid>")
-def product(pid):
-    item = next((p for p in PRODUCTS if p["id"] == pid), None)
-    return (jsonify(item), 200) if item else (jsonify({"error": "no such product"}), 404)
-
-
-@app.get("/api/search")
-def search():
-    q = request.args.get("q", "").lower()
-    return jsonify([p for p in PRODUCTS if q in p["name"].lower()][:20])
-
-
-@app.get("/admin/status")
-def status():
-    return jsonify({"level": LEVEL, "budgets": BUDGET, "mock_url": resolver_mod.MOCK_URL,
-                    "decisions": len(decisions)})
-
-
-@app.get("/admin/decisions")
-def admin_decisions():
-    limit = int(request.args.get("limit", 2000))
-    rows = list(decisions)
-    return jsonify(rows[-limit:])
-
-
-@app.post("/admin/reset")
-def reset():
-    """?scope=budgets clears only the per-minute counters; the default clears caches and the log too."""
-    if request.args.get("scope") == "budgets":
-        n = 0
-        patterns = ["budget:*"] + (["rdns:*"] if request.args.get("cache") == "rdns" else [])
-        for pat in patterns:
-            for key in r.scan_iter(pat):
-                r.delete(key)
-                n += 1
-        return jsonify({"ok": True, "budgets_cleared": n})
-    r.flushdb()
-    decisions.clear()
-    return jsonify({"ok": True})
+    return app
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
-    print(f"demo store on http://127.0.0.1:{port}  (DEFENSE_LEVEL={LEVEL}, "
-          f"store={'memory' if os.environ.get('REDIS_URL', 'memory://').startswith('memory') else 'redis'}, "
-          f"mock internet at {resolver_mod.MOCK_URL})")
-    app.run(host="127.0.0.1", port=port)
+    application = create_app()
+    cfg = application.config["LAB"]
+    print(f"{STORE_NAME} on http://127.0.0.1:{cfg.port}  level={cfg.defense_level}  "
+          f"db={cfg.database_url.split('://')[0]}  redis={cfg.redis_url.split('://')[0]}  "
+          f"ext={application.extensions['lab_ext']}")
+    application.run(host="127.0.0.1", port=cfg.port, threaded=True, debug=False, use_reloader=False)

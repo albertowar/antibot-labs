@@ -1,29 +1,27 @@
 """Reverse DNS verification: the PTR says who owns the address, forward DNS proves it.
 
-The oldest and still most widely documented crawler check (Google, Bing, Apple,
-Amazon). Two lookups:
+The oldest and still most widely documented crawler check (Google, Bing, Apple, Amazon). Two
+lookups:
 
-  1. PTR of the source IP -> a hostname. The *owner of the IP block* controls this
-     record. For a crawler that is the operator; for a VPS it is whoever rents it,
-     and hosting panels let tenants type anything into it ("crawl-1-2-3-4.googlebot.com"
-     is a valid PTR string for an attacker's box).
-  2. A/AAAA of that hostname -> addresses. The *owner of the domain* controls this.
-     An attacker can name their PTR after googlebot.com but cannot make
-     googlebot.com resolve that name to their address.
+  1. PTR of the source IP -> a hostname. The *owner of the IP block* controls this record. For
+     a crawler that is the operator; for a VPS it is whoever rents it, and hosting panels let
+     tenants type anything into it ("crawl-1-2-3-4.googlebot.com" is a valid PTR string for an
+     attacker's box).
+  2. A/AAAA of that hostname -> addresses. The *owner of the domain* controls this. An attacker
+     can name their PTR after googlebot.com but cannot make googlebot.com resolve that name to
+     their address.
 
-Forward-confirmed reverse DNS (FCrDNS) requires both to agree. Round 1 does step 1
-only, which is what a lot of copied snippets do, and Round 2 shows why that is
-worthless on its own.
+Forward-confirmed reverse DNS (FCrDNS) requires both to agree. Round 1 does step 1 only, which
+is what a lot of copied snippets do, and Round 2 shows why that is worthless on its own.
 
-Suffix matching must respect label boundaries: `.googlebot.com` with its leading
-dot, or the bare domain. A substring test (`"googlebot.com" in name`) is beaten by
-`crawl-1.googlebot.com.attacker.example`.
+Suffix matching must respect label boundaries: `.googlebot.com` with its leading dot, or the
+bare domain. A substring test (`"googlebot.com" in name`) is beaten by
+`crawl-1.googlebot.com.attacker-hosting.example`.
 
-False positives: operators that publish no reverse DNS (OpenAI, Anthropic,
-Perplexity) can never pass; a resolver outage turns every crawler into an
-anonymous client; and the check costs one or two DNS round trips, so cache the
-verdict per IP. Crawler addresses are stable for hours, so positive verdicts can
-live an hour; keep negative verdicts short (minutes) so a fix propagates.
+False positives: operators that publish no reverse DNS (OpenAI, Anthropic, Perplexity) can never
+pass; a resolver outage turns every crawler into an anonymous client; and the check costs one or
+two DNS round trips, so cache the verdict per IP. Crawler addresses are stable for hours, so
+positive verdicts can live an hour; keep negative verdicts short (minutes) so a fix propagates.
 
 Enabled at DEFENSE_LEVEL >= 1 (suffix) and >= 2 (forward confirmation + cache).
 """
@@ -34,6 +32,7 @@ import json
 
 POSITIVE_TTL_S = 3600
 NEGATIVE_TTL_S = 300
+CACHE_PREFIX = "lab:ch2:rdns:"        # under lab:*, so POST /lab/reset clears it
 
 
 def name_matches(name: str, suffixes: list[str]) -> bool:
@@ -54,5 +53,4 @@ def verify(ip: str, suffixes: list[str], level: int, resolver, r) -> tuple[bool,
     matching = [n for n in names if name_matches(n, suffixes)]
     if not matching:
         return False, [f"PTR {names[0]} is not under {suffixes}"]
-    # TODO (Round 2): forward-confirm `matching` with resolver.a(name) and cache the verdict in r.
     return True, [f"PTR {matching[0]} matches {suffixes} (not forward-confirmed)"]

@@ -1,27 +1,31 @@
 """Operator-published IP ranges, and what a match is worth.
 
-Operators that run no reverse DNS (OpenAI, Anthropic, Perplexity) and some that do
-(Google, Bing) publish JSON files of the prefixes their crawlers use. Same shape
-everywhere, modelled on Google's:
+Operators that run no reverse DNS (OpenAI, Anthropic, Perplexity) and some that do (Google,
+Bing) publish JSON files of the prefixes their crawlers use. Same shape everywhere, modelled on
+Google's:
 
     {"creationTime": "2026-10-08T00:00:00Z",
-     "prefixes": [{"ipv4Prefix": "198.51.100.20/30"}, {"ipv6Prefix": "2001:db8::/48"}]}
+     "prefixes": [{"ipv4Prefix": "203.0.113.4/30"}, {"ipv6Prefix": "2001:db8::/48"}]}
 
-Workshop 1, Chapter 3 built the same index for cloud-provider ranges. Three things
-are different for crawlers:
+W1 Ch3 built the same index for cloud-provider ranges. Three things are different for crawlers:
 
-  * **Freshness.** Operators add prefixes without notice. A vendored copy
-    (VENDORED_SNAPSHOT below is "what someone pasted in last quarter") silently
-    rejects every crawler on a new prefix, which is a false positive you only find
-    when a search team asks why indexing dropped. Fetch on a schedule, cache with
-    a TTL, and keep the last good copy as a fallback for when the fetch fails.
-  * **A range names a network, not a program.** Google's user-triggered fetchers
-    include App Engine egress: any tenant's app can make requests from those
-    addresses, with any User-Agent. Anthropic's single list covers three bots.
-    Verification tells you *whose network*; entitlement is a separate decision.
-  * **Category, not identity, decides the lane.** User-triggered fetchers act for
-    one person and ignore robots.txt, so they get a person's budget. Shared
-    infrastructure gets nothing beyond what any client gets.
+  * **Freshness.** Operators add prefixes without notice. A vendored copy (VENDORED_SNAPSHOT
+    below is "what someone pasted in last quarter") silently rejects every crawler on a new
+    prefix, which is a false positive you only find when a search team asks why indexing
+    dropped. Fetch on a schedule, cache with a TTL, and keep the last good copy as a fallback
+    for when the fetch fails.
+  * **A range names a network, not a program.** Google's user-triggered fetchers include App
+    Engine egress: any tenant's app can make requests from those addresses, with any
+    User-Agent. Anthropic's single list covers three bots. Verification tells you *whose
+    network*; entitlement is a separate decision.
+  * **Category, not identity, decides the lane.** User-triggered fetchers act for one person and
+    ignore robots.txt, so they get a person's budget. Shared infrastructure gets nothing beyond
+    what any client gets.
+
+The lab's operators run on addresses from the store's own cloud pools (data/world.json:
+`cloud_gcp` for Google, Bing and Apple, `cloud_vm` for OpenAI, Anthropic, Perplexity and the
+shared "App Engine" slice). That is the point: the edge rents those pools to anyone, so the pool
+proves nothing and only the operator's published list can say who is who.
 
 Enabled at DEFENSE_LEVEL >= 3.
 """
@@ -30,28 +34,28 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import os
 from dataclasses import dataclass
 
 import httpx
+import labnet
 
-from operators import CRAWLER_LANE_CATEGORIES, OPERATORS
+from .operators import CRAWLER_LANE_CATEGORIES, OPERATORS
 
-MOCK_URL = os.environ.get("MOCK_URL", "http://127.0.0.1:5001")
 RANGE_TTL_S = 3600          # how long a fetched list is trusted before refetching
 FETCH_TIMEOUT_S = 2.0
+CACHE_PREFIX = "lab:ch2:ranges:"      # under lab:*, so POST /lab/reset clears it
 
-# "Pasted in last quarter": the snapshot a stub ships with. gptbot.json is missing
-# the 198.51.100.24/30 prefix OpenAI added since.
+# "Pasted in last quarter": the snapshot a stub ships with. gptbot.json is missing the
+# 203.0.113.8/30 prefix OpenAI added since.
 VENDORED_SNAPSHOT: dict[str, list[str]] = {
-    "google/common-crawlers.json": ["198.51.100.10/31"],
-    "google/user-triggered-fetchers.json": ["203.0.113.0/24"],
-    "bing/bingbot.json": ["198.51.100.12/31"],
-    "openai/gptbot.json": ["198.51.100.20/30"],
-    "openai/searchbot.json": ["198.51.100.28/30"],
-    "openai/chatgpt-user.json": ["198.51.100.32/29"],
-    "anthropic/bots.json": ["198.51.100.40/29"],
-    "perplexity/perplexitybot.json": ["198.51.100.50/31"],
+    "google/common-crawlers.json": ["198.51.100.96/30"],
+    "google/user-triggered-fetchers.json": ["203.0.113.48/28"],
+    "bing/bingbot.json": ["198.51.100.100/30"],
+    "openai/gptbot.json": ["203.0.113.4/30"],
+    "openai/searchbot.json": ["203.0.113.12/30"],
+    "openai/chatgpt-user.json": ["203.0.113.16/29"],
+    "anthropic/bots.json": ["203.0.113.24/29"],
+    "perplexity/perplexitybot.json": ["203.0.113.32/31"],
 }
 
 
@@ -62,6 +66,11 @@ class RangeHit:
     prefix: str
 
 
+def mock_url() -> str:
+    """The side service that plays the operators' websites (guarded: it must be this machine)."""
+    return labnet.target("MOCK_URL", "http://127.0.0.1:5001")
+
+
 def _parse(doc: dict) -> list[str]:
     return [p.get("ipv4Prefix") or p.get("ipv6Prefix") for p in doc.get("prefixes", [])
             if p.get("ipv4Prefix") or p.get("ipv6Prefix")]
@@ -69,21 +78,21 @@ def _parse(doc: dict) -> list[str]:
 
 def load(list_path: str, r) -> list[str]:
     """Return the prefixes for one published file: cache -> live fetch -> last good -> snapshot."""
-    key = f"ranges:{list_path}"
+    key = f"{CACHE_PREFIX}{list_path}"
     cached = r.get(key)
     if cached:
         return json.loads(cached)
     try:
-        resp = httpx.get(f"{MOCK_URL}/ranges/{list_path}", timeout=FETCH_TIMEOUT_S, follow_redirects=False)
+        resp = httpx.get(f"{mock_url()}/ranges/{list_path}", timeout=FETCH_TIMEOUT_S, follow_redirects=False)
         resp.raise_for_status()
         prefixes = _parse(resp.json())
         if prefixes:
             r.set(key, json.dumps(prefixes), ex=RANGE_TTL_S)
-            r.set(f"ranges-last-good:{list_path}", json.dumps(prefixes))   # no TTL: the fallback
+            r.set(f"{CACHE_PREFIX}last-good:{list_path}", json.dumps(prefixes))   # no TTL: the fallback
             return prefixes
     except (httpx.HTTPError, ValueError):
         pass
-    last_good = r.get(f"ranges-last-good:{list_path}")
+    last_good = r.get(f"{CACHE_PREFIX}last-good:{list_path}")
     if last_good:
         return json.loads(last_good)
     return VENDORED_SNAPSHOT.get(list_path, [])
