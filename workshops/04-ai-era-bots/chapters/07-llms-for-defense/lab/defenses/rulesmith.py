@@ -5,7 +5,7 @@ Triage labels a session. A rule generalizes. For each cluster of sessions
 the analyst flagged as bots, the rulesmith asks the model for up to three
 candidate rules that would catch that cluster, in the narrow DSL
 (defenses/rules.py). The candidates go to rules/pending.json. Nothing here
-is enforced: a draft is a hypothesis, and defenses/gate.py is the experiment.
+is enforced: a draft is a hypothesis, and defenses/rule_gate.py is the experiment.
 
 Why this is where hallucination bites. A model generalizes from whatever it
 finds most salient, and in a cluster of scraper sessions the most salient
@@ -23,14 +23,12 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from llm import LLMClient
-from rules import PENDING_FILE, check_rule
-from schemas import DRAFTS_SCHEMA, safe_text, validate
-from sessionize import cards_for_run, flatten
-from cluster import clusters_of, cluster_sig
-from store import make_engine, verdicts_t
+from .llm import LLMClient
+from .rules import PENDING_FILE, check_rule
+from .schemas import DRAFTS_SCHEMA, safe_text, validate
+from .sessionize import cards_for_run, flatten
+from .cluster import clusters_of, cluster_sig
+from .rule_store import make_engine, verdicts_t
 from sqlalchemy import select
 
 SYSTEM = (
@@ -73,7 +71,7 @@ def flagged_clusters(conn, run_id, tag):
     rows = conn.execute(select(verdicts_t.c.sid, verdicts_t.c.label)
                         .where(verdicts_t.c.run_id == run_id, verdicts_t.c.tag == tag)).all()
     bot_sids = {sid for sid, label in rows if label == "bot"}
-    from sessionize import card_for_sid
+    from .sessionize import card_for_sid
     cards = [(sid, card_for_sid(conn, sid)) for sid in bot_sids]
     cards = [(s, c) for s, c in cards if c]
     return clusters_of(cards)

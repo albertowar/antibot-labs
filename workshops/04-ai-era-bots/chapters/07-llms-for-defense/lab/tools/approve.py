@@ -24,10 +24,10 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "defenses"))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # lab root
 
-from rules import ACTIVE_FILE, AUDIT_FILE, PENDING_FILE, check_rule
-from schemas import safe_text
+from defenses.rules import ACTIVE_FILE, AUDIT_FILE, PENDING_FILE, check_rule
+from defenses.schemas import safe_text
 
 
 def _rule_id(rule):
@@ -73,7 +73,7 @@ def cmd_list():
     pend = pending_index()
     active = {r.get("id") for r in load(ACTIVE_FILE, {"rules": []}).get("rules", [])}
     if not pend:
-        print("no candidates (run defenses/rulesmith.py then defenses/gate.py)")
+        print("no candidates (run defenses.rulesmith then defenses.rule_gate)")
         return
     for rid, r in pend.items():
         g = r.get("gate", {})

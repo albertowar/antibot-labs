@@ -46,8 +46,8 @@ import os
 import random
 import re
 
-from fields import FLAT_FIELDS, UNTRUSTED
-from llm import LLMResult, estimate_tokens, messages_text
+from .fields import FLAT_FIELDS, UNTRUSTED
+from .llm import LLMResult, estimate_tokens, messages_text
 
 SEED = os.environ.get("LLM_SEED", "2026")
 TRACE = os.environ.get("LLM_MOCK_TRACE") == "1"
@@ -87,7 +87,7 @@ _ALIASES = {
     "asset ratio": "asset_ratio", "asset_ratio": "asset_ratio", "errors": "errors_4xx", "errors_4xx": "errors_4xx", "4xx": "errors_4xx",
     "duration": "duration_s", "duration_s": "duration_s", "median gap": "median_gap_s", "median_gap_s": "median_gap_s", "gap": "median_gap_s",
     "honeypot": "honeypot_hit", "honeypot_hit": "honeypot_hit", "honeypot hit": "honeypot_hit",
-    "api v0": "api_v0_hit", "api_v0_hit": "api_v0_hit", "api_v0": "api_v0_hit",
+    "partner-feed": "disallowed_hit", "disallowed_hit": "disallowed_hit", "partner-feed": "disallowed_hit",
     "reached cart": "reached_cart", "reached_cart": "reached_cart", "cart": "reached_cart",
     "logged in": "logged_in", "logged_in": "logged_in",
 }
@@ -116,7 +116,7 @@ def _flatten_card(obj):
         if isinstance(obj.get(key), dict):
             obj = {**obj, **obj[key]}
     if "requests" in obj and isinstance(obj["requests"], dict):
-        from sessionize import flatten
+        from .sessionize import flatten
         card = {"id": obj.get("id", ""), "net": obj.get("net", {}), "client": obj.get("client", {}),
                 "requests": obj["requests"], "paths": obj.get("paths", []),
                 "login": obj.get("login", {"account": None})}
@@ -126,7 +126,7 @@ def _flatten_card(obj):
             card["client"].setdefault(k, default)
         for k in ("n", "pages", "assets", "asset_ratio", "errors_4xx", "duration_s", "median_gap_s"):
             card["requests"].setdefault(k, 0)
-        for k in ("honeypot_hit", "api_v0_hit", "reached_cart"):
+        for k in ("honeypot_hit", "disallowed_hit", "reached_cart"):
             card["requests"].setdefault(k, False)
         return flatten(card)
     return {k: obj.get(k) for k in FLAT_FIELDS}
@@ -191,17 +191,22 @@ def honest_verdict(flat):
     n_pages, n_assets = flat.get("n_pages") or 0, flat.get("n_assets") or 0
     if flat.get("honeypot_hit"):
         signals.append((3, "honeypot_hit", "followed the hidden /specials-archive link"))
-    if flat.get("api_v0_hit"):
-        signals.append((2, "api_v0_hit", "called the API that robots.txt disallows"))
+    if flat.get("disallowed_hit"):
+        signals.append((2, "disallowed_hit", "called the API that robots.txt disallows"))
     m = SCRIPTED_UA.search(ua)
     if m:
         signals.append((3, "ua", f"'{m.group(0)}' in the User-Agent"))
     if n_assets == 0 and n_pages >= 2:
         signals.append((2, "n_assets", f"{n_pages} pages and no CSS/JS/images"))
+    if flat.get("reached_cart") and (flat.get("asset_ratio") or 0) == 0 and n_pages >= 2:
+        signals.append((1, "asset_ratio", "reached the cart without fetching a single asset"))
     if flat.get("asn_type") == "datacenter":
         signals.append((1, "asn_type", f"hosting network {flat.get('asn')}"))
     gap = flat.get("median_gap_s")
-    if gap is not None and gap < 1.5 and n_pages >= 3:
+    # Scripted pacing: bots here think ~1 virtual second and the store itself adds ~2-3
+    # more (real request time divided by LAB_TIME_SCALE), so the metronome line sits at 4.
+    # Real shoppers' think time puts their median well above it (6+ for most cohorts).
+    if gap is not None and gap < 4.0 and n_pages >= 3:
         signals.append((1, "median_gap_s", f"{gap}s between pages, metronome pacing"))
     if not (flat.get("accept_language") or "").strip():
         signals.append((1, "accept_language", "empty"))
@@ -236,6 +241,8 @@ def honest_verdict(flat):
 
 class MockBackend:
     def chat(self, messages, schema):
+        if "rules" in schema.get("properties", {}):
+            return self._draft(messages)
         p = perceive(messages)
         text = messages_text(messages)
         p_tok, draw, decision = estimate_tokens(text), None, "honest"
@@ -264,6 +271,50 @@ class MockBackend:
             print(f"    mock: fmt={p['fmt']} envelope={p['envelope']} intents={p['intents'] or '-'} "
                   f"kind={p['kind'] or '-'} draw={'-' if draw is None else f'{draw:.2f}'} → {decision} "
                   f"→ {content['label']}")
+        return LLMResult(content, raw, p_tok, c_tok, True, latency, "mock", "scripted-analyst")
+
+    def _draft(self, messages):
+        """The rulesmith's prompt (DRAFTS_SCHEMA): draft rules for a cluster of flats.
+
+        The mock drafts identity-first BY CONSTRUCTION, the way defenses/rulesmith.py's
+        docstring says real models fail: the most salient shared thing in a cluster is
+        an identity string, so rule one tests the User-Agent and the ASN — a true
+        statement about the cluster and a terrible rule, because real customers share
+        both. When the whole cluster is asset-less it adds one behavioural rule too,
+        so the gate has something it can honestly pass. Deterministic: no draws.
+        """
+        user = "\n".join(m["content"] for m in messages if m.get("role") != "system")
+        flats = [{k: o.get(k) for k in FLAT_FIELDS}
+                 for _, o in _json_objects(user) if "ua" in o or "asn_type" in o]
+        rules = []
+        if flats:
+            first = flats[0]
+            uas = [str(f.get("ua") or "") for f in flats]
+            # the LAST token every UA shares reads as the most distinctive one
+            common = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]{3,}", uas[0])
+                      if all(w in ua for ua in uas)]
+            token = (common[-1] if common else (uas[0][:20] or "Mozilla"))[:80]
+            rules.append({"description": f"sessions with {token} in the UA from {first.get('asn')}",
+                          "action": "block",
+                          "when": {"all": [
+                              {"field": "ua", "op": "contains", "value": token},
+                              {"field": "asn", "op": "eq", "value": str(first.get("asn"))[:80]}]}})
+            if all((f.get("n_assets") or 0) == 0 for f in flats) and first.get("asn_type"):
+                gaps = [f.get("median_gap_s") for f in flats if f.get("median_gap_s") is not None]
+                lid = round(max(gaps) + 0.5, 1) if gaps else 2.0
+                rules.append({"description": "asset-less scripted pacing on a hosting network",
+                              "action": "block",
+                              "when": {"all": [
+                                  {"field": "n_assets", "op": "lte", "value": 0},
+                                  {"field": "asn_type", "op": "eq", "value": str(first.get("asn_type"))},
+                                  {"field": "median_gap_s", "op": "lte", "value": lid}]}})
+        content = {"rules": rules}
+        raw = json.dumps(content)
+        text = messages_text(messages)
+        p_tok, c_tok = estimate_tokens(text), estimate_tokens(raw)
+        latency = 200 + 0.8 * p_tok + 25 * c_tok
+        if TRACE:
+            print(f"    mock: drafts={len(rules)} for cluster prompt ({p_tok} tok)")
         return LLMResult(content, raw, p_tok, c_tok, True, latency, "mock", "scripted-analyst")
 
 

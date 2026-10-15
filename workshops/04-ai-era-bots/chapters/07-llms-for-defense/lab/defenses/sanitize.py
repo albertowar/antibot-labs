@@ -17,9 +17,9 @@ reference implementation if you want to move on.
 import copy
 import re
 
-from fields import CAPS, UNTRUSTED
-from schemas import VERDICT_SCHEMA, safe_text, validate
-from sessionize import flatten, untrusted_text
+from .fields import CAPS, UNTRUSTED
+from .schemas import VERDICT_SCHEMA, safe_text, validate
+from .sessionize import flatten, untrusted_text
 
 # A starter phrase list. The reference solution extends it — but never
 # completely: some paraphrases always get through, which is the point.
@@ -32,7 +32,7 @@ PHRASES = [
 ]
 _PHRASES = [re.compile(p, re.I) for p in PHRASES]
 REDACTED = "[removed]"
-HARD_BOT = ("honeypot_hit", "api_v0_hit")
+HARD_BOT = ("honeypot_hit", "disallowed_hit")
 
 
 def _norm(s):

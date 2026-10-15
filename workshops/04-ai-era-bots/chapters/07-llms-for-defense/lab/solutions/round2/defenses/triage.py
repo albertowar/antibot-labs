@@ -16,9 +16,9 @@ Two prompt styles and one input mode, chosen by flags:
                flood of near-identical sessions costs a handful of calls. R3.
 
 CLI:
-    python defenses/triage.py --since-run simulate-1 --limit 100
-    python defenses/triage.py --show <sid>        # print the exact messages sent
-    python defenses/triage.py --since-run round1_injected_ua --hardened --tag r2
+    python -m defenses.triage --since-run simulate-1 --limit 100
+    python -m defenses.triage --show <sid>        # print the exact messages sent
+    python -m defenses.triage --since-run round1_injected_ua --hardened --tag r2
 """
 
 import argparse
@@ -27,15 +27,13 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-import sanitize
-from cluster import prefilter, cluster_key
-from fields import FLAT_FIELDS, TRUSTED
-from llm import LLMClient, usd
-from schemas import VERDICT_SCHEMA, VERDICT_SCHEMA_FOR_MODEL, safe_text, validate
-from sessionize import cards_for_run, card_for_sid, flatten
-from store import make_engine, verdicts_t
+from . import sanitize
+from .cluster import prefilter, cluster_key
+from .fields import FLAT_FIELDS, TRUSTED
+from .llm import LLMClient, usd
+from .schemas import VERDICT_SCHEMA, VERDICT_SCHEMA_FOR_MODEL, safe_text, validate
+from .sessionize import cards_for_run, card_for_sid, flatten
+from .rule_store import make_engine, verdicts_t
 from sqlalchemy import insert, delete
 
 SYSTEM_NAIVE = "You are a bot-detection analyst. Read the session and answer in JSON with label, confidence and reasons."
@@ -68,7 +66,7 @@ NAIVE_TEMPLATE = (
     "duration_s: {duration_s}\n"
     "median_gap_s: {median_gap_s}\n"
     "honeypot_hit: {honeypot_hit}\n"
-    "api_v0_hit: {api_v0_hit}\n"
+    "disallowed_hit: {disallowed_hit}\n"
     "reached_cart: {reached_cart}\n"
     "logged_in: {logged_in}\n"
     "Is this a human or a bot? Answer in JSON."

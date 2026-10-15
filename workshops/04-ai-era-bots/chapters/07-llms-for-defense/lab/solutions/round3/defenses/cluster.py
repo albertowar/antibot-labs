@@ -23,7 +23,7 @@ whole exercise.
 
 import re
 
-from sessionize import flatten
+from .sessionize import flatten
 
 UA_FAMILY = re.compile(r"(HeadlessChrome|Chrome|Firefox|Safari|python|httpx|curl|wget|scrapy|bot)", re.I)
 
@@ -97,7 +97,7 @@ def clusters_of(cards):
 
 if __name__ == "__main__":
     import sys
-    from sessionize import cards_for_run
+    from .sessionize import cards_for_run
     from store import make_engine
     run = sys.argv[1] if len(sys.argv) > 1 else "simulate-1"
     with make_engine().connect() as conn:

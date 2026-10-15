@@ -22,8 +22,8 @@ def classify(flat):
     reasons = []
     if flat["honeypot_hit"]:
         reasons.append({"field": "honeypot_hit", "evidence": "followed the hidden link"})
-    if flat["api_v0_hit"]:
-        reasons.append({"field": "api_v0_hit", "evidence": "called the robots.txt-disallowed API"})
+    if flat["disallowed_hit"]:
+        reasons.append({"field": "disallowed_hit", "evidence": "called the robots.txt-disallowed /partner-feed"})
     if SCRIPTED_UA.search(flat["ua"] or ""):
         reasons.append({"field": "ua", "evidence": SCRIPTED_UA.search(flat["ua"]).group(0)})
     if flat["n_assets"] == 0 and flat["n_pages"] >= 2:
@@ -35,7 +35,7 @@ def classify(flat):
 
 if __name__ == "__main__":
     import sys
-    from sessionize import cards_for_run, flatten
+    from .sessionize import cards_for_run, flatten
     from store import make_engine
     run = sys.argv[1] if len(sys.argv) > 1 else "simulate-1"
     with make_engine().connect() as conn:

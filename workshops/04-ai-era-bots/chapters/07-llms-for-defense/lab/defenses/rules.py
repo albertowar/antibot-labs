@@ -25,7 +25,7 @@ import json
 import os
 import time
 
-from fields import OPS, RULE_FIELDS
+from .fields import OPS, RULE_FIELDS
 
 RULES_DIR = os.path.join(os.path.dirname(__file__), "..", "rules")
 ACTIVE_FILE = os.path.join(RULES_DIR, "active.json")

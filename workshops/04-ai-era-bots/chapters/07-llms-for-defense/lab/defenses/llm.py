@@ -72,7 +72,7 @@ class LLMClient:
     def __init__(self, backend=None, model=None):
         self.backend = backend or BACKEND
         if self.backend == "mock":
-            from llm_mock import MockBackend
+            from .llm_mock import MockBackend
             self.model = model or "scripted-analyst"
             self._impl = MockBackend()
         elif self.backend == "ollama":
@@ -131,7 +131,6 @@ class _Ollama:
 
 if __name__ == "__main__":
     import sys
-    sys.path.insert(0, os.path.dirname(__file__))
     from schemas import VERDICT_SCHEMA_FOR_MODEL
     client = LLMClient()
     r = client.chat([{"role": "system", "content": "Answer in JSON."},

@@ -34,7 +34,7 @@ FIELDS = {
     "duration_s":      ("num",  True, None),
     "median_gap_s":    ("num",  True, None),
     "honeypot_hit":    ("bool", True, None),
-    "api_v0_hit":      ("bool", True, None),
+    "disallowed_hit":      ("bool", True, None),
     "reached_cart":    ("bool", True, None),
     "logged_in":       ("bool", True, None),
 }

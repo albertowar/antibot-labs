@@ -30,11 +30,9 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from rules import PENDING_FILE, check_rule, matches
-from sessionize import card_for_sid, flatten, verified_sids
-from store import make_engine, verdicts_t
+from .rules import PENDING_FILE, check_rule, matches
+from .sessionize import card_for_sid, flatten, verified_sids
+from .rule_store import make_engine, verdicts_t
 from sqlalchemy import select
 
 FP_MAX = 0.01

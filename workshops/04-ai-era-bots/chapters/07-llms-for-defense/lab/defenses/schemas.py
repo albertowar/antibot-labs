@@ -21,7 +21,7 @@ the analyst's terminal.
 
 import re
 
-from fields import FLAT_FIELDS, OPS, RULE_FIELDS
+from .fields import FLAT_FIELDS, OPS, RULE_FIELDS
 
 RULE_SCHEMA = {
     "type": "object", "additionalProperties": False,
