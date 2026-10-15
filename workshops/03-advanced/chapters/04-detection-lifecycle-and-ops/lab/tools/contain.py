@@ -24,10 +24,10 @@ import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import config  # noqa: E402
-from report import decisions, read_log  # noqa: E402
+from report import decisions, read_log  # noqa: E402  (puts the lab root on sys.path)
+from defenses import config  # noqa: E402
 
 WEEK_SECONDS = 7 * 86400
 

@@ -6,9 +6,9 @@ evidence: logs roll, counters expire, and the sessions you most want to
 study are gone by morning. This copies the forensic set for a window into
 data/snapshots/<label>/:
 
-    the decision-log lines for the window (full, not summarised)
-    the ground-truth rows for the window (data/truth.jsonl)
-    the effective config and corpus state at snapshot time
+    the decision-log sessions for the window (one entry per sign-in session, the
+        ground-truth actor label included: the lab's, not production's)
+    the analyst labels, the effective config and the corpus state at snapshot time
     a short manifest (when, which weeks, counts)
 
     python tools/snapshot.py --week 5 --label inc-2026-05
@@ -52,7 +52,7 @@ def main():
     with open(os.path.join(out, "decisions.jsonl"), "w") as f:
         for e in entries:
             f.write(json.dumps(e) + "\n")
-    for name in ("truth.jsonl", "labels.jsonl", "ops_config.json", "world_updates.json"):
+    for name in ("labels.jsonl", "ops_config.json", "world_updates.json"):
         src = os.path.join(LAB, "data", name)
         if os.path.exists(src):
             shutil.copy(src, os.path.join(out, name))

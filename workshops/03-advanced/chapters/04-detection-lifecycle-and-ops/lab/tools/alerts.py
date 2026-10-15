@@ -6,7 +6,7 @@ What Alertmanager would page you about
     python tools/alerts.py --baseline 1    change the reference week (default: week 1)
     python tools/alerts.py --drift         add the drift report (PSI / KS per feature)
 
-Signal-health alerts come from defenses/health.py, drift from defenses/drift.py.
+Signal-health alerts come from tools/health.py, drift from tools/drift.py.
 This tool is the glue a real deployment keeps in Prometheus alerting rules and
 an Evidently test suite; here it runs the same checks against the decision log
 so the lab needs no Docker to show the alert that would have fired.
@@ -15,10 +15,7 @@ Exit code is the number of critical alerts, so it can gate a script.
 """
 
 import argparse
-import os
 import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
 
 import drift  # noqa: E402
 import health  # noqa: E402

@@ -3,25 +3,24 @@ The replayer: five weeks of operations in a few minutes
 
     python tools/weeks.py --week 1          replay week 1 (customers + that week's bots)
     python tools/weeks.py --through 3       replay weeks 1..3 in order
-    python tools/weeks.py --week 4 --quiet  no per-week summary (checkpoint uses this)
+    python tools/weeks.py --week 4 --quiet  no per-week summary (the checkpoint uses this)
 
-Each week it builds the 200 customers and 10 monitors (tools/population.py)
-and the week's adversary sessions (attacks/weekN_*.py), merges them by lab
-clock so the decision log reads in calendar order, and sends each one
-through the live demo site. The site stamps every decision with the week, so
-every tool downstream (health, drift, gate, ops) can slice by week.
+Each week it builds the 200 customers and 10 monitors (tools/personas_ch4.py) and the week's
+adversary sessions (attacks/weekN_*.py), merges them by lab clock so the decision log reads in
+calendar order, and sends each one through the live store, one at a time (so the per-address and
+per-cluster counters see the same order on every run and the numbers are exact). Every request
+carries the lab calendar (`Lab-Week`, `Lab-Clock`), so every tool downstream (health, drift, gate,
+ops) can slice the log by week.
 
-It expires the windowed counters at each week boundary (POST /lab/new-week),
-because velocity and campaign windows are minutes, not weeks; without that,
-week 5's low-and-slow run would share a counter with week 1.
+It expires the windowed counters at each week boundary (POST /lab/ops/new-week), because velocity and
+campaign windows are minutes of wall clock, not lab weeks; without that, week 5's low-and-slow run
+would share a counter with week 1.
 
-A week's ground truth (who was really a bot) is appended to
-data/truth.jsonl, the only place the actor label is kept, so tools/ops.py
-can score precision and recall the way production never can.
+Ground truth (who was really a bot) is the actor label on each decision row, the one thing the
+scoreboard grades by and production never has.
 """
 
 import argparse
-import json
 import os
 import sys
 import time
@@ -32,20 +31,16 @@ LAB = os.path.join(HERE, "..")
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(LAB, "attacks"))
 
-import population  # noqa: E402
-from report import BASE_URL, server_status  # noqa: E402
+import labclient  # noqa: E402
+import personas_ch4  # noqa: E402
 
 ATTACKS = {1: "week1_baseline", 2: "week2_burned_signal", 3: "week3_hidden_switch",
            4: "week4_label_poison", 5: "week5_humanized_farm",
            6: "week5_humanized_farm"}   # week 6: the same farm, now under containment
-TRUTH = os.path.join(LAB, "data", "truth.jsonl")
 
 
 def new_week():
-    import urllib.request
-    req = urllib.request.Request(f"{BASE_URL}/lab/new-week", method="POST")
-    with urllib.request.urlopen(req, timeout=5) as r:
-        return json.loads(r.read())
+    return labclient.admin("POST", "/lab/ops/new-week")
 
 
 def adversary_sessions(week):
@@ -55,26 +50,14 @@ def adversary_sessions(week):
 
 def replay_week(week, quiet=False):
     new_week()
-    customers = [(p["clock"], ("human", p)) for p in
-                 population.make_people(week) + population.make_monitors(week)]
+    customers = [(p["clock"], ("human", p)) for p in personas_ch4.make_people(week) + personas_ch4.make_monitors(week)]
     bots = [(clock, ("bot", run)) for clock, run in adversary_sessions(week)]
     schedule = sorted(customers + bots, key=lambda t: t[0])
 
     outcomes = {"human": Counter(), "bot": Counter()}
-    truth_rows = []
     for _, (kind, payload) in schedule:
-        if kind == "human":
-            outcome, session = population.visit(payload, week)
-        else:
-            outcome, session = payload()
+        outcome, _ = personas_ch4.visit(payload, week) if kind == "human" else payload()
         outcomes[kind][outcome] += 1
-        truth_rows.append({"sid": session.sid, "week": week, "actor": session.lab["X-Lab-Actor"],
-                           "is_bot": kind == "bot"})
-    os.makedirs(os.path.dirname(TRUTH), exist_ok=True)
-    with open(TRUTH, "a") as f:
-        for row in truth_rows:
-            f.write(json.dumps(row) + "\n")
-
     if not quiet:
         h, b = outcomes["human"], outcomes["bot"]
         print(f"week {week}: {sum(h.values())} customers ("
@@ -91,11 +74,7 @@ def main():
     group.add_argument("--through", type=int, choices=range(1, 7))
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
-    try:
-        server_status()
-    except OSError:
-        print("Demo site not reachable. Start it: REDIS_URL=memory:// python demo_site/app.py")
-        return 1
+    labclient.wait_for_store()
     weeks = [args.week] if args.week else range(1, args.through + 1)
     started = time.perf_counter()
     for week in weeks:

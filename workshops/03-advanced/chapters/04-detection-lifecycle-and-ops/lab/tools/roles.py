@@ -5,12 +5,12 @@ Thin CLI over defenses/registry.py. The pipeline reads roles, not versions,
 and hot-reloads on the manifest's mtime, so every command here takes effect
 on the next request with no restart.
 
-    python tools/registry.py --show
-    python tools/registry.py shadow v2        v2 scores and logs, never acts
-    python tools/registry.py canary v2        v2 acts for config.canary_pct % of sessions
-    python tools/registry.py promote v2       v2 becomes prod
-    python tools/registry.py retire v2        v2 holds no role
-    python tools/registry.py rollback         prod <- the version it replaced (if known)
+    python tools/roles.py --show
+    python tools/roles.py shadow v2        v2 scores and logs, never acts
+    python tools/roles.py canary v2        v2 acts for config.canary_pct % of sessions
+    python tools/roles.py promote v2       v2 becomes prod
+    python tools/roles.py retire v2        v2 holds no role
+    python tools/roles.py rollback         prod <- the version it replaced (if known)
 
 Promote is a deliberate, named act. train.py registers a candidate and
 gate.py judges it, but neither ships it; a person runs `promote`, and the
@@ -21,9 +21,8 @@ import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
-
-import registry  # noqa: E402
+import report as _lab  # noqa: F401,E402  (puts the lab root on sys.path)
+from defenses import registry  # noqa: E402
 
 _PREV = os.path.join(registry.MODELS_DIR, ".prev_prod")
 

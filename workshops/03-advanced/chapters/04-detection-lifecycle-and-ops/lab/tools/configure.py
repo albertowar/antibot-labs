@@ -1,7 +1,7 @@
 """
 Change the live policy without a deploy (Round 1)
 
-Writes operator overrides to data/ops_config.json, which the app re-reads on
+Writes operator overrides to data/ops_config.json, which the store re-reads on
 the next request (defenses/config.py). Nothing here restarts the server.
 
     python tools/configure.py --show
@@ -14,7 +14,7 @@ the next request (defenses/config.py). Nothing here restarts the server.
 Always answer the one question first: who does this change hurt? Replay last
 week against it before you ship it:
 
-    python tools/sweep.py --weight header_order_mismatch=0          (the W2 Ch8 replay tool)
+    python tools/sweep.py --weight header_order_mismatch=0          (replays the log against it)
 
 A weight of 0 is a kill switch. Raising a weight to cover for a burned signal
 is borrowing against the false-positive budget; `sweep.py` and `ops.py` show
@@ -22,12 +22,10 @@ the bill.
 """
 
 import argparse
-import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
-
-import config  # noqa: E402
+import report as _lab  # noqa: F401,E402  (puts the lab root on sys.path)
+from defenses import config  # noqa: E402
 
 
 def main():

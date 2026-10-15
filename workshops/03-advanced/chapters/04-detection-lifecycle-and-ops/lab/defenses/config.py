@@ -1,19 +1,19 @@
 """
-Chapter 4 (W3): Operational configuration, hot-reloaded
+Operational configuration, hot-reloaded
 
 Everything an operator may need to change in the middle of an incident lives
-in one JSON file, ../data/ops_config.json, and the app re-reads it whenever
+in one JSON file, ../data/ops_config.json, and the store re-reads it whenever
 its mtime changes. No deploy, no restart:
 
     weights        {signal: points}   overrides for policy.WEIGHTS (0 = kill switch)
     challenge_at   int                the ladder's challenge line (policy.CHALLENGE_AT)
     block_at       int                the ladder's block line (policy.BLOCK_AT)
-    campaign       bool               run the campaign layer (W2 Ch8 Round 4) and its step-up
+    campaign       bool               run the campaign layer (defenses/campaign.py) and its step-up
     stepup_asn     int | null         blunt containment: step up every login from this ASN,
-                                      real customers included (contain.py, Round 4)
+                                      real customers included (defenses/containment.py)
     until_clock    int | null         lab-clock deadline: when it passes, the overrides above
-                                      expire and the shipped policy is back (contain.py)
-    canary_pct     int                share of sessions scored by the canary model
+                                      expire and the shipped policy is back (tools/contain.py)
+    canary_pct     int                share of sign-ins scored by the canary model
                                       (which model is prod/shadow/canary lives in registry.py)
 
 Why a file and not a flag in code: a weight is a statement about trust that
@@ -24,7 +24,7 @@ promise to undo it, and the TTL keeps the promise for you.
 Trade-off: a hot config is also an attack surface and a footgun. In
 production it belongs in a store with history and an audit log (who, when,
 why), and a change should run against last week's traffic first
-(tools/sweep.py in W2 Ch8; tools/ops.py --replay here).
+(tools/sweep.py replays the log against a policy you have not deployed).
 """
 
 import json
@@ -78,7 +78,7 @@ def effective(clock=None):
 
 
 def update(**changes):
-    """Write changes on top of the file (tools use this; the app only reads)."""
+    """Write changes on top of the file (tools use this; the store only reads)."""
     with _lock:
         data = {}
         if os.path.exists(CONFIG_PATH):
@@ -92,7 +92,7 @@ def update(**changes):
                 data[key] = value
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, sort_keys=True)
         _cache["mtime"] = None
     return data
 

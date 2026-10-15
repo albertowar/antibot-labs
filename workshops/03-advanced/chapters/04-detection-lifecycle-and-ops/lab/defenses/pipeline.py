@@ -1,82 +1,134 @@
 """
-The detection pipeline (inherited from W2 Ch8, now operated)
+The engine: Signal, Verdict, Check and run().
 
-    edge attributes + request + session telemetry
-        -> sensors (always; cheapest first)
-        -> correlation layer (always: this is the W2 end state)
-        -> campaign layer   (when the operator turns it on: config.campaign)
-        -> the model        (prod acts, shadow logs, canary acts for a few)
-        -> decision engine: one score, one ladder, operator overrides on top
+Every check turns what it sees into Signals on one 0-100 scale, or into a hard
+Verdict. The engine adds the points up and policy.decide() maps the sum to
+allow / monitor / challenge / block. One scale, because:
+  - weak evidence adds up: an odd header (15) from a hosting ASN (25) earns a
+    challenge (40); either alone does not;
+  - strong evidence still wins alone: a honeypot hit (100) blocks by itself;
+  - every decision can be explained: the log lists each signal and its points.
 
-The pipeline returns a Decision and never touches the response. Turning a
-decision into an HTTP response is the app's job (demo_site/app.py), and so
-is deciding not to enforce it (allowlist.py).
+Order matters for cost, not for the verdict. A hard verdict (rate_limit, block,
+deceive) stops the gate, so put the cheap, certain checks first.
 
-What changed since W2 Ch8: nothing in how a request is judged, everything in
-who can change the judging and how fast. Weights, thresholds and the
-campaign switch come from config.effective() per request; model roles come
-from the registry. Both hot-reload. "Sensors report, engines decide" was the
-W2 rule; "operators change engines without deploys" is this chapter's.
+Levels: ladder.LADDER[k] runs enforced when k <= DEFENSE_LEVEL. Higher levels
+run in shadow when LAB_SHADOW=1 (logged, never enforced), which is how you
+measure a new layer's false positives before turning it on.
+
+Trade-off baked in here: additive scores assume independent signals. They are
+not (a cloud VM is usually also a hosting ASN). W2 Ch8 replaces the sum with
+calibrated weights; the starter keeps it readable.
 """
 
 import time
 from dataclasses import dataclass, field
+from typing import Callable, Iterable, Optional
 
-import campaign
-import correlation
-import model
-import policy
-from sensors import BASE_SENSORS
+HARD_ACTIONS = ("rate_limit", "block", "deceive")
+ACTIONS = ("allow", "monitor", "challenge") + HARD_ACTIONS
 
 
-@dataclass
-class Context:
-    edge: dict          # resolved by the edge: ip, asn, type, tz, blocklisted
-    ja4: str            # from the edge's TLS terminator
-    headers: list       # [(name, value)] in arrival order, lab headers removed
-    ua: dict            # parsed User-Agent
-    telemetry: dict     # features from /telemetry, or None
-    form: dict
-    counters: object
-    sid: str
+@dataclass(frozen=True)
+class Signal:
+    layer: str              # which check produced it: "headers", "ip_reputation", ...
+    name: str               # what it means: "datacenter", "honeypot_field", ...
+    points: int = 0
+    detail: str = ""
+
+    def flag(self):
+        return f"{self.layer}:{self.name}"
+
+
+@dataclass(frozen=True)
+class Verdict:
+    action: str = "allow"
+    score: int = 0
+    signals: tuple = ()
+    challenge: Optional[str] = None     # challenge type to serve when action == "challenge"
+    retry_after: int = 0                # seconds, for rate_limit
+
+
+@dataclass(frozen=True)
+class Check:
+    name: str
+    fn: Callable
+    phases: tuple = ("request",)        # "request" | "action:<name>" | "action:*" | "response" | "ws:*"
+    shadow: bool = False                # force shadow regardless of level
+
+    def applies(self, phase):
+        for p in self.phases:
+            if p == phase or p == "*":
+                return True
+            if p.endswith("*") and phase.startswith(p[:-1]):
+                return True
+        return False
 
 
 @dataclass
 class Decision:
-    signals: dict = field(default_factory=dict)   # {layer: [signal, ...]}
+    action: str = "allow"
     score: int = 0
-    action: str = "allow"                         # allow | pow | step_up | block
-    weights: dict = field(default_factory=dict)   # the weights that scored it
-    model: dict = field(default_factory=dict)     # {prod|shadow|canary: {version, p, verdict}, acting}
-    ms: float = 0.0
+    signals: list = field(default_factory=list)
+    checks: list = field(default_factory=list)       # [(name, ms)]
+    shadow: list = field(default_factory=list)       # signals from shadow checks
+    challenge: Optional[str] = None
+    retry_after: int = 0
+    hard_by: Optional[str] = None                    # check that short-circuited
 
-    def reasons(self):
-        return [f"[{layer}] {s} (+{self.weights.get(s, 0)})"
-                for layer, sigs in self.signals.items() for s in sigs]
+    def flags(self):
+        return [s.flag() for s in self.signals if s.points or s.layer == "rate_limit" or s.name in ("hard", "trap")]
+
+    def shadow_flags(self):
+        return [s.flag() for s in self.shadow if s.points]
 
 
-def evaluate(ctx, cfg):
-    """cfg is config.effective(clock): the operator's overrides for this request."""
-    started = time.perf_counter()
-    signals = {sensor.LAYER: sensor.sense(ctx) for sensor in BASE_SENSORS}
-    signals[correlation.LAYER] = correlation.sense(ctx)
-    if cfg.get("campaign"):
-        signals[campaign.LAYER] = campaign.sense(ctx)
-    flat = [s for sigs in signals.values() for s in sigs]
-    model_signals, model_info = model.sense(ctx, flat)
-    if model_signals:
-        signals[model.LAYER] = model_signals
-        flat += model_signals
+def _normalise(check, out):
+    """A check may return None, an iterable of Signals, or a Verdict."""
+    if out is None:
+        return Verdict()
+    if isinstance(out, Verdict):
+        return out
+    sigs = tuple(out)
+    return Verdict(action="allow", score=sum(s.points for s in sigs), signals=sigs)
 
-    weights = {**policy.WEIGHTS, **cfg.get("weights", {})}
-    action, score = policy.decide(flat, weights, cfg.get("challenge_at"), cfg.get("block_at"))
-    # Blunt containment (Round 4): step up a whole exit ASN. It catches a
-    # signal-less farm hiding in that ASN, and it challenges every real
-    # customer there too. That cost is the point; keep it behind a TTL.
-    if cfg.get("stepup_asn") and ctx.edge.get("asn") == cfg["stepup_asn"] and action == "allow":
-        action = "step_up"
-        signals.setdefault("containment", []).append("asn_stepup")
-    decision = Decision(signals={k: v for k, v in signals.items() if v}, score=score,
-                        action=action, weights=weights, model=model_info)
-    decision.ms = (time.perf_counter() - started) * 1000
-    return decision
+
+def run(phase, ctx, ladder, level, shadow_enabled=False, shadow_names=(), policy=None):
+    """Run every applicable check for `phase`. Returns a Decision."""
+    from . import policy as default_policy
+    policy = policy or default_policy
+    d = Decision()
+    ctx.phase, ctx.level = phase, level
+    for k in sorted(ladder):
+        enforced = k <= level
+        if not enforced and not shadow_enabled:
+            continue
+        for check in ladder[k]:
+            if not check.applies(phase):
+                continue
+            is_shadow = (not enforced) or check.shadow or check.name in shadow_names
+            t0 = time.perf_counter()
+            try:
+                v = _normalise(check, check.fn(ctx))
+            except Exception as e:                      # a broken check must never take the store down
+                v = Verdict(signals=(Signal(check.name, "error", 0, repr(e)),))
+            d.checks.append((check.name, (time.perf_counter() - t0) * 1000))
+            if is_shadow:
+                d.shadow.extend(v.signals)
+                if v.action in HARD_ACTIONS:
+                    d.shadow.append(Signal(check.name, v.action, 100, "shadow hard verdict"))
+                continue
+            d.signals.extend(v.signals)
+            if v.action in HARD_ACTIONS:
+                d.action, d.hard_by, d.retry_after = v.action, check.name, v.retry_after
+                d.score = 100 if v.action != "rate_limit" else d.score
+                if not v.signals:
+                    d.signals.append(Signal(check.name, "hard", 0, v.action))
+                return d
+            if v.challenge and not d.challenge:
+                d.challenge = v.challenge
+    d.score = min(100, sum(s.points for s in d.signals))
+    d.action = policy.decide(d.score, d.signals, level)
+    if d.action == "challenge" and not d.challenge:
+        d.challenge = policy.DEFAULT_CHALLENGE
+    return d

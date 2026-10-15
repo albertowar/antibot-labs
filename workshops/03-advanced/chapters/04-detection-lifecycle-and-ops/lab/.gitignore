@@ -1,11 +1,15 @@
-venv/
+.venv/
+instance/
+logs/
 __pycache__/
-decision_log.jsonl
-data/truth.jsonl
-data/labels.jsonl
+*.pyc
+*.bak
+.env
+
+# Chapter 4 operator state and artifacts (written by tools/, read by the store)
 data/ops_config.json
 data/world_updates.json
+data/labels.jsonl
 data/snapshots/
-models/*.txt
-models/manifest.json
+models/
 incident/incident_report.md

@@ -37,7 +37,7 @@ from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from report import BASE_URL, by_week, decisions, flat_signals, is_bot, pct, read_log  # noqa: E402
+from report import BASE_URL, by_week, decisions, flat_signals, is_bot, pct, percentiles, persona, read_log  # noqa: E402
 
 ACTED = ("block", "pow", "step_up")
 
@@ -58,10 +58,9 @@ def grade(entries):
 
 
 def bot_wins(entries):
-    # A bot reaches an account when its login is valid and it was not blocked
-    # or stepped up. A proof-of-work is solved, so it does not stop the bot.
-    return [e for e in entries if is_bot(e) and e["cred"] == "valid"
-            and e["enforced"] in ("allow", "pow")]
+    # A bot reaches an account when its session ends signed in. A proof-of-work
+    # is solved, so it does not stop the bot; a deceptive block and a step-up do.
+    return [e for e in entries if is_bot(e) and e["reached"]]
 
 
 def fp_pct(g):
@@ -88,18 +87,24 @@ def week_report(entries, week):
           ("allow", "pow", "step_up", "block") if bot_actions[a])
           + "   (a proof-of-work is solved by the bot, so 'pow' is not a stop)")
     print(f"Bots that reached an account: {len(wins)}   "
-          f"(of {sum(1 for e in bots if e['cred'] == 'valid')} with a valid pair)")
+          f"(of {sum(1 for e in bots if e['cred'] == 'valid' or e['reached'])} that held a valid pair)")
 
     hurt = defaultdict(Counter)
     for e in humans:
         if e["enforced"] in ACTED:
-            hurt[e["actor"].split(':', 1)[1]][e["enforced"]] += 1
+            hurt[persona(e)][e["enforced"]] += 1
     blocked = sum(v for c in hurt.values() for a, v in c.items() if a == "block")
     chall = sum(v for c in hurt.values() for a, v in c.items() if a != "block")
     print(f"\nReal users hurt: {blocked} blocked, {chall} challenged, of {len(humans)} "
           f"({pct(blocked + chall, len(humans)).strip()})")
     for p, actions in sorted(hurt.items(), key=lambda kv: -sum(kv[1].values())):
         print(f"  {p:<16} " + ", ".join(f"{a} {n}" for a, n in sorted(actions.items())))
+
+    gate = [e["ms"] for e in es if e.get("ms") is not None]
+    if gate:
+        median, p95 = percentiles(gate)
+        print(f"\nDefender cost: gate median {median:.2f} ms, p95 {p95:.2f} ms per sign-in "
+              f"({sum(1 for e in es if e['challenged'])} sessions were challenged)")
 
     kg = [e for e in humans if e.get("known_good")]
     kg_hit = [e for e in kg if e["signals"]]
@@ -112,14 +117,14 @@ def week_report(entries, week):
 
 def all_weeks(entries):
     weeks = sorted({e.get("week", 0) for e in entries if e.get("week")})
-    print(f"{'week':>4} {'bots':>5} {'blocked':>8} {'recall':>7} {'users hurt':>11} {'bots in':>8}")
+    print(f"{'week':>4} {'bots':>5} {'stopped':>8} {'recall':>7} {'users hurt':>11} {'bots in':>8}")
     for w in weeks:
         es = by_week(entries, w)
         g = grade(es)
         humans = [e for e in es if not is_bot(e)]
         bots = [e for e in es if is_bot(e)]
         hurt = sum(1 for e in humans if e["enforced"] in ACTED)
-        blocked = sum(1 for e in bots if e["enforced"] == "block")
+        blocked = sum(1 for e in bots if e["enforced"] in ("block", "step_up"))   # a pow is solved, so not a stop
         f = lambda x: "  -  " if x is None else f"{100 * x:4.0f}%"
         print(f"{w:>4} {len(bots):>5} {pct(blocked, len(bots)):>8} {f(g['recall']):>7} "
               f"{pct(hurt, len(humans)):>11} {len(bot_wins(es)):>8}")

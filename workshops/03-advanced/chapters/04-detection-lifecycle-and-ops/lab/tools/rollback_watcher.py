@@ -29,13 +29,12 @@ import time
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import config  # noqa: E402
-import features  # noqa: E402
-import registry  # noqa: E402
-from model import verdict  # noqa: E402
-from report import by_week, decisions, is_bot, read_log  # noqa: E402
+from report import by_week, decisions, is_bot, read_log  # noqa: E402  (puts the lab root on sys.path)
+from defenses import config, registry  # noqa: E402
+from defenses import mlfeatures as features  # noqa: E402
+from defenses.model import verdict  # noqa: E402
 
 ROLLBACK_FP_DIFF = 0.02
 
@@ -70,7 +69,7 @@ def reading():
 def check():
     r = reading()
     if r is None:
-        print("no prod+canary models set (tools/registry.py canary <version>)")
+        print("no prod+canary models set (tools/roles.py canary <version>)")
         return 0
     print(f"week {r['week']}: {r['n']} sessions, disagreement {100 * r['disagree']:.1f}%, "
           f"canary FP {100 * r['canary_fp']:.1f}% vs prod {100 * r['prod_fp']:.1f}% "

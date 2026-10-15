@@ -1,5 +1,5 @@
 """
-Chapter 4 (W3): What the pipeline exposes to Prometheus
+What the store exposes to Prometheus
 
 The defender's view of the defender's own system, and nothing else. There is
 deliberately no "is this a bot" label here: production has no ground truth,
@@ -22,8 +22,8 @@ measure without truth:
 Rates are Prometheus' job (rate(), increase()), so everything here is a
 counter, a gauge or a histogram, never a precomputed percentage.
 
-Scraped by Prometheus at /metrics (docker compose --profile monitoring) and
-read directly by tools/ops.py, so the lab works with or without Docker.
+Scraped by Prometheus at /metrics (docker compose --profile monitoring; demo_site/ext/ops.py serves
+it) and readable with curl, so the lab works with or without Docker.
 """
 
 from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest)
@@ -43,24 +43,30 @@ pipeline_seconds = Histogram("pipeline_seconds", "Pipeline time per login",
 corpus_age = Gauge("corpus_age_weeks", "Lab weeks since this data source was refreshed", ["corpus"])
 
 
-def observe(decision, cred, known_good, model_info):
-    for layer, sigs in decision.signals.items():
-        for s in sigs:
+def observe_decision(signals, action, known_good, model_info, gate_ms):
+    """One scored sign-in (the first attempt, not the retry after a solved challenge).
+    signals: {layer: [name, ...]}; action: allow | pow | step_up | block."""
+    for names in signals.values():
+        for s in names:
             signal_fired.labels(signal=s).inc()
             if known_good:
                 known_good_signal.labels(signal=s).inc()
     if known_good:
         known_good_total.inc()
-    decisions.labels(action=decision.action).inc()
-    logins.labels(cred=cred).inc()
-    pipeline_seconds.observe(decision.ms / 1000)
+    decisions.labels(action=action).inc()
+    pipeline_seconds.observe(gate_ms / 1000)
     for role in ("prod", "shadow", "canary"):
-        info = model_info.get(role)
+        info = (model_info or {}).get(role)
         if info:
             model_score.labels(role=role).observe(info["p"])
-    if model_info.get("prod") and model_info.get("shadow"):
+    if (model_info or {}).get("prod") and model_info.get("shadow"):
         shadow_verdicts.labels(prod=model_info["prod"]["verdict"],
                                shadow=model_info["shadow"]["verdict"]).inc()
+
+
+def observe_login(cred):
+    """The password outcome, once the route has checked it: valid | wrong_password | unknown_user."""
+    logins.labels(cred=cred).inc()
 
 
 def render():

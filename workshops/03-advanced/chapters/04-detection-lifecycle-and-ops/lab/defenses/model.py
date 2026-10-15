@@ -1,38 +1,39 @@
 """
-Chapter 4 (W3): The model as one more sensor, in three roles
+The model as one more sensor, in three roles
 
-W2 Ch7 trained a LightGBM classifier and scored checkouts with it. Here it
-joins the W2 Ch8 pipeline the only way a model should join a rule stack: as
-a sensor that *reports* two signals, with weights that live in policy.py like
-everyone else's:
+W2 Ch7 trained a LightGBM classifier and scored checkouts with it. Here it joins the rule stack the
+only way a model should join one: as a sensor that *reports* two signals, with weights that live in
+policy.py like everyone else's:
 
     model_suspicious   p >= t_suspicious   (+30 by default: the challenge band)
     model_bot          p >= t_bot          (+60: the block line)
 
-The thresholds belong to the model version (registry.py), because every
-retrain moves the score distribution. The weights belong to the policy,
-because a weight of 0 is the kill switch for a model that has gone wrong.
+The thresholds belong to the model version (registry.py), because every retrain moves the score
+distribution. The weights belong to the policy, because a weight of 0 is the kill switch for a model
+that has gone wrong.
 
 Three roles, same request, same feature vector:
     prod     its signals go into the score                        (acts)
     shadow   scored, logged, metered, never in the score          (observes)
-    canary   acts instead of prod for canary_pct % of sessions,   (acts for a few)
-             chosen by a stable hash of the session id so one
-             person never flips between models mid-session
+    canary   acts instead of prod for canary_pct % of people,     (acts for a few)
+             chosen by a stable hash of the account being signed in to, so one person never
+             flips between models from one sign-in to the next
 
-Boosters hot-reload when the manifest or a model file changes, so promoting,
-shadowing and rolling back are file writes, never restarts.
+Boosters hot-reload when the manifest or a model file changes, so promoting, shadowing and rolling
+back are file writes, never restarts. No model holds a role until the operator promotes one, and
+until then this check says nothing.
 """
 
+import hashlib
 import os
 
-import config
-import features
-import registry
+from . import attempt, mlfeatures, netinfo, ops, registry, sensors
+from .features import numbers, of
+from .pipeline import Check
 
 try:
     import lightgbm as lgb
-except ImportError:  # the app still runs rules-only without the ML stack
+except ImportError:  # the store still runs rules-only without the ML stack
     lgb = None
 
 SIGNALS = {
@@ -68,14 +69,11 @@ def _booster(version):
     return _boosters[version][1]
 
 
-def canary_bucket(sid, pct):
-    """Stable assignment: the same session always lands on the same side."""
-    if not pct:
+def canary_bucket(key, pct):
+    """Stable assignment: the same key always lands on the same side."""
+    if not pct or not key:
         return False
-    try:
-        return int(sid[-4:], 16) % 100 < pct
-    except ValueError:
-        return False
+    return int(hashlib.sha256(key.encode()).hexdigest()[:8], 16) % 100 < pct
 
 
 def verdict(p, meta):
@@ -86,16 +84,14 @@ def verdict(p, meta):
     return "clean"
 
 
-def sense(ctx, flat_signals):
-    """Returns (signals_from_the_acting_model, info). info holds every role's
-    probability and verdict for the log, the metrics and the shadow report."""
+def _check(ctx):
+    """Signals from the acting model; every role's probability and verdict go to the log."""
     if lgb is None:
-        return [], {}
+        return None
     roles, versions = _roles()
     if not any(roles.values()):
-        return [], {}
-    row = features.vector(flat_signals, features.telemetry_numbers(ctx.telemetry),
-                          ctx.edge.get("type", "unknown"))
+        return None
+    row = mlfeatures.vector(sensors.flat(ctx), numbers(of(ctx)), netinfo.of(ctx)["kind"])
     info = {}
     for role, version in roles.items():
         if not version:
@@ -106,12 +102,16 @@ def sense(ctx, flat_signals):
         p = float(booster.predict([row])[0])
         info[role] = {"version": version, "p": round(p, 4), "verdict": verdict(p, versions[version])}
 
-    pct = config.load().get("canary_pct", 0)
-    acting = "canary" if "canary" in info and canary_bucket(ctx.sid, pct) else "prod"
+    pct = ops.state(ctx)["cfg"].get("canary_pct", 0)
+    person = attempt.credentials(ctx)[0] or ctx.edge.ip
+    acting = "canary" if "canary" in info and canary_bucket(person, pct) else "prod"
     info["acting"] = acting
+    ctx.note(model=info)
     v = info.get(acting, {}).get("verdict")
-    if v == "bot":
-        return ["model_bot"], info
-    if v == "suspicious":
-        return ["model_suspicious"], info
-    return [], info
+    name = {"bot": "model_bot", "suspicious": "model_suspicious"}.get(v)
+    if name is None:
+        return None
+    return sensors.emit(ctx, LAYER, [name])
+
+
+CHECK = Check("model", _check, phases=sensors.LOGIN)

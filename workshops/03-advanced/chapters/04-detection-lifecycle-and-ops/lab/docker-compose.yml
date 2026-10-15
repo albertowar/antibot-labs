@@ -1,38 +1,53 @@
-# W3 Ch4 lab. Redis is optional (REDIS_URL=memory:// works without it); the
-# `monitoring` profile is optional too and exists only because the W3 capstone
-# asks for a Grafana signal-health dashboard. Everything binds to 127.0.0.1.
+# Optional. The store runs without Docker (SQLite + an in-process Redis). Bring these up to run the
+# production-shaped stack the series uses everywhere else:
 #
-#   docker compose up -d --wait                     # just Redis
-#   docker compose --profile monitoring up -d       # + Prometheus + Grafana
+#   docker compose up -d --wait                        # Redis + PostgreSQL
+#   REDIS_URL=redis://127.0.0.1:6379/0 \
+#   DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python demo_site/app.py
 #
-# The Flask app runs on the host (python demo_site/app.py), not in a container,
-# so Prometheus scrapes it via host.docker.internal.
+# The `monitoring` profile adds Prometheus and a provisioned Grafana dashboard (the signal-health board
+# the W3 capstone asks you to build):
+#
+#   docker compose --profile monitoring up -d --wait   # + Prometheus :9090 + Grafana :3000 (admin/admin)
+#
+# The store runs on the host (python demo_site/app.py), not in a container, so Prometheus scrapes it
+# through host.docker.internal. The store's edge accepts loopback traffic only, and on Docker Desktop
+# the forwarded connection arrives from 127.0.0.1. On a native Linux engine host.docker.internal is the
+# bridge gateway, which the edge refuses: there, read /metrics with curl instead (the required path
+# needs neither Prometheus nor Grafana). Set STORE_PORT if you run the store on another PORT.
 name: w3-ch04-detection-ops
 
 services:
   redis:
     image: redis:8.10.2-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "127.0.0.1:6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 3s
-      retries: 20
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 2s, timeout: 2s, retries: 15}
+  postgres:
+    image: postgres:18.6-alpine
+    environment: {POSTGRES_USER: workshop, POSTGRES_PASSWORD: workshop, POSTGRES_DB: shop}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql"]   # the 18 image keeps PGDATA under this mount
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U workshop -d shop"], interval: 2s, timeout: 2s, retries: 15}
 
   prometheus:
     image: prom/prometheus:v3.15.0
     profiles: ["monitoring"]
+    environment:
+      STORE_PORT: ${STORE_PORT:-5000}
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=7d"
-    ports:
-      - "127.0.0.1:9090:9090"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.tmpl.yml:ro
+    # the template's only variable is the store's port
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        sed "s/__STORE_PORT__/$$STORE_PORT/" /etc/prometheus/prometheus.tmpl.yml > /tmp/prometheus.yml &&
+        exec /bin/prometheus --config.file=/tmp/prometheus.yml --storage.tsdb.path=/prometheus
+        --storage.tsdb.retention.time=7d --web.listen-address=0.0.0.0:9090
+    ports: ["127.0.0.1:9090:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    healthcheck: {test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9090/-/ready"], interval: 2s, timeout: 3s, retries: 20}
 
   grafana:
     image: grafana/grafana:13.2.3
@@ -44,7 +59,10 @@ services:
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "127.0.0.1:3000:3000"
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
-      - prometheus
+      prometheus: {condition: service_healthy}
+    healthcheck: {test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health | grep -q '\"database\": \"ok\"'"], interval: 3s, timeout: 3s, retries: 30}
+
+volumes:
+  pgdata: {}

@@ -1,282 +1,197 @@
 """
-Traffic engine for simulated customers and bots (inherited from W2 Ch8)
+labclient: how every lab actor (shopper or bot) talks to the store.
 
-Every simulated visit goes through LabSession: the browser it claims, its
-headers in that browser's order, the telemetry the page's collector would
-post, the address it connects from, how it completes a challenge, and (new
-in W3 Ch4) *when* on the lab calendar it happened: X-Lab-Week and
-X-Lab-Clock let tools/weeks.py replay five weeks in minutes.
+Each actor "rents" a source address from a pool in data/world.json and labels
+itself for the scoreboard. demo_site/lab_edge.py turns that into the client
+address the defenses see and strips the label before they run.
 
-The world moves between weeks. From week 3, Chrome 146 is out: a new major,
-a new JA4 the week-0 table has never seen, and a different header order on
-fetch(). browser_headers() and ja4_for() take a week for that reason.
+Ethics guardrail: the localhost guard is labnet.py at the lab root (a byte-identical
+copy of scripts/labnet.py). On import this module asks it for DEMO_URL, which it
+refuses unless it is this machine, and checks every side-service URL that is set
+(REDIS_URL, DATABASE_URL, PROVIDER_URL, ...). Lab traffic never leaves localhost,
+and no real proxy, VPN or Tor node is ever contacted: the pools are addresses the
+store *pretends* to see.
 
-Safety rails (do not remove):
-- DEMO_URL must point at localhost; anything else is refused.
-- Source addresses come only from ../world.json documentation ranges.
-- Credentials are synthetic (*@example.test).
+    from labclient import LabClient, world_pool, admin
+    bot = LabClient("bot:wave1", ip=world_pool("cloud_vm")[0])
+    r = bot.get("/api/products", headers=[("User-Agent", "python-requests/2.34")])
+    admin("POST", "/lab/reset")
 """
 
-import hashlib
 import ipaddress
 import json
-import math
 import os
 import random
-import string
+import re
 import sys
 import time
 
 import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB = os.path.join(HERE, "..")
-sys.path.insert(0, os.path.join(LAB, "demo_site"))
-sys.path.insert(0, os.path.join(LAB, "defenses"))
+LAB = os.path.abspath(os.path.join(HERE, ".."))
+if LAB not in sys.path:
+    sys.path.insert(0, LAB)                    # lab root: labnet.py, demo_site, defenses
+from labnet import is_local, require_local, require_local_env, target  # noqa: E402
 
-import users  # noqa: E402  (the store's seed, so simulated humans know their passwords)
-from ladder import leading_zero_bits  # noqa: E402
+BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
+require_local_env()
+WORLD_FILE = os.environ.get("WORLD_FILE", os.path.join(LAB, "data", "world.json"))
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://localhost:5000")
 
-with open(os.path.join(LAB, "world.json")) as f:
+def assert_local(url=BASE_URL):
+    """Refuse a URL that is not this machine (labnet.require_local). Returns the URL."""
+    return require_local(url)
+
+with open(WORLD_FILE) as f:
     WORLD = json.load(f)
-JA4 = WORLD["ja4"]
-
-# --------------------------------------------------------------------------
-# Network: addresses from the simulated internet
-# --------------------------------------------------------------------------
-_NETS = {name: ipaddress.ip_network(p["cidr"]) for name, p in WORLD["pools"].items()}
 
 
-def ip_from(pool, index):
-    net = _NETS[pool]
-    return str(net[index % net.num_addresses])
+def world_pool(name, n=None):
+    """
+    Source addresses in one pool, or in every pool of a `groups` entry (in order): the explicit
+    `ips`, or the first `hosts` of the `cidr`, one per /`spread` when the pool sets it.
+    Same rule as tools/build_world.py hosts(); tools/smoke.py checks that they agree.
+    """
+    if name in WORLD.get("groups", {}):
+        ips = [ip for member in WORLD["groups"][name] for ip in world_pool(member)]
+        return ips[:n] if n else ips
+    p = WORLD["pools"][name]
+    if "ips" in p:
+        ips = list(p["ips"])
+    else:
+        net = ipaddress.ip_network(p["cidr"])
+        count = p.get("hosts", 50)
+        if "spread" in p:
+            step = 1 << (net.max_prefixlen - p["spread"])
+            ips = [str(ipaddress.ip_address(int(net.network_address) + i * step + 1)) for i in range(count)]
+        else:
+            base = int(net.network_address) + (1 if net.version == 4 and net.prefixlen < 31 else 0)
+            ips = [str(ipaddress.ip_address(base + i)) for i in range(count)]
+    return ips[:n] if n else ips
 
 
-def ip_in(cidr, index):
-    """An address inside an arbitrary documentation range (the reassigned block in Round 2)."""
-    net = ipaddress.ip_network(cidr)
-    return str(net[index % net.num_addresses])
+def group_members(name):
+    """The pool names behind a `groups` entry (or [name] for a plain pool)."""
+    return list(WORLD.get("groups", {}).get(name, [name]))
 
 
-def pool_tz(pool):
-    return WORLD["pools"][pool]["tz"]
+def pool_type(name):
+    return WORLD["pools"][name]["type"]
 
 
-# --------------------------------------------------------------------------
-# Browsers: what each one sends on a same-origin fetch()
-# --------------------------------------------------------------------------
-CHROME_MAJOR, FIREFOX_MAJOR, SAFARI_MAJOR = 145, 155, 26
-CHROME_RELEASE_WEEK, CHROME_NEW_MAJOR = 3, 146          # the browser release the corpus has not seen
-JA4_CHROME_NEW = "t13d1517h2_8daaf6152771_b0da82dd1658"  # illustrative, like the week-0 table
+class LabClient:
+    """
+    A requests.Session that sends headers exactly in the order given (no
+    library defaults), from a rented source IP, with a scoreboard label.
 
-BROWSERS = {
-    "chrome-win": {"engine": "chrome", "platform": "Win32", "mobile": False,
-                   "ua": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{CHROME_MAJOR}.0.0.0 Safari/537.36",
-                   "ch_platform": '"Windows"',
-                   "gpus": ["ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-                            "ANGLE (AMD, AMD Radeon RX 6600 (0x000073FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-                            "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)"]},
-    "chrome-mac": {"engine": "chrome", "platform": "MacIntel", "mobile": False,
-                   "ua": f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{CHROME_MAJOR}.0.0.0 Safari/537.36",
-                   "ch_platform": '"macOS"',
-                   "gpus": ["ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
-                            "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)"]},
-    "chrome-android": {"engine": "chrome", "platform": "Linux armv81", "mobile": True,
-                       "ua": f"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{CHROME_MAJOR}.0.0.0 Mobile Safari/537.36",
-                       "ch_platform": '"Android"',
-                       "gpus": ["Adreno (TM) 740", "Mali-G715-Immortalis MC11"]},
-    "firefox-win": {"engine": "firefox", "platform": "Win32", "mobile": False,
-                    "ua": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{FIREFOX_MAJOR}.0) Gecko/20100101 Firefox/{FIREFOX_MAJOR}.0",
-                    "gpus": ["ANGLE (NVIDIA, NVIDIA GeForce GTX 980 Direct3D11 vs_5_0 ps_5_0), or similar",
-                             "ANGLE (Intel, Intel(R) HD Graphics 400 Direct3D11 vs_5_0 ps_5_0), or similar"]},
-    "firefox-linux": {"engine": "firefox", "platform": "Linux x86_64", "mobile": False,
-                      "ua": f"Mozilla/5.0 (X11; Linux x86_64; rv:{FIREFOX_MAJOR}.0) Gecko/20100101 Firefox/{FIREFOX_MAJOR}.0",
-                      "gpus": ["Mesa Intel(R) UHD Graphics 620 (KBL GT2)", "AMD Radeon Graphics (radeonsi, renoir)"]},
-    "safari-mac": {"engine": "safari", "platform": "MacIntel", "mobile": False,
-                   "ua": f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{SAFARI_MAJOR}.0 Safari/605.1.15",
-                   "gpus": ["Apple GPU"]},
-    "safari-ios": {"engine": "safari", "platform": "iPhone", "mobile": True,
-                   "ua": f"Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{SAFARI_MAJOR}.0 Mobile/15E148 Safari/604.1",
-                   "gpus": ["Apple GPU"]},
-    # Old hardware stuck on the last Chrome that supports Windows 7
-    "chrome-win7": {"engine": "chrome", "platform": "Win32", "mobile": False,
-                    "ua": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
-                    "ch_platform": '"Windows"', "ch_major": 109,
-                    "gpus": ["ANGLE (Intel, Intel(R) HD Graphics 4000 Direct3D11 vs_5_0 ps_5_0, D3D11)"]},
-}
+    ip      one fixed source IP (a sticky proxy, or a real home connection)
+    pool    rotate: pick a random IP from this list on EVERY request (e.g. world_pool("cloud_vm"))
+    ja4     a claimed TLS fingerprint (honoured as "claimed" until a TLS edge measures one)
+    """
 
+    def __init__(self, actor, ip=None, pool=None, ja4=None, rng=None, timeout=30):
+        self.actor, self.ip, self.pool, self.ja4 = actor, ip, pool, ja4
+        self.rng = rng or random.Random()
+        self.http = requests.Session()
+        self.http.headers.clear()            # our order, not requests' defaults
+        self.timeout = timeout
+        self.requests, self.statuses = 0, []
+        self.last = None
 
-def chrome_is_new(name, week):
-    b = BROWSERS[name]
-    return b["engine"] == "chrome" and "ch_major" not in b and week >= CHROME_RELEASE_WEEK
+    def current_ip(self):
+        return self.rng.choice(self.pool) if self.pool else self.ip
 
+    def request(self, method, path, headers=(), data=None, json=None, ip=None, allow_redirects=False):
+        lab = [("X-Lab-Client-IP", ip or self.current_ip() or WORLD["student_ip"]), ("X-Lab-Actor", self.actor)]
+        if self.ja4:
+            lab.append(("X-Lab-JA4", self.ja4))
+        hdrs = list(headers) + lab
+        r = self.http.request(method, BASE_URL + path, headers=dict(hdrs), data=data, json=json,
+                              timeout=self.timeout, allow_redirects=allow_redirects)
+        self.requests += 1
+        self.statuses.append(r.status_code)
+        self.last = r
+        return r
 
-def ja4_for(engine, week=1, name=None):
-    """The JA4 a client stack shows this week. Chrome's changes with the release."""
-    if name and chrome_is_new(name, week):
-        return JA4_CHROME_NEW
-    return JA4[engine]
+    def get(self, path, headers=(), ip=None, **kw):
+        return self.request("GET", path, headers, ip=ip, **kw)
+
+    def post(self, path, data=None, headers=(), ip=None, json=None, **kw):
+        return self.request("POST", path, headers, data=data, json=json, ip=ip, **kw)
+
+    def set_cookie(self, name, value):
+        self.http.cookies.set(name, value, path="/")
+
+    def verdict(self):
+        r = self.last
+        return (r.headers.get("X-Lab-Verdict"), r.headers.get("X-Lab-Score"), r.headers.get("X-Lab-Signals", "")) if r is not None else None
 
 
-def browser_headers(name, accept_language="en-US,en;q=0.9", week=1):
-    """Headers of a page's fetch() POST, in the order the engine sends them."""
-    b = BROWSERS[name]
-    origin, referer = BASE_URL, f"{BASE_URL}/login"
-    if b["engine"] == "chrome":
-        major = b.get("ch_major", CHROME_MAJOR)
-        ua = b["ua"]
-        ch = [("sec-ch-ua", f'"Chromium";v="{major}", "Not:A-Brand";v="99", "Google Chrome";v="{major}"'),
-              ("sec-ch-ua-mobile", "?1" if b["mobile"] else "?0"),
-              ("sec-ch-ua-platform", b["ch_platform"])]
-        if chrome_is_new(name, week):
-            # Chrome 146: the Sec-Fetch-* trio moved ahead of User-Agent (illustrative)
-            major = CHROME_NEW_MAJOR
-            ua = ua.replace(f"Chrome/{CHROME_MAJOR}.", f"Chrome/{major}.")
-            ch[0] = ("sec-ch-ua", f'"Chromium";v="{major}", "Not:A-Brand";v="99", "Google Chrome";v="{major}"')
-            return ch + [("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "cors"),
-                         ("Sec-Fetch-Dest", "empty"), ("User-Agent", ua), ("Accept", "*/*"),
-                         ("Origin", origin), ("Referer", referer),
-                         ("Accept-Encoding", "gzip, deflate, br, zstd"), ("Accept-Language", accept_language)]
-        return ch + [("User-Agent", ua), ("Accept", "*/*"), ("Origin", origin),
-                     ("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "cors"),
-                     ("Sec-Fetch-Dest", "empty"), ("Referer", referer),
-                     ("Accept-Encoding", "gzip, deflate, br, zstd"), ("Accept-Language", accept_language)]
-    if b["engine"] == "firefox":
-        return [("User-Agent", b["ua"]), ("Accept", "*/*"), ("Accept-Language", accept_language),
-                ("Accept-Encoding", "gzip, deflate, br, zstd"), ("Referer", referer),
-                ("Origin", origin), ("Sec-Fetch-Dest", "empty"), ("Sec-Fetch-Mode", "cors"),
-                ("Sec-Fetch-Site", "same-origin")]
-    return [("Accept", "*/*"), ("Sec-Fetch-Site", "same-origin"), ("Accept-Language", accept_language),
-            ("Sec-Fetch-Mode", "cors"), ("Accept-Encoding", "gzip, deflate, br"), ("Origin", origin),
-            ("User-Agent", b["ua"]), ("Referer", referer), ("Sec-Fetch-Dest", "empty")]
+# --- Reading the store's pages (what a scraper or the JS on the page would see) ---
+
+def form_fields(html):
+    """Every <input/select/textarea name=...> and its value, in page order (a naive form filler's view)."""
+    fields = {}
+    for tag in re.findall(r"<(?:input|select|textarea)[^>]*>", html):
+        name = re.search(r'name="([^"]+)"', tag)
+        value = re.search(r'value="([^"]*)"', tag)
+        if name and (name.group(1) not in fields or "checked" in tag):
+            fields[name.group(1)] = value.group(1) if value else ""
+    return fields
 
 
-# --------------------------------------------------------------------------
-# Telemetry: fingerprints and behaviour traces
-# --------------------------------------------------------------------------
-BUTTON = (640, 420)
+def csrf_of(html):
+    m = re.search(r'name="csrf" value="([^"]+)"', html)
+    return m.group(1) if m else ""
 
 
-def fingerprint(rng, browser, tz, languages=("en-US", "en"), randomized=False, platform=None,
-                renderer=None):
-    b = BROWSERS[browser]
-    canvas = "".join(rng.choices(string.hexdigits.lower(), k=24))
-    return {"platform": platform or b["platform"], "webgl_renderer": renderer or rng.choice(b["gpus"]),
-            "canvas": canvas,
-            "canvas2": "".join(rng.choices(string.hexdigits.lower(), k=24)) if randomized else canvas,
-            "screen": rng.choice(["390x844", "412x915"]) if b["mobile"] else
-            rng.choice(["1920x1080", "1536x864", "2560x1440", "1440x900"]),
-            "timezone": tz, "languages": list(languages), "webdriver": False, "cdp": False,
-            "hardware_concurrency": rng.choice([4, 8, 8, 12, 16])}
+def product_skus(html):
+    return re.findall(r'class="product-card" data-sku="([^"]+)"', html)
 
 
-def human_path(rng):
-    """A hand: a curved path with overshoot noise and uneven event spacing."""
-    sx, sy = rng.uniform(100, 1200), rng.uniform(80, 700)
-    ex, ey = BUTTON[0] + rng.uniform(-30, 30), BUTTON[1] + rng.uniform(-8, 8)
-    dx, dy = ex - sx, ey - sy
-    length = math.hypot(dx, dy) or 1
-    nx, ny = -dy / length, dx / length
-    bend1, bend2 = rng.uniform(0.15, 0.4) * length * rng.choice([-1, 1]), rng.uniform(0.05, 0.3) * length
-    c1 = (sx + dx * 0.3 + nx * bend1, sy + dy * 0.3 + ny * bend1)
-    c2 = (sx + dx * 0.7 + nx * bend2, sy + dy * 0.7 + ny * bend2)
-    n, t, points = rng.randint(25, 60), 0, []
-    for i in range(n):
-        u = i / (n - 1)
-        x = (1 - u) ** 3 * sx + 3 * (1 - u) ** 2 * u * c1[0] + 3 * (1 - u) * u ** 2 * c2[0] + u ** 3 * ex
-        y = (1 - u) ** 3 * sy + 3 * (1 - u) ** 2 * u * c1[1] + 3 * (1 - u) * u ** 2 * c2[1] + u ** 3 * ey
-        t += max(4, rng.gauss(16, 6))
-        points.append([round(t), round(x + rng.gauss(0, 1.5)), round(y + rng.gauss(0, 1.5))])
-    return points
+# --- Lab admin -----------------------------------------------------------------
+
+def admin(method, path, **kw):
+    """Lab admin calls (reset, level, scoreboard). Not something a real client could do."""
+    r = requests.request(method, BASE_URL + path, timeout=60, **kw)
+    r.raise_for_status()
+    return r.json()
 
 
-def taps(rng):
-    t, points = 0, []
-    for _ in range(rng.randint(3, 6)):
-        t += rng.uniform(300, 1500)
-        points.append([round(t), round(rng.uniform(20, 370)), round(rng.uniform(100, 800))])
-    return points
+def reset(mode="state", **params):
+    return admin("POST", "/lab/reset", params=dict(mode=mode, **params))
 
 
-def keystrokes(rng, count):
-    t, keys = rng.uniform(500, 1500), []
-    for _ in range(count):
-        t += rng.uniform(80, 260)
-        keys.append([round(t), round(t + rng.uniform(50, 140))])
-    return keys
+def set_level(n):
+    return admin("POST", "/lab/level", json={"level": n})
 
 
-# --------------------------------------------------------------------------
-# Challenges and sessions
-# --------------------------------------------------------------------------
-def solve_pow(prefix, bits):
-    nonce = 0
-    while leading_zero_bits(hashlib.sha256(f"{prefix}:{nonce}".encode()).digest()) < bits:
-        nonce += 1
-    return str(nonce)
+def scoreboard(since=None):
+    return admin("GET", "/lab/scoreboard", params={"since": since} if since else None)
 
 
-class LabSession:
-    """One visit: GET /login, POST /telemetry, POST /login, and any challenge.
+def wait_for_store(timeout=30):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            return admin("GET", "/lab/status")
+        except requests.RequestException:
+            time.sleep(0.5)
+    raise SystemExit(f"Store not reachable on {BASE_URL}. Start it: python demo_site/app.py")
 
-    week/clock stamp the visit on the lab calendar. owns_mailbox says whether
-    this client can read the account's inbox for a step-up code: a real user
-    can, a credential stuffer cannot. extra headers are sent as-is (the
-    known-good cohort's token)."""
 
-    def __init__(self, actor, ip, ja4, headers, week=0, clock=0, owns_mailbox=True, extra=None):
-        self.s = requests.Session()
-        self.s.headers.clear()
-        for name, value in headers:
-            self.s.headers[name] = value
-        self.lab = {"X-Lab-Client-IP": ip, "X-Lab-JA4": ja4, "X-Lab-Actor": actor,
-                    "X-Lab-Week": str(week), "X-Lab-Clock": str(int(clock)), **(extra or {})}
-        self.owns_mailbox = owns_mailbox
-        self.requests_sent, self.pow_ms = 0, 0.0
+# --- Browsers (Playwright), with the same guard --------------------------------
 
-    @property
-    def sid(self):
-        return self.s.cookies.get("sid")
+def browser_context(playwright_browser, actor, ip=None, **kw):
+    """A Playwright context that carries the lab headers and refuses to leave this machine."""
+    ctx = playwright_browser.new_context(extra_http_headers={"X-Lab-Client-IP": ip or WORLD["student_ip"],
+                                                             "X-Lab-Actor": actor}, **kw)
 
-    def _post(self, path, **kw):
-        self.requests_sent += 1
-        headers = {**kw.pop("headers", {}), **self.lab}
-        return self.s.post(f"{BASE_URL}{path}", headers=headers, timeout=10, **kw)
-
-    def open_login(self):
-        self.requests_sent += 1
-        self.s.get(f"{BASE_URL}/login", headers=self.lab, timeout=10)
-
-    def send_telemetry(self, fp, mouse, keys, pointer_type="mouse"):
-        self._post("/telemetry", json={"fp": fp, "behavior": {
-            "mouse": mouse, "keys": keys, "pointer_type": pointer_type}})
-
-    def login(self, username, password, extra=None):
-        """Returns (outcome, response); outcome is ok, invalid or blocked.
-        A real user's browser solves the proof-of-work, and the user reads
-        their own inbox for a step-up code."""
-        form = {"username": username, "password": password, **(extra or {})}
-        r = self._post("/login", data=form)
-        body = r.json()
-        if body.get("action") == "challenge":
-            started = time.perf_counter()
-            nonce = solve_pow(body["pow"]["prefix"], body["pow"]["bits"])
-            self.pow_ms += (time.perf_counter() - started) * 1000
-            r = self._post("/login", data=form, headers={"X-PoW": nonce})
-            body = r.json()
-        elif body.get("action") == "verify":
-            code = None
-            if self.owns_mailbox:
-                code = requests.get(f"{BASE_URL}/lab/mailbox/{username}", timeout=10).json()["code"]
-            r = self._post("/login/verify", json={"code": code or "000000"})
-            body = r.json()
-        if r.status_code == 200:
-            return "ok", r
-        if r.status_code == 401:
-            return "invalid", r
-        return "blocked", r
-
+    def _route(route):
+        if is_local(route.request.url):
+            route.continue_()
+        else:
+            route.abort()
+    ctx.route("**/*", _route)
+    return ctx

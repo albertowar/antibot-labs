@@ -1,7 +1,7 @@
 """
 The analyst's queue: label sessions a person actually looked at (Round 3-4)
 
-Weak labels are circular (defenses/labels.py): the model that let a bot in
+Weak labels are circular (tools/labels.py): the model that let a bot in
 calls it human, and the next model learns the same mistake. The only way out
 is a human eye on a small, well-chosen sample. This tool is that sample.
 
@@ -9,7 +9,7 @@ is a human eye on a small, well-chosen sample. This tool is that sample.
     python tools/label.py --queue --week 4
     python tools/label.py --session <sid> --as bot --note "resi exit, helper mouse"
     python tools/label.py --cluster <cluster-key> --as bot --week 5
-    python tools/label.py --audit                      labels vs ground truth (labels.py --audit)
+    python tools/label.py --audit                      labels vs ground truth (tools/labels.py --audit)
 
 The queue ranks by disagreement and surprise, because that is where a label
 buys the most: sessions where shadow and prod disagree, where the model is
@@ -27,7 +27,7 @@ import os
 import sys
 from collections import Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import labels  # noqa: E402
 from report import decisions, flat_signals, read_log  # noqa: E402

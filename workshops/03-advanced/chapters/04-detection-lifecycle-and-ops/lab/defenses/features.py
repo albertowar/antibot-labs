@@ -1,55 +1,99 @@
 """
-Chapter 4 (W3): One feature function for training and for serving
+Client telemetry -> features.
 
-The model sees exactly what the rules see, plus the four numbers the
-behaviour sensor thresholds, plus the edge's network type. Nothing else:
+The page's collector (static/js/risk.js, a few lines of what W2 Ch2-4 built properly) posts one JSON
+blob per session to /api/telemetry with kind "risk": a fingerprint and a short behaviour trace.
+This module turns the raw blob into the features the fingerprint, behaviour and correlation layers
+read. The store keeps the blob itself (ctx.telemetry("risk")).
 
-    every signal name            0/1, from the sensors and the correlation layer
-    pointer_events, straightness, interval_std_ms, keystrokes
-                                 the raw telemetry numbers (W2 Ch3), -1 when absent
-    has_telemetry                0/1
-    edge_<type>                  one-hot of residential / mobile / datacenter / tor / unknown
-
-The same function builds the vector from a live request (defenses/model.py)
-and from a decision-log line (defenses/train.py). That is the whole point:
-the most common way a model "drifts" the day it ships is that training and
-serving computed a feature differently. W2 Ch7 made the same rule.
-
-Deliberately absent: anything only the lab knows (actor, pool, cluster key),
-anything that is the *verdict* (action, score), and the model's own signals.
+Remember who wrote the blob: the client. Every field can be forged, and commercial "sensor data"
+generators exist for exactly that. Client telemetry is worth collecting because forging it
+*consistently* across fields, sessions and layers is expensive, not because any single field is
+trusted.
 """
 
-import correlation
-from sensors import BASE_SENSORS
+import hashlib
+import json
+import math
+import statistics
 
-SIGNALS = [s for module in BASE_SENSORS for s in module.SIGNALS] + list(correlation.SIGNALS)
+KIND = "risk"
+PLATFORM_OS = {
+    "Win32": "Windows",
+    "MacIntel": "macOS",
+    "Linux x86_64": "Linux",
+    "iPhone": "iOS",
+    "Linux armv81": "Android",
+}
+
+
+def gpu_vendor(renderer):
+    r = renderer.lower()
+    for needle, vendor in (("swiftshader", "SwiftShader"), ("llvmpipe", "llvmpipe"),
+                           ("nvidia", "NVIDIA"), ("amd", "AMD"), ("radeon", "AMD"),
+                           ("intel", "Intel"), ("apple", "Apple"), ("adreno", "Qualcomm"),
+                           ("mali", "ARM")):
+        if needle in r:
+            return vendor
+    return "unknown"
+
+
+def _hash(obj):
+    return hashlib.sha256(json.dumps(obj, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def extract(blob):
+    fp = blob.get("fp") or {}
+    behavior = blob.get("behavior") or {}
+    mouse = behavior.get("mouse") or []        # [[t_ms, x, y], ...]
+    keys = behavior.get("keys") or []          # [[down_ms, up_ms], ...]
+
+    path = sum(math.dist(a[1:], b[1:]) for a, b in zip(mouse, mouse[1:]))
+    displacement = math.dist(mouse[0][1:], mouse[-1][1:]) if len(mouse) > 1 else 0.0
+    intervals = [b[0] - a[0] for a, b in zip(mouse, mouse[1:])]
+
+    stable = {k: fp.get(k) for k in ("platform", "webgl_renderer", "canvas", "screen",
+                                     "timezone", "languages", "hardware_concurrency")}
+    renderer = fp.get("webgl_renderer", "")
+    return {
+        "platform": fp.get("platform", ""),
+        "platform_os": PLATFORM_OS.get(fp.get("platform", ""), "unknown"),
+        "gpu_vendor": gpu_vendor(renderer),
+        "canvas_stable": fp.get("canvas") == fp.get("canvas2"),
+        "timezone": fp.get("timezone", ""),
+        "languages": fp.get("languages") or [],
+        "webdriver": bool(fp.get("webdriver")),
+        "cdp": bool(fp.get("cdp")),
+        "pointer_type": behavior.get("pointer_type", "mouse"),
+        "pointer_events": len(mouse),
+        "straightness": round(displacement / path, 4) if path else 1.0,
+        "interval_std_ms": round(statistics.pstdev(intervals), 2) if len(intervals) > 1 else None,
+        "keystrokes": len(keys),
+        # Identity of the device and of this exact trace (the correlation layer)
+        "fp_hash": _hash(stable),
+        "fp_family": f"{fp.get('platform', '?')}/{gpu_vendor(renderer)}",
+        "trace_hash": _hash([mouse, keys]) if (mouse or keys) else None,
+    }
+
+
+def of(ctx):
+    """This session's features, or None when the collector never reported. Computed once per request."""
+    if "ops_features" not in ctx.attrs:
+        blob = ctx.telemetry(KIND)
+        ctx.attrs["ops_features"] = extract(blob) if blob else None
+    return ctx.attrs["ops_features"]
+
+
 NUMERIC = ["pointer_events", "straightness", "interval_std_ms", "keystrokes"]
-EDGE_TYPES = ["residential", "mobile", "datacenter", "tor", "unknown"]
-COLUMNS = SIGNALS + NUMERIC + ["has_telemetry"] + [f"edge_{t}" for t in EDGE_TYPES]
 
 
-def telemetry_numbers(t):
-    """The four numbers we log per decision, or None."""
-    if not t:
-        return None
-    return {k: t.get(k) for k in NUMERIC}
+def numbers(t):
+    """The four behaviour numbers the decision log keeps (and the model reads), or None."""
+    return {k: t.get(k) for k in NUMERIC} if t else None
 
 
-def vector(signals, tel, edge_type):
-    """signals: flat list of signal names; tel: telemetry_numbers() or None;
-    edge_type: the edge's ASN type. Returns a list aligned with COLUMNS."""
-    present = set(signals)
-    row = [1 if s in present else 0 for s in SIGNALS]
-    for k in NUMERIC:
-        v = (tel or {}).get(k)
-        row.append(-1.0 if v is None else float(v))
-    row.append(1 if tel else 0)
-    row += [1 if edge_type == t else 0 for t in EDGE_TYPES]
-    return row
-
-
-def from_log(entry):
-    """The same vector, from a decision-log line (see tools/report.py)."""
-    flat = [s for sigs in entry["signals"].values() for s in sigs
-            if s in SIGNALS]  # drops model_* and campaign_cluster on purpose
-    return vector(flat, entry.get("tel"), entry.get("edge_type", "unknown"))
+def cluster_key(ctx):
+    """What the attacker's tooling holds constant while it rotates everything else:
+    JA4 (its TLS stack) | device family (platform/GPU vendor) | ASN (its proxy provider)."""
+    t = of(ctx)
+    return f"{ctx.edge.ja4 or 'no-ja4'}|{t['fp_family'] if t else 'no-telemetry'}|AS{ctx.edge.asn}"

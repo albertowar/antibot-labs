@@ -23,12 +23,12 @@ from collections import Counter
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import features  # noqa: E402
-import registry  # noqa: E402
-from model import verdict  # noqa: E402
-from report import by_week, decisions, is_bot, read_log  # noqa: E402
+from report import by_week, decisions, is_bot, read_log  # noqa: E402  (puts the lab root on sys.path)
+from defenses import mlfeatures as features  # noqa: E402
+from defenses import registry  # noqa: E402
+from defenses.model import verdict  # noqa: E402
 
 
 def score(version, entries):
@@ -46,7 +46,7 @@ def main():
     prod, _ = registry.get("prod")
     shadow, _ = registry.get("shadow")
     if not prod or not shadow:
-        print("need both a prod and a shadow model (tools/registry.py shadow <version>)")
+        print("need both a prod and a shadow model (tools/roles.py shadow <version>)")
         return 1
     entries = decisions(read_log())
     week = args.week or max((e.get("week", 0) for e in entries), default=0)
@@ -77,7 +77,7 @@ def main():
     print(f"  real users the shadow would newly act on:  {newly_users} / {nh}  "
           f"<- this must stay near zero")
     if newly_users:
-        who = Counter(es[i]["actor"].split(":", 1)[1] for i in range(len(es))
+        who = Counter(es[i]["actor"].split(":")[1] for i in range(len(es))
                       if acts_s[i] and not acts_p[i] and not bot[i])
         print("    " + ", ".join(f"{p} {n}" for p, n in who.most_common()))
     return 0

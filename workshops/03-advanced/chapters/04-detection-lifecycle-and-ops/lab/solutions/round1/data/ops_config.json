@@ -1,0 +1,8 @@
+{
+  "note": "R1: header order burned; behaviour re-weighted",
+  "weights": {
+    "header_order_mismatch": 0,
+    "mouse_too_straight": 25,
+    "timing_too_regular": 25
+  }
+}

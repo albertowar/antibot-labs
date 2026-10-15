@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 LAB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 from report import by_week, decisions, flat_signals, is_bot, read_log  # noqa: E402
 
+
 OUT = os.path.join(LAB, "incident", "incident_report.md")
 ACTED = ("block", "pow", "step_up")
 
@@ -39,13 +40,13 @@ def main():
         return 1
     bots = [e for e in es if is_bot(e)]
     humans = [e for e in es if not is_bot(e)]
-    wins = [e for e in bots if e["cred"] == "valid" and e["enforced"] in ("allow", "pow")]
+    wins = [e for e in bots if e["reached"]]
     missed = [e for e in bots if e["enforced"] == "allow"]
     first_bot = min((e for e in bots), key=lambda e: e.get("clock", 0), default=None)
-    pools = Counter(e.get("pool") for e in bots)
+    pools = Counter(f"{e['edge_type']} {(e.get('cluster') or '').rsplit('|', 1)[-1]}" for e in bots)
     bot_sigs = Counter(s for e in bots for s in flat_signals(e))
     hurt = [e for e in humans if e["enforced"] in ACTED]
-    hurt_personas = Counter(e["actor"].split(":", 1)[1] for e in hurt)
+    hurt_personas = Counter(e["actor"].split(":")[1] for e in hurt)
 
     lines = [f"# Incident Report {args.id}", "",
              f"*Auto-filled from the decision log for lab week {args.week}. "
@@ -63,7 +64,7 @@ def main():
              "- Lag from first attack session to the alert that caught it: <fill in from ops.py / alerts.py>.",
              "", "## ATTACK PROFILE",
              f"- Volume: {len(bots)} sessions, {len(wins)} accounts reached.",
-             f"- Infrastructure (pools): " + ", ".join(f"{p} {n}" for p, n in pools.most_common()) + ".",
+             f"- Infrastructure (network kind and ASN): " + ", ".join(f"{p} {n}" for p, n in pools.most_common()) + ".",
              "- Evasion: <what changed from the previous week>.",
              "", "## CONTAINMENT (and its cost)",
              f"- Real users blocked or challenged this week: {len(hurt)} of {len(humans)}"
