@@ -1,9 +1,10 @@
-venv/
 .venv/
-__pycache__/
 instance/
+logs/
+__pycache__/
 *.pyc
 *.bak
-data/keys/*.pem
-data/directories/*.json
-tools/profiles/mine.json
+.env
+
+# generated at setup by tools/make_keys.py: the two synthetic operators' Ed25519 private seeds, never committed
+tools/fixtures/keys/

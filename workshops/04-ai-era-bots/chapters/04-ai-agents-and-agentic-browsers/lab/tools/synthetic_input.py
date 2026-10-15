@@ -1,7 +1,7 @@
 """
-W4 Ch4 — Synthetic human input for the legitimate-traffic simulator
+W4 Ch4: synthetic human input for the shopper cohort (tools/personas_ch4.py)
 
-Generates the event structure collector.js records:
+Generates the event structure static/js/agent.js records:
     moves [t, x, y]   clicks [t, x, y, detail, target]   keys [t, kind]   touches [t, x, y]
     inputs [t, field, chars, keydowns_since_last]   scroll_events [t, programmatic]   overlays []
 
@@ -22,8 +22,8 @@ on simulated humans learns the simulator.
 
 import math
 
-TARGETS = {"place-order": (90, 260), "add-to-cart": (80, 220), "login-submit": (60, 300),
-           "register-submit": (60, 360), "confirm-submit": (90, 420)}
+TARGETS = {"drop-buy": (90, 260), "login-submit": (60, 300),
+           "register-submit": (60, 360), "stepup-submit": (90, 420)}
 SAMPLE_MS = 16
 
 
@@ -49,7 +49,7 @@ def _empty():
             "overlays": [], "scrolls": 0, "untrusted": 0}
 
 
-def mouse_events(rng, dwell_ms, target="place-order", fast=False):
+def mouse_events(rng, dwell_ms, target="drop-buy", fast=False):
     """Wander, then reach for the button with an overshoot and a correction."""
     ev = _empty()
     tx, ty = TARGETS.get(target, (90, 260))
@@ -77,7 +77,7 @@ def mouse_events(rng, dwell_ms, target="place-order", fast=False):
     return ev
 
 
-def keyboard_events(rng, dwell_ms, target="place-order"):
+def keyboard_events(rng, dwell_ms, target="drop-buy"):
     """Screen-reader / keyboard-only user: Tab through the page, Enter on the button."""
     ev, t = _empty(), rng.uniform(300, 700)
     for _ in range(rng.randint(4, 9)):
@@ -89,7 +89,7 @@ def keyboard_events(rng, dwell_ms, target="place-order"):
     return ev
 
 
-def at_events(rng, dwell_ms, target="place-order"):
+def at_events(rng, dwell_ms, target="drop-buy"):
     """Voice control / switch access: the control is activated through the accessibility tree."""
     ev = _empty()
     t = max(rng.uniform(900, 1800), dwell_ms - rng.uniform(100, 300))
@@ -97,7 +97,7 @@ def at_events(rng, dwell_ms, target="place-order"):
     return ev
 
 
-def touch_events(rng, dwell_ms, target="place-order"):
+def touch_events(rng, dwell_ms, target="drop-buy"):
     ev, t = _empty(), rng.uniform(300, 800)
     tx, ty = TARGETS.get(target, (90, 260))
     for _ in range(rng.randint(1, 3)):
@@ -113,7 +113,7 @@ def touch_events(rng, dwell_ms, target="place-order"):
     return ev
 
 
-def rpa_events(rng, dwell_ms, target="place-order"):
+def rpa_events(rng, dwell_ms, target="drop-buy"):
     """A desktop macro: the cursor jumps to the control and clicks it. No path, detail 1."""
     ev = _empty()
     tx, ty = TARGETS.get(target, (90, 260))
@@ -126,10 +126,15 @@ def rpa_events(rng, dwell_ms, target="place-order"):
 def typing_events(rng, fields, style="typing"):
     """Login/register form input. fields: [(name, n_chars)]. style: typing | autofill | rpa."""
     ev, t = _empty(), rng.uniform(400, 1200)
-    submit = "register-submit" if any(n == "address" for n, _ in fields) else "login-submit"
+    submit = "register-submit" if len(fields) > 2 else "login-submit"
+    pos = (rng.uniform(250, 900), rng.uniform(80, 600))
     for name, n in fields:
         if style == "typing":
-            ev["clicks"].append([int(t), 60, 120, 1, name])
+            field = (60 + rng.uniform(-20, 20), 120 + 60 * len(ev["clicks"]) + rng.uniform(-8, 8))
+            reach_ms = rng.uniform(350, 700)
+            ev["moves"] += _reach(rng, t, pos, field, reach_ms)       # a person moves the pointer to the field first
+            pos, t = field, t + reach_ms + rng.uniform(40, 120)
+            ev["clicks"].append([int(t), round(field[0]), round(field[1]), 1, name])
             t += rng.uniform(150, 400)
             for _ in range(n):
                 ev["keys"].append([int(t), "key"])
@@ -151,7 +156,7 @@ def typing_events(rng, fields, style="typing"):
     return ev
 
 
-def agent_events(rng, dwell_ms, target="place-order", fields=()):
+def agent_events(rng, dwell_ms, target="drop-buy", fields=()):
     """What a DOM-driven agent's telemetry looks like: fill() and one teleport click."""
     ev = _empty()
     t = rng.uniform(600, 900)
@@ -165,7 +170,7 @@ def agent_events(rng, dwell_ms, target="place-order", fields=()):
     return ev
 
 
-def events_for(behavior, rng, dwell_ms, target="place-order"):
+def events_for(behavior, rng, dwell_ms, target="drop-buy"):
     if behavior == "keyboard":
         return keyboard_events(rng, dwell_ms, target)
     if behavior == "at":

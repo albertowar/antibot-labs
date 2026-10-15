@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}Confirm your order · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Check your email</h1>
+  <p class="muted">We sent a {{ payload.digits }}-digit confirmation code to <strong>{{ payload.sent_to }}</strong>. Enter it to finish your order.
+  An agent that cannot read your inbox stops here and hands the order back to you.</p>
+  <form id="stepup-form" data-no-flush data-type="{{ challenge }}">
+    <label class="field"><span>Confirmation code</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+    <button id="stepup-submit" class="btn big" type="submit">Confirm</button>
+  </form>
+  <p id="stepup-result" role="status" class="muted"></p>
+</section>
+{% endblock %}

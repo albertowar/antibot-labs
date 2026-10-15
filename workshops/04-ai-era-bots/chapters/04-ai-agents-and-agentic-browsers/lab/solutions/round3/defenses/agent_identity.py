@@ -1,80 +1,68 @@
 """
-W4 Ch4 — L3 verified agent identity (Round 3)
+W4 Ch4, L3 verified agent identity (Round 3)
 
-defenses/httpsig.py parses the Web Bot Auth headers and checks the Ed25519
-signature. This module decides what a valid signature *means* for the store,
-and it does the checks in the cheapest-first order a verifier should:
+The shared Web Bot Auth verifier (defenses/web_bot_auth.py, defenses/httpsig.py,
+defenses/key_directory.py: W4 Ch2's, byte for byte) answers two separate questions:
 
-    1. Is the claimed operator (Signature-Agent host) one we trust?
-       Checked BEFORE any key lookup. A verifier that fetches a directory from
-       whatever host a request names is a server-side request forgery waiting
-       to happen, and it hands a cost (a fetch) to anyone who asks.
-    2. Does the keyid exist in that operator's key directory?
-    3. Does the signature verify over this request's @authority?
-    4. Is it fresh? created not in the future (small skew), not expired, and
-       the window no longer than MAX_WINDOW_S.
-    5. Is the nonce new? Stored with SET NX for the window's duration.
+    verify(ctx)       did the holder of a key that the Signature-Agent origin publishes sign THIS
+                      message?  -> verified | invalid | unverified
+    trust(res, ctx)   should we act on it?  Only origins in policy.TRUSTED_AGENTS are entitled; a
+                      window longer than policy.SIGNATURE_MAX_WINDOW_S is a replayable credential;
+                      a nonce is spent once.  -> entitled | not entitled | block
 
-Statuses: none (no headers), verified, unknown_operator, invalid, expired, replayed.
-A claim that fails checks 2–5 is scored like a hostile request (+60): nobody
-presents a bad signature by accident. 'none' and 'verified' score 0.
+This module is what the STORE does with those two answers: one identity record per request, which
+Round 3's other checks and the principal (defenses/principal.py) read. Statuses:
 
-What a verified identity proves: that the request came from infrastructure
-holding the operator's key. What it does NOT prove: who the human behind the
-agent is, what they asked for, or whether they consented to this purchase.
-Round 4 deals with that.
+    none          no Web Bot Auth headers at all
+    verified      a valid signature by a key a TRUSTED origin publishes, fresh, nonce unused
+    untrusted     a valid signature by an origin we have never heard of (the attacker's own, perfectly
+                  signed, directory): discovery is not trust
+    replayed      valid, but the window is longer than policy allows, or the nonce was already spent
+    invalid       the signature does not hold: forged, tampered, expired, a key the origin never published
+    unverified    headers present but unusable: a bare Signature-Agent claim, or the directory could
+                  not be fetched
+
+A claim that is present and does not reach `verified` scores like a hostile request (+60): nobody
+presents a bad signature by accident. `none` and `verified` score 0.
+
+The trade-off to decide, not to hide: `unverified` includes "the operator's key directory was
+down". Scoring it +60 blocks honest agents during an operator outage (fail closed); scoring it 0 lets a
+bare claim through (fail open). The lab fails closed; production usually serves a lane below the
+verified one.
+
+What a verified identity proves: that the request came from infrastructure holding the operator's
+key. What it does NOT prove: who the human behind the agent is, what they asked for, or whether they
+consented to this purchase. Round 4 deals with that.
 """
 
-import json
-import os
-import time
+from . import key_directory, web_bot_auth
+from .pipeline import Check, Signal
 
-import httpsig
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-MAX_WINDOW_S = 300      # the draft recommends short-lived signatures
-CLOCK_SKEW_S = 30
-NONCE_TTL_S = MAX_WINDOW_S + CLOCK_SKEW_S
-
-
-def trusted_operators():
-    with open(os.path.join(HERE, "trusted_operators.json")) as f:
-        return set(json.load(f)["trusted"])
+HEADERS = ("Signature-Agent", "Signature-Input", "Signature")
 
 
 def _result(status, operator=None, keyid=None, reason=""):
     return {"status": status, "operator": operator, "keyid": keyid, "reasons": [reason] if reason else []}
 
 
-def verify(ctx, store):
-    parsed = httpsig.parse(ctx["headers"])
-    if parsed is None:
+def _host(origin):
+    return key_directory.origin_authority(origin or "")[0] if origin else None
+
+
+def verify(ctx):
+    """The identity record for this request: {"status", "operator", "keyid", "reasons"}."""
+    if not any(ctx.header(h) for h in HEADERS):
         return _result("none")
-    if not parsed["ok"]:
-        return _result("invalid", reason=f"Signature headers present but unusable: {parsed['error']}")
-    host, keyid = parsed["agent"], parsed["keyid"]
-    if parsed.get("tag") != httpsig.TAG:
-        return _result("invalid", host, keyid, f"Signature tag {parsed.get('tag')!r} is not {httpsig.TAG!r}")
-    if host not in trusted_operators():
-        return _result("unknown_operator", host, keyid,
-                       f"Signature-Agent {host} is not a trusted operator (no key lookup attempted)")
-    directory = httpsig.load_directory(host)
-    key = httpsig.find_key(directory, keyid) if directory else None
-    if key is None:
-        return _result("invalid", host, keyid, f"keyid {keyid} not in {host}'s key directory")
-    ok, why = httpsig.verify_signature(parsed, ctx["authority"], key)
-    if not ok:
-        return _result("invalid", host, keyid, f"Signature from {host} rejected: {why}")
-    now = time.time()
-    if parsed["created"] > now + CLOCK_SKEW_S:
-        return _result("expired", host, keyid, "Signature created in the future")
-    if parsed["expires"] < now - CLOCK_SKEW_S:
-        return _result("expired", host, keyid, f"Signature expired {int(now - parsed['expires'])} s ago")
-    if parsed["expires"] - parsed["created"] > MAX_WINDOW_S:
-        return _result("expired", host, keyid, f"Signature window longer than {MAX_WINDOW_S} s")
-    if not parsed["nonce"] or not store.set(f"nonce:{host}:{parsed['nonce']}", "1", nx=True, ex=NONCE_TTL_S):
-        return _result("replayed", host, keyid, "Signature nonce already seen (replay)")
-    return _result("verified", host, keyid)
+    res = web_bot_auth.verify(ctx)
+    host, why = _host(res.agent), "; ".join(res.reasons)
+    if res.status == "invalid":
+        return _result("invalid", host, res.keyid, why)
+    if res.status != "verified":
+        return _result("unverified", host, res.keyid, why)
+    trust = web_bot_auth.trust(res, ctx)
+    if trust.entitled:
+        return _result("verified", host, res.keyid, "; ".join(trust.reasons))
+    return _result("replayed" if trust.block else "untrusted", host, res.keyid, "; ".join(trust.reasons))
 
 
 def score(identity):
@@ -83,8 +71,11 @@ def score(identity):
     return 60, [f"Claimed agent identity did not verify ({identity['status']}): " + "; ".join(identity["reasons"])]
 
 
-if __name__ == '__main__':
-    import fakeredis
-    store = fakeredis.FakeStrictRedis(decode_responses=True)
-    print(verify({"headers": {}, "authority": "127.0.0.1:8404"}, store))
-    print(verify({"headers": {"Signature-Agent": '"agents.evil.test"'}, "authority": "127.0.0.1:8404"}, store))
+def _check(ctx):
+    from . import principal as who      # principal.py imports this module: import it late
+    ident = who.identity(ctx)
+    points, reasons = score(ident)
+    return [Signal("agent_identity", ident["status"], points, "; ".join(reasons)[:140])] if points else None
+
+
+CHECK = Check("agent_identity", _check, phases=("action:drop_buy",))

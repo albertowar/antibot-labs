@@ -1,226 +1,372 @@
+"""RFC 9421 HTTP Message Signatures, the subset Web Bot Auth uses. Ships done.
+
+This is given infrastructure so you can read it, not a student exercise. It
+implements just enough of RFC 9421 to sign and verify the way the IETF
+`draft-ietf-webbotauth-httpsig-protocol-00` and Cloudflare's verifier do:
+
+  * Ed25519 only (the one algorithm Cloudflare's verifier accepts in 2026).
+  * Derived components `@method`, `@authority`, `@path`, `@query`, `@target-uri`, `@scheme`,
+    plus any header, plus a Dictionary member of a header (`"signature-agent";key="sig1"`,
+    the form the working-group draft now requires).
+  * Signature parameters `created`, `expires`, `keyid`, `tag`, `nonce`, `alg`.
+  * JWK thumbprints (RFC 7638 / RFC 8037) as key ids, and the Ed25519 JWK Set
+    served at /.well-known/http-message-signatures-directory.
+
+Why hand-roll instead of `http-message-signatures` (PyPI, Apache-2.0)? The point of
+Round 4 is to *see* the signature base: the exact bytes the agent signed, line by
+line. A library hides that, and the Python libraries did not yet document the
+Web Bot Auth parameters when this was written. In production use a maintained
+library (Cloudflare's `web-bot-auth` in TypeScript/Rust, or `http-message-signatures`
+in Python) and keep this file as the reference for what it must be doing.
+
+The one deliberate simplification: the structured-field parser below handles the
+grammar these three headers actually use, not all of RFC 9651.
 """
-W4 Ch4 — HTTP Message Signatures (RFC 9421) with the Web Bot Auth profile. GIVEN, not a TODO.
 
-This is the cryptographic core both sides use: the agent operator signs with
-it (attacks/agent/identity.py, tools/legit_traffic.py) and the store verifies
-with it (defenses/agent_identity.py). It implements exactly what the IETF
-webbotauth working group's draft asks for, nothing more:
-
-    Signature-Agent:  "agents.lab-provider.test"          where the keys live
-    Signature-Input:  sig1=("@authority" "signature-agent");created=…;expires=…;
-                      keyid="<JWK thumbprint>";alg="ed25519";nonce="…";tag="web-bot-auth"
-    Signature:        sig1=:<base64 Ed25519 signature>:
-
-The signature base is the RFC 9421 canonical form of the covered components
-plus the @signature-params line. Keys are Ed25519 JWKs; keyid is the RFC 7638
-thumbprint. In production the verifier fetches
-https://<Signature-Agent>/.well-known/http-message-signatures-directory and
-caches it; in the lab, tools/make_keys.py writes those directories into
-data/directories/<host>.json and load_directory() reads them from disk.
-
-What this module deliberately leaves to agent_identity.py (the Round 3 TODO):
-freshness (created/expires), nonce single-use, and whether the operator is one
-you trust. A valid signature from a key you have never heard of proves only
-that someone owns a key.
-
-Sources: RFC 9421 (2024); draft-ietf-webbotauth-httpsig-protocol-00 (2026);
-RFC 7638 (2015); RFC 8941 structured fields (2021).
-"""
+from __future__ import annotations
 
 import base64
 import hashlib
 import json
-import os
 import re
 import secrets
 import time
+from dataclasses import dataclass, field
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-COVERED = ("@authority", "signature-agent")
-TAG = "web-bot-auth"
+WEB_BOT_AUTH_TAG = "web-bot-auth"
+DIRECTORY_TAG = "http-message-signatures-directory"
+DIRECTORY_PATH = "/.well-known/http-message-signatures-directory"
 DIRECTORY_MEDIA_TYPE = "application/http-message-signatures-directory+json"
-LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DIRECTORIES = os.path.join(LAB_DIR, "data", "directories")
 
 
-# --------------------------------------------------------------------------
-# Keys
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------- keys & JWK
 
-def b64url(raw):
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+def b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def b64url_decode(text):
+def b64u_decode(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def generate_private_key():
-    return ed25519.Ed25519PrivateKey.generate()
+def jwk_from_public(pub: Ed25519PublicKey) -> dict:
+    raw = pub.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return {"kty": "OKP", "crv": "Ed25519", "x": b64u(raw)}
 
 
-def save_private_key(key, path):
-    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                            serialization.NoEncryption())
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as f:
-        f.write(pem)
-
-
-def load_private_key(path):
-    with open(path, "rb") as f:
-        return serialization.load_pem_private_key(f.read(), password=None)
-
-
-def public_jwk(public_key):
-    raw = public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    jwk = {"kty": "OKP", "crv": "Ed25519", "x": b64url(raw)}
-    jwk["kid"] = jwk_thumbprint(jwk)
-    return jwk
-
-
-def jwk_thumbprint(jwk):
-    """RFC 7638: SHA-256 over the required members in lexicographic order, no whitespace."""
-    canon = json.dumps({"crv": jwk["crv"], "kty": jwk["kty"], "x": jwk["x"]}, separators=(",", ":"), sort_keys=True)
-    return b64url(hashlib.sha256(canon.encode()).digest())
-
-
-def public_key_from_jwk(jwk):
+def public_from_jwk(jwk: dict) -> Ed25519PublicKey:
     if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519":
-        raise ValueError("only Ed25519 OKP keys are supported")
-    return ed25519.Ed25519PublicKey.from_public_bytes(b64url_decode(jwk["x"]))
+        raise ValueError("only Ed25519 JWKs are supported")
+    return Ed25519PublicKey.from_public_bytes(b64u_decode(jwk["x"]))
 
 
-def directory_for(private_key):
-    """The JSON the operator serves at /.well-known/http-message-signatures-directory."""
-    return {"keys": [public_jwk(private_key.public_key())]}
+def thumbprint(jwk: dict) -> str:
+    """RFC 7638 thumbprint; RFC 8037 fixes the OKP member set to crv, kty, x."""
+    canonical = json.dumps({"crv": jwk["crv"], "kty": jwk["kty"], "x": jwk["x"]},
+                           separators=(",", ":"), sort_keys=True)
+    return b64u(hashlib.sha256(canonical.encode()).digest())
 
 
-def load_directory(host, directories=DIRECTORIES):
-    """Lab stand-in for fetching https://<host>/.well-known/http-message-signatures-directory."""
-    if not re.fullmatch(r"[a-z0-9.-]+", host or ""):
-        return None
-    path = os.path.join(directories, f"{host}.json")
-    if not os.path.exists(path):
-        return None
-    with open(path) as f:
-        return json.load(f)
+def load_private(hex_seed: str) -> Ed25519PrivateKey:
+    return Ed25519PrivateKey.from_private_bytes(bytes.fromhex(hex_seed))
 
 
-# --------------------------------------------------------------------------
-# Signing (the agent operator's side)
-# --------------------------------------------------------------------------
-
-def signature_params(keyid, created, expires, nonce, label_components=COVERED, tag=TAG):
-    comps = " ".join(f'"{c}"' for c in label_components)
-    return (f'({comps});created={created};expires={expires};keyid="{keyid}";'
-            f'alg="ed25519";nonce="{nonce}";tag="{tag}"')
-
-
-def signature_base(components, values, params):
-    lines = [f'"{name}": {values[name]}' for name in components]
-    lines.append(f'"@signature-params": {params}')
-    return "\n".join(lines).encode()
+def generate() -> tuple[str, dict, str]:
+    """Return (private seed hex, public JWK, thumbprint) for a fresh Ed25519 key."""
+    priv = Ed25519PrivateKey.generate()
+    seed = priv.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+                              serialization.NoEncryption()).hex()
+    jwk = jwk_from_public(priv.public_key())
+    return seed, jwk, thumbprint(jwk)
 
 
-def sign(private_key, authority, agent_host, created=None, ttl=300, nonce=None, label="sig1"):
-    """Return the three headers an agent adds to one request."""
-    created = int(created if created is not None else time.time())
-    expires = created + ttl
-    nonce = nonce or b64url(secrets.token_bytes(24))
-    keyid = public_jwk(private_key.public_key())["kid"]
-    params = signature_params(keyid, created, expires, nonce)
-    values = {"@authority": authority, "signature-agent": f'"{agent_host}"'}
-    sig = private_key.sign(signature_base(COVERED, values, params))
-    return {
-        "Signature-Agent": f'"{agent_host}"',
-        "Signature-Input": f"{label}={params}",
-        "Signature": f"{label}=:{base64.b64encode(sig).decode()}:",
-    }
+# ---------------------------------------------------- structured fields (subset)
+
+def sf_string(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-# --------------------------------------------------------------------------
-# Parsing and verifying (the store's side)
-# --------------------------------------------------------------------------
-
-_PARAMS_RE = re.compile(r'^(?P<label>[a-zA-Z0-9_-]+)=(?P<params>\((?P<comps>[^)]*)\)(?P<rest>.*))$')
-_PARAM_KV = re.compile(r';([a-z]+)=("(?:[^"\\]|\\.)*"|[^;]+)')
+def _sf_unquote(text: str) -> str:
+    return text[1:-1].replace('\\"', '"').replace("\\\\", "\\")
 
 
-def parse(headers):
-    """Parse Signature-Agent / Signature-Input / Signature. Returns a dict or None if absent."""
-    agent = headers.get("Signature-Agent")
-    sig_input = headers.get("Signature-Input")
-    sig = headers.get("Signature")
-    if not (agent or sig_input or sig):
-        return None
-    out = {"agent_raw": agent, "ok": False, "error": None}
-    if not (agent and sig_input and sig):
-        out["error"] = "incomplete: Signature-Agent, Signature-Input and Signature are all required"
-        return out
-    m = _PARAMS_RE.match(sig_input.strip())
-    if not m:
-        out["error"] = "malformed Signature-Input"
-        return out
-    comps = re.findall(r'"([^"]+)"', m.group("comps"))
-    params = {}
-    for key, value in _PARAM_KV.findall(m.group("rest")):
-        params[key] = value[1:-1] if value.startswith('"') else value
-    sm = re.match(rf'^{re.escape(m.group("label"))}=:([A-Za-z0-9+/=]+):$', sig.strip())
-    if not sm:
-        out["error"] = "malformed Signature (label mismatch or not a byte sequence)"
-        return out
-    try:
-        signature = base64.b64decode(sm.group(1), validate=True)
-        created = int(params.get("created", "0"))
-        expires = int(params.get("expires", "0"))
-    except (ValueError, TypeError):
-        out["error"] = "malformed signature parameters"
-        return out
-    host = agent.strip()
-    if host.startswith('"') and host.endswith('"'):
-        host = host[1:-1]
-    out.update({
-        "label": m.group("label"), "components": comps, "params_str": m.group("params"),
-        "params": params, "signature": signature, "agent": host.lower(),
-        "keyid": params.get("keyid"), "created": created, "expires": expires,
-        "nonce": params.get("nonce"), "tag": params.get("tag"), "alg": params.get("alg"), "ok": True,
-    })
+_PARAM = re.compile(r';([a-z*][a-z0-9_\-.*]*)(?:=("(?:[^"\\]|\\.)*"|[^;"\s)]+))?')
+_ITEM = re.compile(r'"((?:[^"\\]|\\.)*)"((?:;[a-z*][a-z0-9_\-.*]*(?:=(?:"(?:[^"\\]|\\.)*"|[^;"\s)]+))?)*)')
+
+
+def _parse_params(text: str) -> dict:
+    params: dict = {}
+    for m in _PARAM.finditer(text):
+        key, raw = m.group(1), m.group(2)
+        if raw is None:
+            params[key] = True
+        elif raw.startswith('"'):
+            params[key] = _sf_unquote(raw)
+        elif re.fullmatch(r"-?\d+", raw):
+            params[key] = int(raw)
+        else:
+            params[key] = raw
+        # Reject anything we did not consume so a crafted header can't smuggle bytes.
+    return params
+
+
+def serialize_params(params: dict) -> str:
+    out = []
+    for key, value in params.items():
+        if value is True:
+            out.append(f";{key}")
+        elif isinstance(value, int):
+            out.append(f";{key}={value}")
+        else:
+            out.append(f";{key}={sf_string(str(value))}")
+    return "".join(out)
+
+
+def serialize_component_id(name: str, params: dict | None = None) -> str:
+    return sf_string(name) + serialize_params(params or {})
+
+
+def serialize_inner_list(components: list[tuple[str, dict]]) -> str:
+    return "(" + " ".join(serialize_component_id(n, p) for n, p in components) + ")"
+
+
+@dataclass
+class SignatureInput:
+    label: str
+    components: list[tuple[str, dict]]
+    params: dict
+    raw: str  # everything after "label=", used verbatim in the signature base
+
+
+def parse_signature_input(header: str) -> dict[str, SignatureInput]:
+    """Parse `sig1=("@authority" "signature-agent");created=...;...`, one or more labels."""
+    out: dict[str, SignatureInput] = {}
+    pos = 0
+    text = header.strip()
+    while pos < len(text):
+        m = re.match(r'\s*,?\s*([a-z*][a-z0-9_\-.*]*)=\(', text[pos:])
+        if not m:
+            raise ValueError("malformed Signature-Input")
+        label = m.group(1)
+        start = pos + m.end() - 1          # at "("
+        close = text.index(")", start)
+        inner = text[start + 1:close]
+        components = [(_sf_unquote('"' + im.group(1) + '"'), _parse_params(im.group(2)))
+                      for im in _ITEM.finditer(inner)]
+        pm = re.match(r'((?:;[a-z*][a-z0-9_\-.*]*(?:=(?:"(?:[^"\\]|\\.)*"|[^;",\s]+))?)*)', text[close + 1:])
+        params_text = pm.group(1) if pm else ""
+        end = close + 1 + len(params_text)
+        out[label] = SignatureInput(label, components, _parse_params(params_text), text[start:end])
+        pos = end
     return out
 
 
-def verify_signature(parsed, authority, public_key):
-    """Pure signature check: does the key sign this request's base? (No freshness, no trust.)"""
-    if not parsed or not parsed.get("ok"):
-        return False, parsed.get("error") if parsed else "no signature"
-    if set(parsed["components"]) != set(COVERED):
-        return False, f"covered components must be {list(COVERED)}, got {parsed['components']}"
-    if parsed.get("alg") not in (None, "ed25519"):
-        return False, f"unsupported alg {parsed['alg']!r}"
-    values = {"@authority": authority, "signature-agent": parsed["agent_raw"].strip()}
-    base = signature_base(parsed["components"], values, parsed["params_str"])
+def parse_signature(header: str) -> dict[str, bytes]:
+    """Parse `sig1=:base64:, sig2=:base64:` into label -> raw signature bytes."""
+    out: dict[str, bytes] = {}
+    for m in re.finditer(r'([a-z*][a-z0-9_\-.*]*)=:([A-Za-z0-9+/=]*):', header):
+        out[m.group(1)] = base64.b64decode(m.group(2))
+    return out
+
+
+def parse_signature_agent(header: str) -> dict[str, str]:
+    """Both wire forms. Returns {label-or-"*": origin}.
+
+    String form (what Cloudflare's verifier requires in 2026):   "https://chatgpt.com"
+    Dictionary form (what the WG draft now says signers MUST send): sig1="https://chatgpt.com";type=directory
+    """
+    text = header.strip()
+    if text.startswith('"'):
+        m = re.match(r'"((?:[^"\\]|\\.)*)"', text)
+        return {"*": _sf_unquote(m.group(0))} if m else {}
+    out: dict[str, str] = {}
+    for m in re.finditer(r'([a-z*][a-z0-9_\-.*]*)="((?:[^"\\]|\\.)*)"', text):
+        out[m.group(1)] = _sf_unquote('"' + m.group(2) + '"')
+    return out
+
+
+# ---------------------------------------------------------------- signature base
+
+@dataclass
+class MessageContext:
+    """What the verifier knows about the request it received (or the signer is about to send)."""
+    method: str
+    authority: str
+    path: str
+    headers: dict[str, str]              # lower-cased names
+    scheme: str = "http"
+    query: str = ""                      # the RAW query string, as sent (Flask's ctx.args is parsed and loses it)
+    extra: dict = field(default_factory=dict)
+
+    @property
+    def target_uri(self) -> str:
+        q = f"?{self.query}" if self.query else ""
+        return f"{self.scheme}://{self.authority}{self.path}{q}"
+
+
+def component_value(name: str, params: dict, ctx: MessageContext, label: str) -> str:
+    if name == "@method":
+        return ctx.method.upper()
+    if name == "@authority":
+        return ctx.authority.lower()
+    if name == "@path":
+        return ctx.path
+    if name == "@query":
+        return "?" + ctx.query            # RFC 9421 §2.2.7: the raw query with its leading "?" (just "?" if empty)
+    if name == "@target-uri":
+        return ctx.target_uri
+    if name == "@scheme":
+        return ctx.scheme
+    if name.startswith("@"):
+        raise ValueError(f"unsupported derived component {name}")
+    value = ctx.headers.get(name.lower())
+    if value is None:
+        raise ValueError(f"covered header {name} is missing")
+    value = " ".join(value.split())
+    if "key" in params:
+        # Dictionary member: re-serialize just that member's value (RFC 9421 §2.1.2).
+        members = parse_signature_agent(value) if name.lower() == "signature-agent" else {}
+        member = members.get(params["key"])
+        if member is None:
+            raise ValueError(f"{name} has no member {params['key']!r}")
+        return sf_string(member)
+    return value
+
+
+def signature_base(si: SignatureInput, ctx: MessageContext) -> str:
+    lines = [f"{serialize_component_id(n, p)}: {component_value(n, p, ctx, si.label)}"
+             for n, p in si.components]
+    lines.append(f'"@signature-params": {si.raw}')
+    return "\n".join(lines)
+
+
+# ----------------------------------------------------------------- sign / verify
+
+def sign(private_key: Ed25519PrivateKey, keyid: str, ctx: MessageContext,
+         components: list[tuple[str, dict]], *, label: str = "sig1",
+         created: int | None = None, expires: int | None = None, nonce: str | None = None,
+         tag: str = WEB_BOT_AUTH_TAG, extra_params: dict | None = None) -> dict[str, str]:
+    """Return the Signature-Input and Signature headers for this request context."""
+    created = int(time.time()) if created is None else created
+    expires = created + 60 if expires is None else expires
+    params: dict = {"created": created, "expires": expires, "keyid": keyid}
+    if nonce:
+        params["nonce"] = nonce
+    params["tag"] = tag
+    if extra_params:
+        params.update(extra_params)
+    raw = serialize_inner_list(components) + serialize_params(params)
+    si = SignatureInput(label, components, params, raw)
+    sig = private_key.sign(signature_base(si, ctx).encode())
+    return {"Signature-Input": f"{label}={raw}",
+            "Signature": f"{label}=:{base64.b64encode(sig).decode()}:"}
+
+
+def verify_signature(public_key: Ed25519PublicKey, si: SignatureInput, signature: bytes,
+                     ctx: MessageContext) -> bool:
     try:
-        public_key.verify(parsed["signature"], base)
-    except InvalidSignature:
-        return False, "signature does not verify for this authority and key"
-    return True, "signature verifies"
+        public_key.verify(signature, signature_base(si, ctx).encode())
+        return True
+    except (InvalidSignature, ValueError):
+        return False
 
 
-def find_key(directory, keyid):
-    for jwk in (directory or {}).get("keys", []):
-        if jwk.get("kid") == keyid or jwk_thumbprint(jwk) == keyid:
-            return public_key_from_jwk(jwk)
-    return None
+def agent_headers(private_key: Ed25519PrivateKey, keyid: str, agent_origin: str, ctx: MessageContext,
+                  *, components: tuple[str, ...] = ("@authority", "signature-agent"),
+                  agent_form: str = "string", created: int | None = None,
+                  expires: int | None = None, nonce: str | None = "auto", label: str = "sig1") -> dict[str, str]:
+    """Everything a Web Bot Auth client adds to a request: Signature-Agent + the two signature headers.
+
+    `agent_form="string"` sends `Signature-Agent: "https://..."` (Cloudflare's wire form);
+    `"dict"` sends `Signature-Agent: sig1="https://..."` and covers it as `"signature-agent";key="sig1"`
+    (the working-group draft form).
+    """
+    if agent_form == "dict":
+        sa_value = f'{label}={sf_string(agent_origin)}'
+        comps = [(c, {"key": label}) if c == "signature-agent" else (c, {}) for c in components]
+    else:
+        sa_value = sf_string(agent_origin)
+        comps = [(c, {}) for c in components]
+    headers = dict(ctx.headers)
+    headers["signature-agent"] = sa_value
+    sctx = MessageContext(ctx.method, ctx.authority, ctx.path, headers, ctx.scheme, ctx.query)
+    if nonce == "auto":
+        nonce = b64u(secrets.token_bytes(16))
+    out = sign(private_key, keyid, sctx, comps, label=label, created=created, expires=expires, nonce=nonce)
+    out["Signature-Agent"] = sa_value
+    return out
 
 
-if __name__ == '__main__':
-    key = generate_private_key()
-    hdrs = sign(key, "127.0.0.1:8404", "agents.lab-provider.test")
-    for k, v in hdrs.items():
-        print(f"{k}: {v}")
-    parsed = parse(hdrs)
-    print(verify_signature(parsed, "127.0.0.1:8404", key.public_key()))
-    print(verify_signature(parsed, "shop.example", key.public_key()))
+# ---------------------------------------------------- the signed key directory
+
+def sign_directory(jwks: dict, private_keys: dict[str, Ed25519PrivateKey], authority: str,
+                   *, created: int | None = None, ttl: int = 3600) -> dict[str, str]:
+    """One signature per key over `("@authority";req)`, tagged for the directory (draft App. B / Cloudflare).
+
+    `authority` is the host the directory was requested from: the proof binds the keys to
+    the origin that serves them, so a copy of the file hosted elsewhere does not verify.
+    """
+    created = int(time.time()) if created is None else created
+    ctx = MessageContext("GET", authority, DIRECTORY_PATH, {})
+    comps = [("@authority", {"req": True})]
+    inputs, sigs = [], []
+    for i, jwk in enumerate(jwks["keys"]):
+        kid = thumbprint(jwk)
+        h = sign(private_keys[kid], kid, ctx, comps, label=f"binding-{i}", created=created,
+                 expires=created + ttl, tag=DIRECTORY_TAG)
+        inputs.append(h["Signature-Input"])
+        sigs.append(h["Signature"])
+    return {"Signature-Input": ", ".join(inputs), "Signature": ", ".join(sigs),
+            "Content-Type": DIRECTORY_MEDIA_TYPE}
+
+
+def verify_directory(jwks: dict, headers: dict[str, str], authority: str, now: int | None = None) -> tuple[bool, str]:
+    """Check every key in the JWK Set is bound to `authority` by a valid directory signature."""
+    now = int(time.time()) if now is None else now
+    try:
+        inputs = parse_signature_input(headers.get("signature-input", ""))
+        sigs = parse_signature(headers.get("signature", ""))
+    except ValueError as exc:
+        return False, f"directory headers malformed: {exc}"
+    ctx = MessageContext("GET", authority, DIRECTORY_PATH, {})
+    by_kid = {si.params.get("keyid"): (si, sigs.get(label)) for label, si in inputs.items()}
+    for jwk in jwks.get("keys", []):
+        kid = thumbprint(jwk)
+        si, sig = by_kid.get(kid, (None, None))
+        if si is None or sig is None:
+            return False, f"no directory signature for key {kid[:8]}"
+        if si.params.get("tag") != DIRECTORY_TAG:
+            return False, "directory signature has the wrong tag"
+        if si.params.get("created", 0) > now + 60:
+            return False, "directory signature created in the future"
+        if si.params.get("expires", 0) < now:
+            return False, "directory signature expired"
+        if not verify_signature(public_from_jwk(jwk), si, sig, ctx):
+            return False, f"directory signature invalid for key {kid[:8]}"
+    return True, "directory bound to origin"
+
+
+if __name__ == "__main__":
+    # Self-test: sign a request both ways, verify, then tamper.
+    seed, jwk, kid = generate()
+    priv = load_private(seed)
+    for form in ("string", "dict"):
+        ctx = MessageContext("GET", "shop.example", "/product/7", {"user-agent": "ChatGPT-User/1.0"})
+        h = agent_headers(priv, kid, "https://chatgpt.com", ctx, agent_form=form)
+        rctx = MessageContext("GET", "shop.example", "/product/7",
+                              {"user-agent": "ChatGPT-User/1.0", "signature-agent": h["Signature-Agent"]})
+        si = parse_signature_input(h["Signature-Input"])["sig1"]
+        sig = parse_signature(h["Signature"])["sig1"]
+        print(f"--- {form} form ---")
+        print(signature_base(si, rctx))
+        print("verify:", verify_signature(public_from_jwk(jwk), si, sig, rctx))
+        tampered = MessageContext("GET", "evil.example", "/product/7", rctx.headers)
+        print("verify (other authority):", verify_signature(public_from_jwk(jwk), si, sig, tampered))
+    jwks = {"keys": [jwk]}
+    dh = sign_directory(jwks, {kid: priv}, "chatgpt.com")
+    print("directory:", verify_directory(jwks, {k.lower(): v for k, v in dh.items()}, "chatgpt.com"))
+    print("directory (moved):", verify_directory(jwks, {k.lower(): v for k, v in dh.items()}, "mirror.example"))

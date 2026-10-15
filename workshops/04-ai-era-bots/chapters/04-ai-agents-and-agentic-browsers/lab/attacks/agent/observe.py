@@ -1,19 +1,19 @@
 """
 How the agent reads a page.
 
-A browser agent does not parse HTML the way a scraper does. It builds a list
-of things it can act on — their role, their accessible name, their value —
-much like the accessibility tree a screen reader uses. browser-use, Playwright
-MCP and Chrome DevTools MCP all do a version of this. We collect:
+A browser agent does not parse HTML the way a scraper does. It builds a list of things it can act on
+(role, accessible name, value), much like the accessibility tree a screen reader uses. browser-use,
+Playwright MCP and Chrome DevTools MCP all do a version of this. We collect:
 
     url, title, visible text (truncated)
-    elements: [{index, tag, role, name, selector, value}]
-    last_result: the text of #result, so the agent sees what its last action did
+    elements: [{index, tag, role, name, selector}]
+    state: what the page says happened (the order was confirmed, the request was refused, a
+           confirmation code is wanted, a notice appeared)
 
-snapshot() can also draw numbered highlight boxes over each element. Some agent
-tools do this so a vision model can refer to "element 7". It is injected DOM,
-and collector.js reports it (Round 2). highlight=False is the default; the
-Round 2 attack turns it off to stay quiet, which is the point of that round.
+snapshot() can also draw numbered highlight boxes over each element. Some agent tools do this so a
+vision model can refer to "element 7". It is injected DOM, and static/js/agent.js reports it
+(Round 2). highlight=False is the default; the Round 2 attack turns it off to stay quiet, which is
+the point of that round.
 """
 
 EXTRACT_JS = r"""
@@ -47,26 +47,33 @@ EXTRACT_JS = r"""
       box.appendChild(h);
     }
   });
+  const q = (s) => document.querySelector(s);
+  const flash = q('.flash');
   return {url: location.href, title: document.title,
-          text: (document.body.innerText || '').slice(0, 1500), elements: out};
+          text: (document.body.innerText || '').slice(0, 1500), elements: out,
+          page: document.body.dataset.page || '',
+          confirmed: !!q('[data-testid="order-confirmed"]'),
+          challenge: (q('[data-challenge]') || {dataset: {}}).dataset.challenge || '',
+          flash: flash && flash.classList.contains('warn') ? flash.innerText.trim().slice(0, 200) : ''};
 }
 """
 
 
 def snapshot(page, highlight=False):
     snap = page.evaluate(EXTRACT_JS, highlight)
-    try:
-        el = page.query_selector("#result[data-outcome]")
-        if el:
-            snap["last_result"] = {"outcome": el.get_attribute("data-outcome"),
-                                   "text": (el.inner_text() or "")[:300]}
-    except Exception:
-        pass
+    if snap["confirmed"]:
+        snap["last_result"] = {"outcome": "allow", "text": "order confirmed"}
+    elif snap["challenge"]:
+        snap["last_result"] = {"outcome": "challenge", "text": "confirmation code required"}
+    elif snap["page"] == "blocked":
+        snap["last_result"] = {"outcome": "block", "text": snap["text"][-200:].replace("\n", " ")}
+    elif snap["flash"]:
+        snap["last_result"] = {"outcome": "deny", "text": snap["flash"]}
     return snap
 
 
 def find(snapshot_dict, **by):
-    """First element whose fields match (case-insensitive substring on name/role/tag)."""
+    """First element whose fields match (case-insensitive substring on name/role/tag/selector)."""
     for el in snapshot_dict.get("elements", []):
         if all(str(by[k]).lower() in str(el.get(k, "")).lower() for k in by):
             return el

@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block page %}cart{% endblock %}{% block title %}Cart · {{ store_name }}{% endblock %}
+{% block content %}
+<h1>Your cart</h1>
+{% if lines %}
+<table class="lines">
+  <thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Price</th><th></th></tr></thead>
+  <tbody>{% for l in lines %}
+  <tr data-sku="{{ l.sku }}"><td><a href="/product/{{ l.sku }}"><img src="/img/{{ l.sku }}.svg?w=64" alt="" width="48" height="48"> {{ l.product.name }}</a></td><td>{{ l.size or '—' }}</td><td>{{ l.qty }}</td><td>${{ "%.2f"|format(l.line_cents / 100) }}</td>
+    <td><form action="/cart/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="sku" value="{{ l.sku }}"><input type="hidden" name="size" value="{{ l.size }}"><button class="link" type="submit">Remove</button></form></td></tr>
+  {% endfor %}</tbody>
+  <tfoot><tr><td colspan="3">Total</td><td colspan="2"><strong>${{ "%.2f"|format(total_cents / 100) }}</strong></td></tr></tfoot>
+</table>
+<div class="actions"><a class="btn" href="/checkout">Checkout</a><a class="btn ghost" href="/products">Keep shopping</a></div>
+{% else %}<p class="empty">Your cart is empty. <a href="/products">Find something</a>.</p>{% endif %}
+{% endblock %}

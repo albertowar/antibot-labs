@@ -1,56 +1,80 @@
+"""Generate the lab's Ed25519 keypairs at setup. Nothing secret is committed.
+
+    python tools/make_keys.py            # create any missing key (what every tool does on first use)
+    python tools/make_keys.py --force    # rotate: replace both keys
+
+Two synthetic agent operators need a key: `agents.lab-provider.test` (the operator the store trusts:
+its key signs the verified agent of Round 3 and the people's agents of Round 4) and `agents.evil.test`
+(an operator that published a perfectly valid key directory of its own, which nobody at the store has
+ever heard of: Round 3's third forgery). The mock internet plays their websites: it publishes each
+operator's signed key directory, and the agent scripts sign their requests with the matching private
+key. Neither operator exists outside this lab (`.test` is reserved, RFC 6761),
+and no key is committed: they are written to `tools/fixtures/keys/` (gitignored) the first time
+anything asks for them, and a fresh clone gets fresh keys. No checkpoint prints a thumbprint, so
+rotating changes no expected result.
+
+In production the private key never leaves the operator's signing service. Here it sits in a file on
+your disk because the lab has to play both ends; do not reuse it anywhere.
+
+Other code asks for a key with `load(owner)`; it creates the file if it is missing.
 """
-W4 Ch4 — Generate the lab's agent-operator keys and their key directories
 
-Two operators, both local, both synthetic:
+from __future__ import annotations
 
-    agents.lab-provider.test   the operator the store TRUSTS (defenses/trusted_operators.json).
-                               Its key signs the verified agent (Round 3) and the agent-user personas.
-    agents.evil.test           an operator that published a perfectly valid key directory of its own.
-                               Nobody at the store has ever heard of it (Round 3's third case).
-
-Writes data/keys/<name>.pem (private) and data/directories/<host>.json (what
-the operator would serve at /.well-known/http-message-signatures-directory).
-Idempotent: existing keys are kept unless --force.
-
-Run (from lab/):
-    python tools/make_keys.py
-"""
-
-import argparse
 import json
 import os
 import sys
+import tempfile
 
-LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-import httpsig  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))          # lab root: defenses/
+from defenses import httpsig  # noqa: E402
 
-OPERATORS = {"lab-provider": "agents.lab-provider.test", "evil": "agents.evil.test"}
-
-
-def key_path(name):
-    return os.path.join(LAB_DIR, "data", "keys", f"{name}.pem")
+KEYS_DIR = os.path.join(HERE, "fixtures", "keys")
+OWNERS = ["agents.lab-provider.test", "agents.evil.test"]
 
 
-def main(force=False):
-    for name, host in OPERATORS.items():
-        pem = key_path(name)
-        if os.path.exists(pem) and not force:
-            key = httpsig.load_private_key(pem)
-            print(f"  kept   {os.path.relpath(pem, LAB_DIR)}")
-        else:
-            key = httpsig.generate_private_key()
-            httpsig.save_private_key(key, pem)
-            print(f"✅ wrote  {os.path.relpath(pem, LAB_DIR)}")
-        directory = httpsig.directory_for(key)
-        out = os.path.join(httpsig.DIRECTORIES, f"{host}.json")
-        os.makedirs(httpsig.DIRECTORIES, exist_ok=True)
-        with open(out, "w") as f:
-            json.dump(directory, f, indent=1)
-        print(f"✅ wrote  {os.path.relpath(out, LAB_DIR)}  (kid {directory['keys'][0]['kid'][:16]}…)")
+def _path(owner: str) -> str:
+    return os.path.join(KEYS_DIR, f"{owner}.json")
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--force", action="store_true", help="regenerate even if keys exist")
-    main(parser.parse_args().force)
+def create(owner: str) -> dict:
+    """Write a fresh keypair for `owner` (atomically: two processes may race on first use)."""
+    seed, jwk, kid = httpsig.generate()
+    doc = {"owner": owner, "seed_hex": seed, "jwk": jwk, "thumbprint": kid}
+    os.makedirs(KEYS_DIR, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=KEYS_DIR, suffix=".tmp")
+    with os.fdopen(fd, "w") as fh:
+        json.dump(doc, fh, indent=2)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, _path(owner))
+    return doc
+
+
+def load(owner: str) -> dict:
+    """{"owner", "seed_hex", "jwk", "thumbprint"} for `owner`, creating the key on first use."""
+    try:
+        with open(_path(owner)) as fh:
+            return json.load(fh)
+    except (FileNotFoundError, ValueError):
+        create(owner)
+        with open(_path(owner)) as fh:     # re-read: if another process won the race, use its key
+            return json.load(fh)
+
+
+def ensure() -> None:
+    for owner in OWNERS:
+        load(owner)
+
+
+def main() -> None:
+    force = "--force" in sys.argv
+    for owner in OWNERS:
+        existed = os.path.exists(_path(owner))
+        doc = create(owner) if force else load(owner)
+        state = "rotated" if force and existed else ("kept" if existed and not force else "created")
+        print(f"{owner:26} {state:8} keyid={doc['thumbprint']}  -> {os.path.relpath(_path(owner))}")
+
+
+if __name__ == "__main__":
+    main()

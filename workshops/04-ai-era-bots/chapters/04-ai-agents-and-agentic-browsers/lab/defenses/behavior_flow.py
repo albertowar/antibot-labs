@@ -1,5 +1,5 @@
 """
-W2 behavior and flow (W2 Ch3, Ch9) — carried into W4 Ch4 as a SHADOW instrument
+W2 behavior and flow (W2 Ch3, Ch9), run here as a SHADOW instrument
 
 A native stealth browser such as Camoufox can make every fingerprint
 attribute coherent. What it does by default is still *robotic*: it navigates
@@ -9,11 +9,11 @@ layer looks at how the session got to the click.
     Untrusted (synthetic) DOM events               +60   dispatchEvent / element.click() from JS
     Buy click with no pointer path before it       +45   automation "teleports" the cursor
     Perfectly straight, constant-speed path        +35   linear interpolation, no human jitter
-    Less than MIN_DWELL_MS on the product page     +30   measured by the server, not the client
-    Buy with no product-page view in this session  +40   direct API call
+    Less than MIN_DWELL_MS on the drop page     +30   measured by the server, not the client
+    Buy with no drop-page view in this session  +40   direct API call
 
 The dwell time comes from the server's own flow log (when it served the
-product page), not from client telemetry, so it can't be replayed or edited.
+drop page), not from client telemetry, so it can't be replayed or edited.
 
 Where it fails:
   - Keyboard and screen-reader users never move a mouse. They Tab to the
@@ -32,7 +32,7 @@ MIN_MOVES_BEFORE_CLICK = 3
 
 
 def _buy_click(events):
-    clicks = [c for c in events.get("clicks", []) if len(c) >= 5 and c[4] in ("buy", "place-order", "add-to-cart")]
+    clicks = [c for c in events.get("clicks", []) if len(c) >= 5 and c[4] in ("buy", "drop-buy", "place-order", "add-to-cart")]
     return clicks[-1] if clicks else None
 
 
@@ -86,12 +86,12 @@ def score_behavior(sess):
         dwell = sess["now_ms"] - views[-1]
         if dwell < MIN_DWELL_MS:
             points += 30
-            reasons.append(f"Bought {dwell} ms after the product page was served (min {MIN_DWELL_MS})")
+            reasons.append(f"Bought {dwell} ms after the drop page was served (min {MIN_DWELL_MS})")
     return points, reasons
 
 
 if __name__ == '__main__':
-    sess = {"page": "/checkout", "now_ms": 10_400, "flow": [[10_000, "/checkout"]],
-            "events": {"moves": [[300, 640, 360]], "clicks": [[310, 640, 360, 1, "place-order"]], "keys": [],
+    sess = {"page": "/drop/lab-runner-9", "now_ms": 10_400, "flow": [[10_000, "/drop/lab-runner-9"]],
+            "events": {"moves": [[300, 640, 360]], "clicks": [[310, 640, 360, 1, "drop-buy"]], "keys": [],
                        "touches": [], "untrusted": 0}}
     print(score_behavior(sess))

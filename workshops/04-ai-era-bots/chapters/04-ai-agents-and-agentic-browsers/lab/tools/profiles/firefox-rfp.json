@@ -1,6 +1,6 @@
 {
  "name": "firefox-rfp",
- "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture). Replace or extend with your own capture from /lab/capture.",
+ "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture).",
  "impersonate": "firefox147",
  "headers": {
   "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"

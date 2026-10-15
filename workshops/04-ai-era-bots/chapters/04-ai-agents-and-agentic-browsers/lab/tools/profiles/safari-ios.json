@@ -1,6 +1,6 @@
 {
  "name": "safari-ios",
- "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture). Replace or extend with your own capture from /lab/capture.",
+ "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture).",
  "impersonate": "safari260_ios",
  "headers": {
   "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1"

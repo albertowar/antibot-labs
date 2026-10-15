@@ -1,28 +1,32 @@
+"""Shared agent engine, signer and the ethics guardrail for every attack script.
+
+Rules of engagement are absolute: these scripts run ONLY against the local Kestrel store you run
+yourself. ``tools/labclient.py`` asks the lab-root ``labnet.py`` guard for the store URL, and that
+guard refuses a non-loopback target before a single request is sent; every browser context the
+agents use goes through ``labclient.browser_context``, which also aborts any request that is not
+local. Lab traffic never touches a third party, a public proxy, anyone else's infrastructure or a
+hosted LLM API. Every account, operator, key and address here is synthetic.
+
+Source addresses are rented from ``data/world.json`` (RFC 5737 / 3849 documentation ranges) and
+sent in ``X-Lab-Client-IP``, which the store's edge honours only from loopback and only inside a
+pool. A user-directed agent runs from its user's home (``home_fiber``), an operator's agent from
+the operator's cloud (``cloud_vm``), a scalper's fleet from rented residential exits
+(``residential_proxy``). No new pool, no invented address.
+
+The agents are a small browser agent in the shape of browser-use / Playwright MCP (attacks/agent/):
+observe, decide, act, in a real Chromium. Just strong enough to beat the previous round; not a tool.
+
+It also measures what each attack costs the attacker (wall time and CPU, including the browser),
+because that cost is what the defenses are for.
 """
-W4 Ch4 — Shared attacker helpers (rules of engagement built in)
 
-Every attack script imports this module. It enforces the lab's rules:
-
-  - target() only returns http://localhost / 127.0.0.1 / ::1 URLs and exits on
-    anything else. These scripts must never point at a site you don't own.
-  - Egress IPs are *claimed* with the X-Lab-Egress header from data/egress_pool.txt,
-    a documentation range (RFC 5737). No real proxy, no proxy list, no third-party
-    infrastructure, no third-party LLM API is ever used.
-  - Accounts, emails and addresses are synthetic (@mail.example), seeded by tools/seed.py.
-  - X-Lab-Actor labels every session for the scoreboard. No defense reads it.
-
-It also measures what each attack costs the attacker (wall time and CPU,
-including the browser), because that cost is what the defenses are for.
-"""
-
+import contextlib
 import json
 import os
 import random
 import sys
 import time
 from urllib.parse import urlparse
-
-import requests
 
 try:
     import resource  # Unix only; on Windows CPU cost is reported as 0
@@ -32,30 +36,36 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "tools"))
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-import personas  # noqa: E402
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target as _target, require_local, require_local_env  # noqa: E402
-BASE_URL = _target("DEMO_URL", "http://127.0.0.1:8404")
-
-
-def target():
-    """The guarded demo-store URL (see labnet.py)."""
-    return BASE_URL
-
+from labclient import BASE_URL, browser_context, world_pool  # noqa: E402  (runs the labnet guard on import)
+import make_keys  # noqa: E402  (generates the Ed25519 fixtures on first use; nothing secret is committed)
+from defenses import httpsig  # noqa: E402  (labclient put the lab root on sys.path)
 
 DROP_SKU = "lab-runner-9"
-DROP_NAME = "Lab Runner 9 (limited drop)"
+OPERATOR = "agents.lab-provider.test"       # the operator the store trusts (policy.TRUSTED_AGENTS)
+EVIL = "agents.evil.test"                   # an operator with a perfectly valid key directory, unknown to the store
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-             "Chrome/150.0.0.0 Safari/537.36")
+             "Chrome/153.0.0.0 Safari/537.36")
 LAB_AGENT_UA = CHROME_UA + " LabAgent/1.0 (+https://agents.lab-provider.test)"
+VIEWPORT = {"width": 1280, "height": 800}
 FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn", "avery", "rowan"]
 LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright", "scott", "green"]
 
+OWNER_BASE = 200            # seeded users user200..user249: the accounts the Round 1-3 agents buy for
+AGENT_USER_ACCOUNTS = (110, 111)
 
-def authority(base):
+
+def target():
+    """The guarded store URL (see labnet.py)."""
+    return BASE_URL
+
+
+def authority(base=BASE_URL):
+    """The Host the store sees (and so the @authority a signature must cover). verify.py picks a free port."""
     return urlparse(base).netloc
+
+
+def agent_user_accounts():
+    return AGENT_USER_ACCOUNTS
 
 
 def headless():
@@ -66,46 +76,103 @@ def headless():
     return not (os.environ.get("DISPLAY") or sys.platform in ("darwin", "win32"))
 
 
-def egress_pool():
-    with open(os.path.join(HERE, "data", "egress_pool.txt")) as f:
-        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+def owner_accounts(n=5, start=0):
+    """The accounts a user-directed agent buys for: seeded users, so their history is real and aged.
 
-
-def owner_accounts(n=5):
-    return personas.owner_accounts(n)
+    Each attack takes its own slice (`start`), because the drop is one unit per account and a round
+    runs several attacks one after the other.
+    """
+    from demo_site.seed import password_for, username
+    return [{"email": username(OWNER_BASE + start + i), "password": password_for(OWNER_BASE + start + i)}
+            for i in range(n)]
 
 
 def fleet_identity(rng):
-    """A fleet's throwaway account: random name + digits, its own synthetic inbox, one reshipper."""
-    email = f"{rng.choice(FIRST)}{rng.choice(LAST)}{rng.randint(100, 9999)}@mail.example"
-    return {"email": email, "password": f"Fleet-{rng.getrandbits(32):08x}",
-            "address": f"48 Harbor Freight Way, Unit {rng.randint(1, 400)}, Elizabeth NJ 07201"}
+    """A fleet's throwaway account: random name + digits, its own synthetic inbox."""
+    first, last = rng.choice(FIRST), rng.choice(LAST)
+    return {"name": f"{first.title()} {last.title()}", "email": f"{first}.{last}{rng.randint(100, 9999)}@mail.example",
+            "password": f"fleet-{rng.getrandbits(32):08x}"}
+
+
+def home_ips(n, start=0):
+    return world_pool("home_fiber")[start:start + n]
+
+
+# --- Web Bot Auth signer (the operator side of defenses/agent_identity.py) -----------------------
+
+class Signer:
+    """Signs requests the way a registered operator would (RFC 9421, Ed25519, W4 Ch2's httpsig).
+
+    The operator holds the private key (tools/fixtures/keys/<owner>.json, generated by
+    tools/make_keys.py, never committed) and publishes the public half in its key directory (the
+    mock internet). Covered components: @authority and signature-agent, a fresh nonce per request.
+    `window` is the signature's lifetime in seconds: Round 3's replay case is the one an operator
+    got wrong (a 24 h window on a request that leaked into a CDN log).
+    """
+
+    def __init__(self, owner, window=60):
+        k = make_keys.load(owner)
+        self.key, self.keyid, self.agent, self.window = httpsig.load_private(k["seed_hex"]), k["thumbprint"], f"https://{owner}", window
+
+    def headers(self, path, query="", method="GET", authority_=None, created=None, window=None):
+        ctx = httpsig.MessageContext(method, authority_ or authority(), path, {}, "http", query)
+        created = int(time.time()) if created is None else created
+        return httpsig.agent_headers(self.key, self.keyid, self.agent, ctx, created=created,
+                                     expires=created + (window or self.window))
+
+
+# --- the people behind the agents ------------------------------------------------------------------
+
+def grant_mandate(client, email, password, operator, sku=DROP_SKU, ttl_min=15):
+    """The account holder, in their OWN session, approves a purchase by an operator.
+
+    A plain HTTP session with a browser's headers: this is the person, not the agent. Returns
+    (mandate id, None) or (None, why).
+    """
+    h = [("User-Agent", CHROME_UA), ("Accept-Language", "en-US,en;q=0.9"), ("Sec-Fetch-Mode", "cors"),
+         ("Content-Type", "application/json")]
+    r = client.post("/api/login", headers=h, json={"email": email, "password": password})
+    if r.status_code != 200:
+        return None, f"owner login failed ({r.status_code})"
+    r = client.post("/api/account/mandates", headers=h, json={"operator": operator, "sku": sku, "ttl_min": ttl_min})
+    if r.status_code != 201:
+        return None, f"mandate refused ({r.status_code}): {r.text[:80]}"
+    return r.json()["mandate"]["id"], None
 
 
 def mailbox_code(base, email):
-    """Read the latest step-up code from the lab inbox (synthetic inboxes the fleet owns)."""
+    """The latest step-up code in the lab inbox (a synthetic inbox the caller owns)."""
+    import requests
     r = requests.get(f"{base}/lab/mailbox/{email}", timeout=10)
-    msg = (r.json() or {}).get("message") or {}
-    return msg.get("code")
+    msgs = (r.json() or {}).get("messages") or []
+    return msgs[-1].get("code") if msgs else None
 
 
-def grant_mandate(base, account, operator, sku=DROP_SKU, ttl_min=15, egress=None):
-    """
-    The account holder, in their OWN session, approves a purchase by an operator.
-    Modelled as a plain HTTP session with a browser UA: this is the human, not the agent.
-    """
-    s = requests.Session()
-    s.headers.update({"User-Agent": CHROME_UA, "Accept-Language": "en-US,en;q=0.9", "Sec-Fetch-Mode": "navigate",
-                      "X-Lab-Actor": "agent-owner"} | ({"X-Lab-Egress": egress} if egress else {}))
-    s.get(f"{base}/login")
-    r = s.post(f"{base}/api/login", json={"email": account["email"], "password": account["password"]})
-    if r.json().get("outcome") != "allow":
-        return None, f"owner login failed: {r.json().get('message')}"
-    r = s.post(f"{base}/api/account/mandates", json={"operator": operator, "sku": sku, "ttl_min": ttl_min})
-    body = r.json()
-    if body.get("outcome") != "allow":
-        return None, body.get("message", "mandate refused")
-    return body["mandate"]["id"], None
+# --- browser sessions --------------------------------------------------------------------------------
+
+@contextlib.contextmanager
+def chromium():
+    """One Chromium for the whole attack; every agent session gets its own context (a fresh cookie jar)."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless(), args=["--disable-blink-features=AutomationControlled"])
+        try:
+            yield browser
+        finally:
+            with contextlib.suppress(Exception):
+                browser.close()
+
+
+@contextlib.contextmanager
+def agent_session(browser, actor, ip, user_agent=CHROME_UA):
+    """A fresh browser context carrying the lab headers (labclient.browser_context): one 'agent session'."""
+    context = browser_context(browser, actor, ip=ip, viewport=VIEWPORT, user_agent=user_agent, locale="en-US")
+    page = context.new_page()
+    try:
+        yield context, page
+    finally:
+        with contextlib.suppress(Exception):
+            context.close()
 
 
 class Cost:
@@ -130,29 +197,29 @@ class Cost:
 
 
 def summary(name, results, cost):
-    """The dict every attack's run() returns (read by tools/checkpoint.py)."""
+    """The dict every attack's run() returns; its JSON form is the last line the checkpoint reads."""
     outcomes, reasons = {}, {}
     for r in results:
         outcomes[r["outcome"]] = outcomes.get(r["outcome"], 0) + 1
         for reason in r.get("reasons", []):
             reasons[reason] = reasons.get(reason, 0) + 1
-    succeeded = sum(1 for r in results if r.get("success"))
     return {
-        "attack": name, "attempts": len(results), "succeeded": succeeded, "outcomes": outcomes,
-        "top_reasons": sorted(reasons, key=reasons.get, reverse=True)[:4],
+        "attack": name, "attempted": len(results), "succeeded": sum(1 for r in results if r.get("success")),
+        "outcomes": outcomes, "top_reasons": sorted(reasons, key=reasons.get, reverse=True)[:4],
         "steps_total": sum(r.get("steps", 0) for r in results),
         "wall_s": round(cost.wall_s, 2), "cpu_s": round(cost.cpu_s, 2),
         "wall_s_per_attempt": round(cost.wall_s / max(1, len(results)), 2),
-        "results": results,
+        "results": [{k: v for k, v in r.items() if k != "reasons"} | {"reasons": r.get("reasons", [])[:2]} for r in results],
     }
 
 
 def report(s, success_label="orders placed"):
-    print(f"=== {s['attack']}: {s['succeeded']}/{s['attempts']} {success_label} ===")
+    print(f"=== {s['attack']}: {s['succeeded']}/{s['attempted']} {success_label} ===")
     print(f"  outcomes: {json.dumps(s['outcomes'])}   agent steps: {s['steps_total']}")
     for reason in s["top_reasons"]:
         print(f"    - {reason[:140]}")
     print(f"  attacker cost: {s['wall_s']} s wall, {s['cpu_s']} s CPU ({s['wall_s_per_attempt']} s per attempt)")
+    print(json.dumps({k: v for k, v in s.items() if k != "results"}))      # the last line: the checkpoint reads it
 
 
 def rng_for(name):

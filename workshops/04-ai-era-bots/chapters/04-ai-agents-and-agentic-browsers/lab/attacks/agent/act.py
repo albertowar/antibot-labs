@@ -9,9 +9,8 @@ The agent's "hands": perform one action in the browser.
                       (ghost-cursor-style). Plausible means, still not a real hand,
                       but enough to clear the shape checks.
 
-Both expose click(selector)/fill(selector, text)/goto(path)/read_result(). The
-loop doesn't know which it has, so the only thing that changes between Round 1
-and Round 2 is this object.
+Both expose click(selector)/fill(selector, text)/goto(path)/flush(). The loop doesn't know which it
+has, so the only thing that changes between Round 1 and Round 2 is this object.
 """
 
 import math
@@ -22,7 +21,7 @@ import time
 class Executor:
     """Stock agent actions: resolve and act. Teleport click, instant fill."""
 
-    def __init__(self, page, base, rng=None, think=(0.9, 1.1)):
+    def __init__(self, page, base, rng=None, think=(0.5, 0.7)):
         self.page, self.base, self.rng = page, base, rng or random.Random()
         self.think = think
 
@@ -77,8 +76,21 @@ class HumanizedExecutor(Executor):
             pts.append((x + self.rng.gauss(0, 0.4), y + self.rng.gauss(0, 0.4)))
         return pts
 
+    def _scroll_to(self, selector):
+        """Bring the control into the viewport the way a hand does: wheel ticks, not scrollIntoView()."""
+        for _ in range(8):
+            box = self.page.locator(selector).bounding_box()
+            if not box:
+                return None
+            vh = self.page.viewport_size["height"]
+            if 60 <= box["y"] and box["y"] + box["height"] <= vh - 60:
+                return box
+            self.page.mouse.wheel(0, 120 if box["y"] > vh / 2 else -120)
+            time.sleep(self.rng.uniform(0.05, 0.15))
+        return self.page.locator(selector).bounding_box()
+
     def _move_to(self, selector):
-        box = self.page.locator(selector).bounding_box()
+        box = self._scroll_to(selector)
         if not box:
             return None
         tx = box["x"] + box["width"] * self.rng.uniform(0.3, 0.7)
@@ -98,13 +110,12 @@ class HumanizedExecutor(Executor):
         self._pause()
 
     def fill(self, selector, text):
-        self._move_to(selector)
-        self.page.click(selector, timeout=5000)
+        at = self._move_to(selector)
+        if at is not None:
+            self.page.mouse.click(*at)
+        else:
+            self.page.click(selector, timeout=5000)
         for ch in text:
-            self.page.keyboard.press(ch if ch.isalnum() else _key(ch))
+            self.page.keyboard.type(ch)
             time.sleep(max(0.03, self.rng.gauss(0.11, 0.04)))
         self._pause()
-
-
-def _key(ch):
-    return {"@": "@", ".": ".", "-": "-", "_": "-", " ": "Space"}.get(ch, ch)

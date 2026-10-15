@@ -1,5 +1,5 @@
 """
-W4 Ch4 — L2 agent behavior: how a session acts, scored to CHALLENGE, never to block (Round 2)
+W4 Ch4, L2 agent behavior: how a session acts, scored to CHALLENGE, never to block (Round 2)
 
 W2 Ch3 taught pointer kinematics against humanized bots. Agents are a
 different animal: they don't fake a hand, they *don't have one*. A DOM- or
@@ -21,14 +21,17 @@ Who else looks like this (the false positives you must price in):
     corporate RPA / macro users                     teleport + fill = 35 -> challenged. Real cost.
     a human's own agentic browser                   looks exactly like an agent, because it is one
 
-That is why this layer caps at 59: it may ask a human to confirm; it may not
-decide on its own. Round 4 turns the challenge into a hand-off (emailed code).
+That is why this layer caps at 59: it may ask a human to confirm (the `step_up` challenge: a one-time
+code emailed to the account, registered by demo_site/ext/agents.py); it may not decide on its own.
+At level 4 the points stop being a verdict and become an input to the checkout gate.
 FP-Agent (Wang, Shafiq & Vekaria, 2026) found behavior separates agents from
 humans far better than browser fingerprints do, and this module is why: the
 fingerprint is the user's real Chrome.
 """
 
 import statistics
+
+from .pipeline import Check, Signal
 
 CHALLENGE_MAX = 59
 TELEPORT_WINDOW_MS = 400
@@ -100,6 +103,22 @@ def score(sess):
     # Return min(points, CHALLENGE_MAX): this layer may ask a human to confirm, never block.
     # Then run the checkpoint and read the "rpa-macro" and "autofill" personas: that is your cost.
     return min(points, CHALLENGE_MAX), reasons
+
+
+def _check(ctx):
+    from . import agent_session, principal as who      # principal.py imports this module: import it late
+    p = who.principal(ctx)
+    # Identity replaces inference: once we know who operates the agent we stop guessing from its hands.
+    points, reasons = score(agent_session.state(ctx)) if p["kind"] != "verified_agent" else (0, [])
+    ctx.attrs["behavior_points"] = points              # the checkout gate (level 4) reads this
+    ctx.note(behavior_points=points)
+    if ctx.level >= 4 or not points:
+        return None            # at level 4 two challenge-band layers would add up to a block for a nervous human
+    return [Signal("agent_behavior", "robotic_session", points, "; ".join(reasons)[:140])]
+
+
+CHECK = Check("agent_behavior", _check, phases=("action:drop_buy",))
+
 
 if __name__ == '__main__':
     agent = {"flow": [[0, "/"], [1210, "/products"], [2405, "/product/lab-runner-9"], [3620, "/checkout"]],

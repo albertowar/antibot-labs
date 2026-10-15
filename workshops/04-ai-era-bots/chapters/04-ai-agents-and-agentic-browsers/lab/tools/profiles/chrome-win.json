@@ -1,6 +1,6 @@
 {
  "name": "chrome-win",
- "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture). Replace or extend with your own capture from /lab/capture.",
+ "source": "synthetic: hand-built from values typical of this browser and hardware in October 2026 (not a capture).",
  "impersonate": "chrome150",
  "headers": {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",

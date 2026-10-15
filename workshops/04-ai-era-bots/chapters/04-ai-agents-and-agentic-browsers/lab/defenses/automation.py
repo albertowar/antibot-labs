@@ -1,7 +1,7 @@
 """
-W2 automation flags (W2 Ch1, Ch9) — carried into W4 Ch4 as a SHADOW instrument
+W2 automation flags (W2 Ch1, Ch9), run here as a SHADOW instrument
 
-The classic tells, checked when a session tries to check out:
+The classic tells, checked when a session tries to buy the drop:
 
     No telemetry from the drop page   +60   the page's JavaScript never ran (bare HTTP client)
     navigator.webdriver === true      +60   WebDriver / CDP-launched Chromium without patches
