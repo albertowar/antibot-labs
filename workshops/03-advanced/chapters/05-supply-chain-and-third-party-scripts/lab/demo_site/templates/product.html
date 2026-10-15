@@ -1,14 +1,42 @@
-{% extends "base.html" %}
-{% block title %}Workshop Store — {{ sku }}{% endblock %}
+{% extends "base.html" %}{% block page %}product{% endblock %}
+{% block title %}{{ p.name }} · {{ store_name }}{% endblock %}{% block description %}{{ p.blurb }}{% endblock %}
 {% block content %}
-<section class="product">
-  <div class="product-img" aria-hidden="true">👟</div>
-  <div class="product-info">
-    <h1>Workshop Runner <small>{{ sku }}</small></h1>
-    <p class="price">$180.00</p>
-    <p>A perfectly ordinary demo product. Add it to your cart and head to
-       checkout to see where a skimmer would sit.</p>
-    <a class="btn" href="/checkout">Buy now</a>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/products">Shop</a> › <a href="/products?category={{ p.category }}">{{ p.category|capitalize }}</a> › {{ p.name }}</nav>
+<section class="pdp" data-sku="{{ p.sku }}">
+  <div class="pdp-img"><img src="/img/{{ p.sku }}.svg?w=640" alt="{{ p.name }}" width="640" height="640"></div>
+  <div class="pdp-info">
+    <h1>{{ p.name }}</h1>
+    <div class="card-meta">{% include "partials/_stars.html" %}<span class="muted">{{ reviews|length }} reviews · {{ p.colorway }}</span></div>
+    <p class="price big">${{ "%.2f"|format(p.price) }}</p>
+    <p class="lead">{{ p.blurb }}</p>
+    <form class="buy" action="/cart/add" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="sku" value="{{ p.sku }}"><input type="hidden" name="next" value="/cart">
+      {% if p.sizes %}<fieldset class="sizes"><legend>Size</legend>{% for s in p.sizes %}<label><input type="radio" name="size" value="{{ s }}" {% if loop.first %}checked{% endif %}><span>{{ s }}</span></label>{% endfor %}</fieldset>{% endif %}
+      <div class="row">
+        <label class="qty">Qty <input type="number" name="qty" value="1" min="1" max="10"></label>
+        <button id="add-to-cart" class="btn" type="submit" {% if p.stock <= 0 %}disabled{% endif %}>{% if p.stock > 0 %}Add to cart{% else %}Sold out{% endif %}</button>
+      </div>
+    </form>
+    <ul class="facts"><li>SKU {{ p.sku }}</li><li>{{ p.stock }} in stock</li><li>Free returns for 60 days</li></ul>
+    {{ slot("product:aside", p=p) }}
   </div>
 </section>
+<section class="reviews">
+  <div class="section-head"><h2>Reviews</h2></div>
+  {% for r in reviews %}
+  <article class="review"><header><strong>{{ r.author }}</strong> <span class="stars">{% for i in range(5) %}{% if i < r.rating %}★{% else %}☆{% endif %}{% endfor %}</span> <span class="muted small">{{ r.created_at.strftime('%b %Y') if r.created_at }}</span></header>
+    <h3>{{ r.title }}</h3><p>{{ r.body }}</p></article>
+  {% else %}<p class="muted">No reviews yet.</p>{% endfor %}
+  <form class="review-form card" action="/review/{{ p.sku }}" method="post">
+    <h3>Write a review</h3>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if not user %}<label class="field"><span>Name</span><input name="author" maxlength="40" placeholder="Your first name"></label>{% endif %}
+    <label class="field"><span>Rating</span><select name="rating">{% for i in [5,4,3,2,1] %}<option value="{{ i }}">{{ i }} star{{ 's' if i > 1 }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Title</span><input name="title" maxlength="120" required></label>
+    <label class="field"><span>Review</span><textarea name="body" rows="3" maxlength="2000" required></textarea></label>
+    {{ slot("form:review", p=p) }}
+    <button class="btn" type="submit">Post review</button>
+  </form>
+</section>
+{% if related %}<section><div class="section-head"><h2>More {{ p.category }}</h2></div><div class="grid">{% for p in related %}{% include "partials/_card.html" %}{% endfor %}</div></section>{% endif %}
 {% endblock %}

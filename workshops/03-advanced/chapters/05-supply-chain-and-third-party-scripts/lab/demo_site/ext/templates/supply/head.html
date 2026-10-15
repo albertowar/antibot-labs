@@ -1,0 +1,3 @@
+{# Round 4 (level 4): the runtime monitor loads FIRST, before any other script, so it can wrap
+   fetch / XHR / sendBeacon before they are used. The store's nonce middleware adds the nonce. #}
+{% if supply.monitor %}<script src="/static/js/runtime-monitor.js"></script>{% endif %}

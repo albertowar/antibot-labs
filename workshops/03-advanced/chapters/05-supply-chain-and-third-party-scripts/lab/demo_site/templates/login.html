@@ -1,14 +1,12 @@
-{% extends "base.html" %}
-{% block title %}Workshop Store — Login{% endblock %}
+{% extends "base.html" %}{% block page %}login{% endblock %}{% block title %}Log in · {{ store_name }}{% endblock %}
 {% block content %}
-<section class="form-wrap">
-  <h1>Sign in</h1>
-  <p class="muted">Synthetic credentials only.</p>
-  <form id="login-form" method="post" action="/login">
-    <label>Email <input name="email" type="email" value="buyer@example.test" /></label>
-    <label>Password <input name="password" type="password" value="hunter2-demo" /></label>
-    <button type="submit">Sign in</button>
-  </form>
-  <p id="result" class="muted"></p>
-</section>
+<form id="login-form" class="card narrow" action="/login" method="post">
+  <h1>Log in</h1>
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="next" value="{{ next or '/account' }}">
+  {% with label="Email", name="email", type="email", required=True, autocomplete="email", value=email %}{% include "partials/_field.html" %}{% endwith %}
+  {% with label="Password", name="password", type="password", required=True, autocomplete="current-password" %}{% include "partials/_field.html" %}{% endwith %}
+  {{ slot("form:login") }}
+  <button class="btn big" type="submit">Log in</button>
+  <p class="muted small">No account? <a href="/register">Create one</a>. Forgot your password? Ask the store to <a href="#" data-reset>email a reset link</a>.</p>
+</form>
 {% endblock %}

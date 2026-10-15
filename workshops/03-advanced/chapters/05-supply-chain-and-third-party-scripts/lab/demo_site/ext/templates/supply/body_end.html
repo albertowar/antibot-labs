@@ -1,0 +1,6 @@
+{# The slice's script includes. First-party bundle: your own code (Round 4's poisoned build is this
+   file). The vendor include is the supply-chain surface: the skimmer rides in on it. With SRI on
+   (level 3) the browser checks the file against the pinned baseline hash and refuses it if the
+   vendor swapped the bytes. #}
+<script src="/static/js/shop-bundle.js"></script>
+<script src="/static/vendor/analytics-helper.js"{% if supply.sri %} integrity="{{ supply.sri }}" crossorigin="anonymous"{% endif %}></script>

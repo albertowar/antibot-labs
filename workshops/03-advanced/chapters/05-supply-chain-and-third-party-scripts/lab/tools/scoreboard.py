@@ -1,53 +1,55 @@
 """
-scoreboard.py — one screen: did data get out, and did we block anyone?
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Reads the attacker collector and the demo store's report logs and prints the
-round scoreboard. Run it after an attack + a legit_traffic pass.
-
-Run:
-    python tools/scoreboard.py
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
+import argparse
 import json
-import os
-import sys
-import urllib.request
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE = target("DEMO_URL", "http://127.0.0.1:5000")
-COLLECTOR = target("COLLECTOR_URL", "http://127.0.0.1:5001")
+from labclient import scoreboard
 
 
-def _get(url: str):
-    with urllib.request.urlopen(url, timeout=5) as r:
-        return json.loads(r.read())
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
+            continue
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
 
 
-def main():
-    try:
-        status = _get(f"{BASE}/status")
-        cap = _get(f"{COLLECTOR}/captured")
-        csp = _get(f"{BASE}/csp-report/log")
-        rtm = _get(f"{BASE}/api/script-violation/log")
-    except OSError as exc:
-        print(f"Could not reach demo store or collector: {exc}")
-        return 1
-
-    print("=== Supply-chain scoreboard ===")
-    print(f"  config         CSP_MODE={status['csp_mode']} SRI={status['sri']} "
-          f"MONITOR={status['monitor']} VARIANT={status['skimmer_variant']}")
-    print(f"  🔴 exfil        {cap['sensitive']} capture(s) with card/password "
-          f"data   (total pings {cap['total']})")
-    print(f"  🔵 CSP reports  {len(csp)} violation(s) logged")
-    print(f"  🔵 runtime hits {len(rtm)} outbound call(s) flagged by the monitor")
-    if rtm:
-        for e in rtm[:3]:
-            print(f"       {e['method']} → {e['url']}")
-    verdict = "CONTAINED" if cap["sensitive"] == 0 else "SKIMMED"
-    print(f"\n  verdict: {verdict}")
-    return 0
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

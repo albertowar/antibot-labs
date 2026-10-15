@@ -1,23 +1,24 @@
 """
-generate_sri.py — DEFENSE (Round 3): pin the vendor file you trust.
+generate_sri.py: pin the vendor file you trust (Round 3, level 3).
 
-Prints a <script> tag with a SHA-384 integrity attribute for each file you
-explicitly include. The browser fetches the file, checks the hash, and refuses
-to run it if the bytes differ — so a vendor who swaps the file ships a file the
-browser will not execute.
+The browser fetches a <script integrity="sha384-..."> file, checks the hash and refuses to run it if
+the bytes differ, so a vendor who swaps the file ships a file the browser will not execute. This
+module is both halves:
 
-Reads local files by default (the lab serves its vendor file from disk). Pass
-URLs to hash a remote CDN file instead.
+  CHECK   the ladder check: the vendor <script> carries the pin (page.sri)
+  CLI     prints the <script> tag for a file you explicitly include
 
-Limit to teach alongside this: SRI only covers files named in a <script> tag.
-It cannot see a script injected at runtime by another script, and it will FAIL
-CLOSED on a legitimate CDN version bump — budget for re-pinning on every
-dependency update.
+The pin is a promise about ONE known-good file: the lab pins the baseline release in
+demo_site/ext/assets/analytics-helper.baseline.js and the store may be serving something else.
 
-Prereqs:  pip install httpx   (only needed for URL targets)
+Limits to teach alongside this: SRI only covers files named in a <script> tag. It cannot see a script
+injected at runtime by another script, and it cannot see your own bundle being poisoned (you would
+pin the poisoned build). It FAILS CLOSED on a legitimate CDN version bump: the new, good file is
+refused for every user until you re-pin and redeploy (`tools/cdn_bump.py` measures it).
+
 Usage:
-  python generate_sri.py                      # hash the lab's vendor baseline
-  python generate_sri.py https://cdn/lib.js   # hash a remote file
+  python -m defenses.generate_sri                       # hash the lab's known-good vendor file
+  python -m defenses.generate_sri https://cdn/lib.js    # hash a remote file (needs httpx)
 """
 
 import base64
@@ -25,11 +26,10 @@ import hashlib
 import os
 import sys
 
-HERE = os.path.dirname(__file__)
-# The known-good baseline is what we pin; the served file is checked against it.
-DEFAULT_TARGETS = [
-    os.path.join(HERE, "..", "demo_site", "static", "vendor", "analytics-helper.baseline.js"),
-]
+from .pipeline import Check
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BASELINE = os.path.join(HERE, "..", "demo_site", "ext", "assets", "analytics-helper.baseline.js")
 SERVED_NAME = "/static/vendor/analytics-helper.js"
 
 
@@ -37,8 +37,21 @@ def sri(content: bytes) -> str:
     return "sha384-" + base64.b64encode(hashlib.sha384(content).digest()).decode()
 
 
+def pin() -> str:
+    """The integrity value the store puts on the vendor tag: the known-good baseline's hash."""
+    with open(BASELINE, "rb") as fh:
+        return sri(fh.read())
+
+
+def _check(page):
+    page.sri = pin()
+
+
+CHECK = Check("sri", _check, phases=("page",))
+
+
 def read_target(target: str) -> bytes:
-    if target.startswith("http://") or target.startswith("https://"):
+    if target.startswith(("http://", "https://")):
         import httpx
         resp = httpx.get(target, follow_redirects=True, timeout=15)
         resp.raise_for_status()
@@ -47,20 +60,18 @@ def read_target(target: str) -> bytes:
         return fh.read()
 
 
-def main():
-    targets = sys.argv[1:] or DEFAULT_TARGETS
-    print("<!-- Pin these on the <script> tags in base.html -->\n")
+def main(argv):
+    targets = argv or [BASELINE]
+    print("<!-- Pin these on the <script> tags (the store's template does it from the baseline file) -->\n")
     for target in targets:
         try:
             value = sri(read_target(target))
-        except Exception as exc:  # noqa: BLE001 — surface any fetch/read error
+        except Exception as exc:  # noqa: BLE001  (surface any fetch/read error)
             print(f"<!-- ERROR {target}: {exc} -->")
             continue
-        src = SERVED_NAME if target in DEFAULT_TARGETS else target
-        print(f'<script src="{src}"\n'
-              f'        integrity="{value}"\n'
-              f'        crossorigin="anonymous"></script>\n')
+        src = SERVED_NAME if target == BASELINE else target
+        print(f'<script src="{src}"\n        integrity="{value}"\n        crossorigin="anonymous"></script>\n')
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

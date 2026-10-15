@@ -1,23 +1,21 @@
 """
-Round 2 attack — wake only on checkout, exfil from an injected script.
+Round 2 attack: wake only on the payment and login pages, and exfil from an injected script.
 
-Beating Round 1's defence: a one-shot crawl of the homepage never saw the
-skimmer, because it only arms itself on /checkout and runs the exfil from a
-dynamically injected <script>. It still uses fetch/sendBeacon to reach the
-attacker's origin.
+Beating Round 1's defense: a one-shot crawl of the home page never saw the skimmer, because it only
+arms itself on /checkout and /login and runs its exfil from a dynamically injected <script>. It still
+needs fetch or sendBeacon to reach the attacker's origin.
 
-Point of the round: a CSP with connect-src 'self' (even report-only promoted
-to enforce) blocks that cross-origin fetch/beacon. The injected script may run,
-but the data has nowhere to go.
+Point of the round: a CSP with connect-src 'self' stops that cross-origin call. The injected script
+may run; the data has nowhere to go. Report-Only shows you what enforcement would break first.
 
-Expects server: SKIMMER_VARIANT=dynamic; beaten by CSP_MODE=enforce
-Run:
-    python attacks/round2_checkout_only.py
+Technique: variant "dynamic". Beaten by: CSP enforce (level 2).
+    python attacks/round2_checkout_only.py                 # against whatever the store enforces
+    python attacks/round2_checkout_only.py --report-only   # the store sends the CSP as Report-Only
 """
+import sys
+
 import _common
 
-def run(base=_common.BASE):
-    return _common.run(base)
-
 if __name__ == "__main__":
-    raise SystemExit(_common.report("Round 2: checkout-only dynamic skimmer"))
+    ro = "--report-only" in sys.argv
+    _common.run("Round 2: checkout-only dynamic skimmer" + (" (CSP Report-Only)" if ro else ""), "dynamic", report_only=ro)

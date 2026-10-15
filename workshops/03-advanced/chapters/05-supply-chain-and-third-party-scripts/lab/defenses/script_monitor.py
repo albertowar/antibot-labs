@@ -11,25 +11,29 @@ Detection is not prevention: finding the skimmer here does not stop it exfil-
 trating. That is why Rounds 2-4 add CSP, SRI and the runtime monitor. What this
 buys you is time-to-detect, which is the metric PCI req 11.6.1 cares about.
 
-Fix vs. the naive version: the baseline path is explicit, not derived by string
-surgery on a filename.
+The hash is of the bytes the server sends today, fetched the way the inventory saw the URL
+(requests to anything that is not this machine are refused by the labnet guard).
 
 Prereqs:  pip install httpx
 Usage:
-  python script_monitor.py --create-baseline      # from script_inventory.json
-  python script_monitor.py                         # re-hash and diff
+  python defenses/script_monitor.py --create-baseline   # from instance/script_inventory.json
+  python defenses/script_monitor.py                      # re-hash and diff (exit 1 on any alert)
 """
 
 import argparse
 import hashlib
 import json
 import os
+import sys
 
 import httpx
 
-HERE = os.path.dirname(__file__)
-INVENTORY = os.path.join(HERE, "script_inventory.json")
-BASELINE = os.path.join(HERE, "script_baseline.json")
+LAB = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+INVENTORY = os.path.join(LAB, "instance", "script_inventory.json")
+BASELINE = os.path.join(LAB, "instance", "script_baseline.json")
+
+sys.path.insert(0, LAB)  # lab root: labnet.py
+from labnet import require_local  # noqa: E402
 
 
 def _urls(inventory: dict) -> list:
@@ -43,6 +47,7 @@ def _urls(inventory: dict) -> list:
 
 
 def hash_url(client: httpx.Client, url: str) -> str:
+    require_local(url, what="script URL")
     try:
         resp = client.get(url, timeout=10, follow_redirects=True)
         resp.raise_for_status()
@@ -60,6 +65,7 @@ def create_baseline() -> int:
     with open(INVENTORY) as fh:
         inventory = json.load(fh)
     hashes = hash_all(_urls(inventory))
+    os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
     with open(BASELINE, "w") as fh:
         json.dump(hashes, fh, indent=2)
     print(f"Baseline written to {BASELINE} ({len(hashes)} scripts).")
@@ -68,7 +74,7 @@ def create_baseline() -> int:
 
 def diff() -> int:
     if not os.path.exists(BASELINE):
-        print("No baseline yet. Run: python script_monitor.py --create-baseline")
+        print("No baseline yet. Run: python defenses/script_monitor.py --create-baseline")
         return 1
     with open(BASELINE) as fh:
         baseline = json.load(fh)

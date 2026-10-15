@@ -1,172 +1,194 @@
 """
-checkpoint.py — are you where this round should be?
+Round checkpoint for W3 Ch5 (Supply Chain & Third-Party Scripts). Declares the rounds and hands over to
+checkpoint_core.
 
-Reads how the demo store is configured, re-runs the round's attack, and checks
-BOTH sides: did the skimmer get card data out, and did any real shopper get
-blocked. Round 1 is special — there the lesson is that detection alone does not
-stop exfil, so it checks the change-monitor fired AND the card still got out.
+    python tools/checkpoint.py --round 3              # set level 3, run the round's skimmer and the 6 browser shoppers
+    python tools/checkpoint.py --round 3 --level 2    # the same skimmer against Round 2's defense (the "before")
+    python tools/checkpoint.py --round 3 --catch-up   # install solutions/round1..3 (ladder.py), your file kept as .bak
+    python tools/checkpoint.py --restore              # put your own file back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-Run (demo store + collector up):
-    python tools/checkpoint.py --round 2
-    python tools/checkpoint.py --round 1 --catch-up   # print the right commands
+This lab is PRE-WRITTEN: every control ships complete and a round is a DEFENSE_LEVEL. The store (and the
+attacker's collector, started for you if none is listening) must be running; a round runs a pair of victims
+through a real browser as the skimmer's audience, next to six browser shoppers.
+
+    round  level  adds                                      skimmer (victims skimmed, of 2: checkout card + login password)
+    -----  -----  ----------------------------------------  --------------------------------------------------------------
+      1    1      inventory + change detection              beacon: both (detection is not prevention)
+      2    2      CSP allowlist (Report-Only, then enforce)  dynamic: both under Report-Only, none enforced
+      3    3      CSP nonce + strict-dynamic, SRI           allowlisted: none
+      4    4      runtime monitor                           first-party poisoned bundle: none
+
+"Succeeded" is victims whose data reached the collector. Next to it run the shoppers (tools/personas_ch5.py):
+none may be stopped, and none may see the store's OWN files refused by the policy. Defender cost is what the
+policy does to people and to the on-call: shoppers hurt, first-party violations, the add-on report noise, the
+SRI re-pin (tools/cdn_bump.py) and the gate time of the shoppers' requests.
 """
 
-import argparse
+import atexit
 import json
 import os
+import statistics
 import subprocess
 import sys
+import time
 import urllib.request
 
-HERE = os.path.dirname(__file__)
-LAB = os.path.dirname(HERE)
-sys.path.insert(0, os.path.join(LAB, "attacks"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE = target("DEMO_URL", "http://127.0.0.1:5000")
-COLLECTOR = target("COLLECTOR_URL", "http://127.0.0.1:5001")
+import personas_ch5  # noqa: E402,F401  (registers the ch5_shop scenario)
+import checkpoint_core  # noqa: E402
+import cdn_bump  # noqa: E402
+import slice_check  # noqa: E402
+import labclient  # noqa: E402
+from checkpoint_core import Round, main  # noqa: E402
 
+LAB = os.path.abspath(os.path.join(HERE, ".."))
 PY = sys.executable
+GATE_MEDIAN_MAX_MS = 20.0
+SHOPPERS = 6
+_collector_proc = []
 
-# Per round: the server state you should be running, and what "passing"
-# means. exfil_blocked=False for Round 1 (detection only).
+
+def ensure_collector():
+    """The attacker's sink must be listening where the store points; start it (loopback only) if nothing is."""
+    url = labclient.admin("GET", "/lab/supply/status")["collector"]
+    try:
+        urllib.request.urlopen(url + "/captured", timeout=2).read()
+        return url
+    except OSError:
+        pass
+    proc = subprocess.Popen([PY, os.path.join(LAB, "collector", "collector.py")], cwd=LAB,
+                            env=dict(os.environ, COLLECTOR_URL=url), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _collector_proc.append(proc)
+    atexit.register(proc.terminate)
+    for _ in range(50):
+        try:
+            urllib.request.urlopen(url + "/captured", timeout=1).read()
+            print(f"[checkpoint] started the collector on {url}")
+            return url
+        except OSError:
+            time.sleep(0.2)
+    raise SystemExit(f"Could not start the collector on {url}. Run: python collector/collector.py")
+
+
+def victims_ok(board, results, attacks):
+    """Every victim finished the page (an erroring victim says nothing about the defense)."""
+    bad = {n: a.get("victim_errors") for n, a in attacks.items() if a.get("victim_errors")}
+    return (not bad, f"victims did not finish: {bad}")
+
+
+def wire(level):
+    return lambda board, results, attacks: slice_check.wire(level)
+
+
+def shoppers(board, results, attacks):
+    """First-party violations must be 0; report the add-on noise and the vendor refusals as costs."""
+    fp = sum(r.get("csp_first_party", 0) for r in results)
+    noise = sum(r.get("csp_addon", 0) for r in results)
+    vendor = sum(r.get("csp_vendor", 0) for r in results)
+    skim = sum(r.get("csp_skimmer", 0) for r in results)
+    print(f"\nthe shoppers: {len(results)} browsers · first-party files refused by the policy: {fp}"
+          f" · add-on pixel/script refused (report noise): {noise} · vendor file refused by SRI: {vendor}"
+          f" · skimmer calls refused: {skim}")
+    stuck = [f"{r['actor']}@{r.get('stage')}" for r in results if r.get("outcome") != "bought"]
+    if stuck:
+        print("  did not finish:", ", ".join(stuck))
+    return (fp == 0, f"{fp} first-party resource(s) were refused for shoppers")
+
+
+def gate_cost(board, results, attacks):
+    rows = labclient.admin("GET", "/lab/decisions", params={"limit": 5000, "actor": "human:"})["items"]
+    ms = [d["ms"] for d in rows]
+    if not ms:
+        return (False, "no shopper requests in the decision log")
+    median = statistics.median(ms)
+    print(f"defender cost: gate time of the shoppers' {len(ms)} requests: median {median:.2f} ms "
+          f"(the controls ride the response, not the gate)")
+    return (median < GATE_MEDIAN_MAX_MS, f"gate median {median:.2f} ms > {GATE_MEDIAN_MAX_MS} ms")
+
+
+def change_detection(board, results, attacks):
+    """Round 1: baseline the clean release, let the vendor swap the file, crawl again, expect CHANGED."""
+    admin = labclient.admin
+    run = lambda *a: subprocess.run([PY, *a], cwd=LAB, capture_output=True, text=True,
+                                    env=dict(os.environ, DEMO_URL=labclient.BASE_URL))
+    admin("POST", "/lab/supply/scenario", json={"vendor": "clean", "variant": "beacon"})
+    run("defenses/inventory_scripts.py")
+    run("defenses/script_monitor.py", "--create-baseline")
+    clean = run("defenses/script_monitor.py")
+    admin("POST", "/lab/supply/scenario", json={"vendor": "compromised"})
+    run("defenses/inventory_scripts.py")
+    swapped = run("defenses/script_monitor.py")
+    lines = [l.strip() for l in swapped.stdout.splitlines() if l.strip().startswith(("CHANGED", "NEW", "REMOVED"))]
+    print("\nchange detection (inventory crawl + hash diff against the clean release)")
+    print(f"  clean release : {'no alerts' if clean.returncode == 0 else 'ALERT (unexpected)'}")
+    for l in lines:
+        print(f"  after the swap: {l}")
+    ok = clean.returncode == 0 and any("analytics-helper.js" in l and l.startswith("CHANGED") for l in lines)
+    return (ok, "the change monitor did not flag the swapped vendor file (and only that)")
+
+
+def csp_evidence(directive_words):
+    def check(board, results, attacks):
+        ro, en = attacks.get("report_only", {}), attacks.get("enforce", {})
+        reports = [r for r in labclient.admin("GET", "/lab/supply/csp-reports")
+                   if r.get("blocked_uri") and "127.0.0.1" in str(r["blocked_uri"])]
+        print(f"\nCSP reports: Report-Only run filed {ro.get('csp_reports')}, enforce run filed {len(reports)} naming the collector "
+              f"({', '.join(sorted({str(r['directive']).split(' ')[0] for r in reports})) or 'none'})")
+        bad = []
+        if not ro.get("csp_reports"):
+            bad.append("Report-Only filed no reports (nothing to learn from)")
+        if not reports:
+            bad.append("enforcement filed no report naming the collector")
+        return (not bad, "; ".join(bad))
+    return check
+
+
+def sri_cost(board, results, attacks):
+    res = cdn_bump.probe()
+    print(f"\nthe SRI re-pin cost: vendor script ran when it serves the pinned release: {res['clean']} · a legitimate "
+          f"new release: {res['updated']} (refused for every visitor until re-pinned) · the swapped file: {res['compromised']}")
+    ok = res["clean"] and not res["updated"] and not res["compromised"]
+    return (ok, f"SRI should run the pinned release and refuse both others, got {res}")
+
+
+def monitor_evidence(board, results, attacks):
+    a = attacks.get("poisoned", {})
+    reports = labclient.admin("GET", "/lab/supply/violations")
+    print(f"\nruntime monitor: {len(reports)} report(s)" + (f", first: {reports[-1]['method']} -> {reports[-1]['url']}" if reports else ""))
+    return (a.get("monitor_reports", 0) >= 1 and bool(reports), "the runtime monitor reported nothing")
+
+
+def make_round(level, description, attacks, expect, checks, **kw):
+    return Round(level=level, description=description, scenario="ch5_shop", population_n=SHOPPERS, attacks=attacks, expect=expect,
+                 solutions=("defenses/ladder.py",), extra_checks=[victims_ok, wire(level), *checks, shoppers, gate_cost], **kw)
+
+
 ROUNDS = {
-    1: dict(env=dict(VENDOR="compromised", SKIMMER_VARIANT="beacon",
-                     CSP_MODE="off", SRI="off", MONITOR="off"),
-            exfil_blocked=False, want_change_alert=True, want_runtime_alert=False),
-    2: dict(env=dict(VENDOR="compromised", SKIMMER_VARIANT="dynamic",
-                     CSP_MODE="enforce", SRI="off", MONITOR="off"),
-            exfil_blocked=True, want_change_alert=False, want_runtime_alert=False),
-    3: dict(env=dict(VENDOR="compromised", SKIMMER_VARIANT="allowlisted",
-                     CSP_MODE="strict", SRI="on", MONITOR="off"),
-            exfil_blocked=True, want_change_alert=False, want_runtime_alert=False),
-    4: dict(env=dict(VENDOR="compromised", SKIMMER_VARIANT="firstparty",
-                     CSP_MODE="strict", SRI="on", MONITOR="on",
-                     TRUSTED_ANALYTICS=COLLECTOR),
-            exfil_blocked=True, want_change_alert=False, want_runtime_alert=True),
+    1: make_round(1, "inventory and change detection: the swap is flagged, the card still leaves",
+                  {"vendor_skimmer": "attacks/round1_vendor_skimmer.py"}, {"vendor_skimmer": "full"}, [change_detection]),
+    2: make_round(2, "CSP: Report-Only teaches, enforcement stops the beacon",
+                  {"report_only": "attacks/round2_checkout_only.py --report-only", "enforce": "attacks/round2_checkout_only.py"},
+                  {"report_only": "full", "enforce": "blocked"}, [csp_evidence(("connect-src",))]),
+    3: make_round(3, "nonce + strict-dynamic and SRI: no allowlist to bypass",
+                  {"allowlist_bypass": "attacks/round3_allowlist_bypass.py"}, {"allowlist_bypass": "blocked"}, [sri_cost]),
+    4: make_round(4, "runtime monitor: the poisoned first-party bundle is seen and its beacon refused",
+                  {"poisoned": "attacks/round4_poisoned_bundle.py"}, {"poisoned": "blocked"}, [monitor_evidence]),
 }
 
-_STATUS_KEY = {"VENDOR": "vendor", "SKIMMER_VARIANT": "skimmer_variant",
-               "CSP_MODE": "csp_mode", "SRI": "sri", "MONITOR": "monitor",
-               "TRUSTED_ANALYTICS": "trusted_analytics"}
-_BOOL = {"on": True, "off": False}
+_check_round = checkpoint_core.check_round
 
 
-def launch_cmd(env: dict) -> str:
-    kv = " ".join(f"{k}={v}" for k, v in env.items())
-    return f"{kv} python demo_site/app.py"
+def check_round(*args, **kwargs):
+    """Make sure the attacker's collector is listening, then run the round."""
+    labclient.wait_for_store()
+    ensure_collector()
+    return _check_round(*args, **kwargs)
 
 
-def status() -> dict:
-    with urllib.request.urlopen(f"{BASE}/status", timeout=5) as r:
-        return json.loads(r.read())
-
-
-def state_matches(env: dict, st: dict) -> bool:
-    for k, v in env.items():
-        want = _BOOL[v] if k in ("SRI", "MONITOR") else v
-        if st.get(_STATUS_KEY[k]) != want:
-            return False
-    return True
-
-
-def change_alerts() -> int:
-    """Crawl + diff. Returns the number of supply-chain alerts (>0 means caught)."""
-    inv = os.path.join(LAB, "defenses", "inventory_scripts.py")
-    mon = os.path.join(LAB, "defenses", "script_monitor.py")
-    subprocess.run([PY, inv, "--base", BASE], cwd=LAB, check=False,
-                   stdout=subprocess.DEVNULL)
-    r = subprocess.run([PY, mon], cwd=LAB, check=False,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # script_monitor exits 1 when it finds alerts (or has no baseline).
-    return r.returncode
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("--round", type=int, required=True, choices=[1, 2, 3, 4])
-    ap.add_argument("--catch-up", action="store_true",
-                    help="print the exact commands to reach this round's state")
-    args = ap.parse_args()
-    cfg = ROUNDS[args.round]
-
-    if args.catch_up:
-        print(f"Round {args.round}: start the store with\n")
-        print("   cd demo_site && " + launch_cmd(cfg["env"]) + "\n")
-        if args.round == 1:
-            print("First build the known-good baseline, then stage the swap:\n")
-            print("   # 1) clean release")
-            print("   cd demo_site && VENDOR=clean python app.py   # in another shell")
-            print("   python defenses/inventory_scripts.py")
-            print("   python defenses/script_monitor.py --create-baseline")
-            print("   # 2) restart the store with the default (compromised) vendor file")
-        return 0
-
-    try:
-        st = status()
-    except OSError:
-        print(f"❌ Demo store not reachable on {BASE}. Is it running?")
-        return 1
-
-    print(f"=== Checkpoint: Round {args.round} ===")
-    if not state_matches(cfg["env"], st):
-        print("❌ Server is not in this round's state. Restart it with:\n")
-        print("     cd demo_site && " + launch_cmd(cfg["env"]))
-        return 1
-    print(f"  server OK: CSP_MODE={st['csp_mode']} SRI={st['sri']} "
-          f"MONITOR={st['monitor']} VARIANT={st['skimmer_variant']}\n")
-
-    failures = 0
-
-    # ── Bot side: run the round's attack ──
-    import _common
-    attack = __import__({1: "round1_vendor_skimmer", 2: "round2_checkout_only",
-                         3: "round3_allowlist_bypass", 4: "round4_poisoned_bundle"}[args.round])
-    cap = attack.run(BASE)
-    got_out = cap["sensitive"] > 0
-    if cfg["exfil_blocked"]:
-        ok = not got_out
-        print(f"  {'✅' if ok else '❌'} exfil blocked "
-              f"({cap['sensitive']} sensitive capture(s) — want 0)")
-    else:
-        ok = got_out
-        print(f"  {'✅' if ok else '❌'} exfil succeeds as expected "
-              f"({cap['sensitive']} capture(s) — detection alone does not stop it)")
-    failures += not ok
-
-    # ── Detection signals ──
-    if cfg["want_change_alert"]:
-        rc = change_alerts()
-        ok = rc != 0
-        print(f"  {'✅' if ok else '❌'} change-monitor flagged the swapped vendor file"
-              + ("" if ok else "  (did you build the baseline? see --catch-up)"))
-        failures += not ok
-
-    if cfg["want_runtime_alert"]:
-        hits = json.loads(urllib.request.urlopen(f"{BASE}/api/script-violation/log",
-                                                  timeout=5).read())
-        ok = len(hits) > 0
-        print(f"  {'✅' if ok else '❌'} runtime monitor flagged the first-party call-out "
-              f"({len(hits)} report(s))")
-        failures += not ok
-
-    # ── Human side ──
-    import legit_traffic
-    shoppers = legit_traffic.run(BASE, count=5)
-    broken = [s for s in shoppers if not s["ok"]]
-    ok = not broken
-    print(f"  {'✅' if ok else '❌'} real shoppers: {len(broken)}/{len(shoppers)} blocked")
-    failures += not ok
-
-    print()
-    if failures:
-        print(f"❌ {failures} check(s) differ from the expected results. "
-              f"Re-read the round, or run with --catch-up.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
-
+checkpoint_core.check_round = check_round
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main(ROUNDS)
