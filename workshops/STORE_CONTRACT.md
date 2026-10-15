@@ -6,7 +6,7 @@ and the hook points a chapter uses to add a defense or a feature. The Demo Store
 (`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
-Contract version: **1.5** (recorded in each starter's `STARTER.json`). Changing anything under
+Contract version: **1.6** (recorded in each starter's `STARTER.json`). Changing anything under
 "Canonical surface" is a contract bump: rebuild the starters (`scripts/build_starter.py`) and rerun
 `tools/smoke.py` in every lab.
 
@@ -18,6 +18,7 @@ Contract version: **1.5** (recorded in each starter's `STARTER.json`). Changing 
 | 1.3 | additive, for W1 Ch3: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
 | 1.4 | two fixes: the baseline pins `fakeredis[lua]` so `ctx.bucket` (a Lua script) works on `REDIS_URL=memory://` instead of raising into a silent `<check>:error` allow, and `smoke.py` exercises it once; `LabClient.verdict()` returns the `X-Lab-Verdict`/`X-Lab-Score`/`X-Lab-Signals` of a blocked (4xx) response instead of `None` (the old guard treated a falsy `requests.Response` as "no response") |
 | 1.5 | additive, for W1 Ch8 (and the W4 crawl-policy chapters): `/robots.txt` is extensible — an ext registers `hooks.robots(provider)` (a callable returning extra lines, called per request so lines may vary with the level) and `routes/seo.py` appends them to the base policy; the base body is byte-identical when nothing registers |
+| 1.6 | additive, for the W4 chapters: (a) `hooks.on_action(name, fn)` now actually fires — the `review`, `checkout` and `drop_buy` routes (HTML and JSON) call it after a successful write with the row (`review=`/`order=`), and the handler may hold it (`status="pending"`), attribute it, or return a replacement response (e.g. a 202); nothing registered leaves the default behaviour byte-identical. (b) `hooks.on_reset(fn)` runs after `POST /lab/reset` so an ext can drop or reseed its own tables and keys. (c) the scoreboard gives a chapter-specific `outcome` (an ext setting `g.outcome`, e.g. `paywalled`/`charged`/`held`) its own column instead of folding it into `other` |
 
 ## 1. The store
 
@@ -95,6 +96,11 @@ session cookie, not on the csrf field.
 
 Retired names (do not reintroduce): `/admin/*`, `/api/v0/*`, `/api/sensor`, `/api/session`, `/api/fp`,
 `/telemetry`, `/products/<sku>`, `/signup`. `/api/v2/*` and `/graphql` are W3 Ch2 ext routes.
+Retired request headers (the edge drops every `X-Lab-*` except the three in §3.6, so a chapter's own
+header must not use that prefix): `X-Lab-Source-IP`, `X-Sim-Client-IP`, `X-Lab-Egress`, `X-Lab-Session`,
+`X-Lab-FP`, `X-Lab-User`, `X-Lab-Round`, `X-Lab-Run`, `X-Lab-Admin`. The one client-IP header is
+`X-Lab-Client-IP`; a session comes from the cookie, a round/run from the level, and scoring ground truth
+travels only via `X-Lab-Actor` (moved to `environ["lab.actor"]`, unreadable by any defense).
 
 ### 3.3 Lab routes (loopback only, skipped by the gate, never "production")
 
@@ -237,6 +243,9 @@ def init(app):
     hooks.enricher(_tag_difficulty)                     # fn(ctx): fill ctx.attrs before the checks
     hooks.ungate("/lab/pow/")                           # paths the gate must skip
     hooks.robots(lambda: ["Disallow: /lab/pow/"])       # extra robots.txt lines (called per request)
+    hooks.on_action("review", _hold)                    # fn(ctx, result, response) after a review/checkout/
+                                                        #   drop_buy write; hold/attribute/swap the outcome
+    hooks.on_reset(_reseed)                             # fn(app) after POST /lab/reset: clear your tables
     app.register_blueprint(Blueprint("pow", __name__, url_prefix="/lab/pow"))
 ```
 
@@ -279,9 +288,17 @@ ttl=None, uses=None)` and `gate.clearance_valid(ctx, type)` are the other two ca
 
 One `Decision` row per gated request: `ts, sid, user_id, actor, phase, method, path, ip, level, score,
 action, enforced, outcome, status, signals, shadow, ms, extra`. `outcome` is what the client experienced:
-`served | purchased | blocked | challenged | rate_limited | deceived | not_found | error`. The scoreboard
+`served | purchased | blocked | challenged | rate_limited | deceived | not_found | error`, or a
+chapter-specific label an ext sets on `g.outcome` (e.g. `paywalled`, `charged`, `held`), which the
+scoreboard reports in its own column rather than folding into `other`. The scoreboard
 groups actors by `kind:persona` and reports bots stopped next to shoppers hurt, purchases by kind and
 drop stock. Chapter-specific fields go in `extra` via `ctx.note()`.
+
+A write route (`review`, `checkout`, `drop_buy`, HTML and JSON) fires `hooks.on_action(name, fn)` after
+it commits, with the written row in `result` (`{"review": …}` or `{"order": …}`); `fn(ctx, result,
+response)` may hold it (`review.status`/`order.status = "pending"`), attribute it, or return a
+replacement response (a 202, a moderation notice). `hooks.on_reset(fn)` runs after `POST /lab/reset`
+clears the core store, so an ext reseeds or drops the tables and Redis keys it owns.
 
 Shoppers hurt are counted as **people**: an individual is hurt if the last thing that happened to them
 was a stop and they bought nothing. A shopper who met a challenge, solved it and carried on is not hurt;

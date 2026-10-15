@@ -1,6 +1,6 @@
 # Kestrel Outfitters: the W2 starter
 
-**Contract:** `workshops/STORE_CONTRACT.md` (version 1.5). **Source:** the skeleton store
+**Contract:** `workshops/STORE_CONTRACT.md` (version 1.6). **Source:** the skeleton store
 (`workshops/01-initiation/starter/`) plus this workshop's baseline, built by `scripts/build_starter.py --workshop 2`
 from `workshops/02-proficient/starter.manifest.json`. Do not edit this folder by hand; change the manifest and rebuild.
 

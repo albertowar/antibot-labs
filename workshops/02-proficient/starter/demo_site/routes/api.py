@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from .. import gate, hooks
 from ..models import GiftCard, Order, Product, Review, User, db, utcnow
 from ..seed import check_password, set_password
-from . import Cart, api_error, current_user, guard
+from . import Cart, after_action, api_error, current_user, guard
 from .pages import listing_query, paginate, place_order
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -58,7 +58,7 @@ def post_review():
                  status="published", extra={"sid": g.ctx.session.sid})
     db.session.add(rev)
     db.session.commit()
-    return jsonify(rev.to_dict()), 201
+    return after_action("review", (jsonify(rev.to_dict()), 201), review=rev, product=p)
 
 
 @bp.route("/cart")
@@ -108,7 +108,7 @@ def checkout():
     if problem:
         return api_error("sold_out", problem, 409)
     c.clear()
-    return jsonify(ok=True, order=order.to_dict()), 201
+    return after_action("checkout", (jsonify(ok=True, order=order.to_dict()), 201), order=order)
 
 
 @bp.route("/buy", methods=["POST"])
@@ -140,7 +140,7 @@ def buy():
                                  email, user, {"kind": "drop", "sku": p.sku, "api": True})
     if problem:
         return api_error("sold_out", problem, 410)
-    return jsonify(ok=True, order=order.to_dict()), 201
+    return after_action("drop_buy", (jsonify(ok=True, order=order.to_dict()), 201), order=order)
 
 
 @bp.route("/login", methods=["POST"])

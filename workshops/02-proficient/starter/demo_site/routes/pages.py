@@ -7,7 +7,7 @@ from sqlalchemy import or_
 
 from ..models import GiftCard, Newsletter, Order, OrderItem, Product, Review, User, db, utcnow
 from ..seed import check_password, set_password
-from . import Cart, api_error, csrf_ok, current_user, guard, render
+from . import Cart, after_action, api_error, csrf_ok, current_user, guard, render
 
 bp = Blueprint("pages", __name__)
 PAGE_SIZE = 24
@@ -100,14 +100,15 @@ def review(sku):
         return r
     rating = max(1, min(5, request.form.get("rating", 5, type=int)))
     author = user.name.split()[0] if user and user.name else request.form.get("author", "Guest")[:40]
-    db.session.add(Review(sku=sku, user_id=user.id if user else None, author=author, rating=rating,
-                          title=request.form.get("title", "")[:120], body=request.form.get("body", "")[:2000],
-                          status="published", extra={"sid": g.ctx.session.sid}))
+    rev = Review(sku=sku, user_id=user.id if user else None, author=author, rating=rating,
+                 title=request.form.get("title", "")[:120], body=request.form.get("body", "")[:2000],
+                 status="published", extra={"sid": g.ctx.session.sid})
+    db.session.add(rev)
     all_ratings = [x.rating for x in Review.query.filter_by(sku=sku, status="published")] + [rating]
     p.rating = sum(all_ratings) / len(all_ratings)
     db.session.commit()
     flash("Thanks for your review.", "ok")
-    return redirect(url_for("pages.product", sku=sku))
+    return after_action("review", redirect(url_for("pages.product", sku=sku)), review=rev, product=p)
 
 
 @bp.route("/cart")
@@ -190,7 +191,7 @@ def checkout():
         flash(problem, "warn")
         return redirect(url_for("pages.cart"))
     c.clear()
-    return render("order_confirmed.html", order=order, fake=False)
+    return after_action("checkout", render("order_confirmed.html", order=order, fake=False), order=order)
 
 
 @bp.route("/drop/<sku>", methods=["GET", "POST"])
@@ -228,7 +229,7 @@ def drop(sku):
     order, problem = place_order([line], email, user, {"kind": "drop", "sku": sku})
     if problem:
         return render("drop.html", p=p, bought=0, sold_out=True), 410
-    return render("order_confirmed.html", order=order, fake=False)
+    return after_action("drop_buy", render("order_confirmed.html", order=order, fake=False), order=order)
 
 
 @bp.route("/login", methods=["GET", "POST"])

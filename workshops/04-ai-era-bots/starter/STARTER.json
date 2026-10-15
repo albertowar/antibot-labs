@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.5",
+  "contract_version": "1.6",
   "workshop": 4,
   "source": "skeleton+manifest",
   "skeleton": "workshops/01-initiation/starter",
   "manifest": "workshops/04-ai-era-bots/starter.manifest.json",
-  "built_from": "9b57ba4",
+  "built_from": "7488e12",
   "default_level": 0,
   "baseline_checks": [],
   "pending_checks": [],

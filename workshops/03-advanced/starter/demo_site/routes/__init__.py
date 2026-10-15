@@ -33,6 +33,24 @@ def guard(action, **notes):
     return gate.respond(d, g.ctx)
 
 
+def after_action(action, response, **result):
+    """Fire the post-write hooks for `action` (review/checkout/drop_buy) and return the response.
+
+    The route calls this on its success path, after the row is written, with the row(s) in
+    `result` (e.g. order=order or review=rev). Each `hooks.on_action(action, fn)` handler is
+    fn(ctx, result, response); it may mutate the persisted row (hold a review as `pending`,
+    mark an order `pending`, attribute an agent order) and return a replacement response, or
+    None to keep the current one. With nothing registered the response is returned unchanged,
+    so the default store behaviour is identical."""
+    from .. import hooks
+    ctx = getattr(g, "ctx", None)
+    for fn in hooks.ACTION_HOOKS.get(action, []):
+        r = fn(ctx, result, response)
+        if r is not None:
+            response = r
+    return response
+
+
 def api_error(code, message, status=400, **extra):
     body = {"error": {"code": code, "message": message}}
     body.update(extra)

@@ -10,7 +10,12 @@ from its init(app). Starter files are never edited by a lab.
                                             a challenge type the policy "challenge" band can serve
     enricher(fn)                            fn(ctx) runs before the checks; fill ctx.attrs
     ungate(prefix)                          paths the gate skips (static assets, your lab routes)
-    on_action(name, fn)                     fn(ctx, result) after a route action (checkout, login, ...)
+    on_action(name, fn)                     fn(ctx, result, response) after a successful write (name is
+                                            one of review/checkout/drop_buy); the written row is in
+                                            `result` ({"review": ...} or {"order": ...}); return a
+                                            replacement response to hold/attribute/swap it, or None
+    on_reset(fn)                            fn(app) after POST /lab/reset clears core state: drop or
+                                            reseed the tables and Redis keys your ext owns
 """
 
 from collections import defaultdict
@@ -22,6 +27,7 @@ SLOTS = defaultdict(list)
 ENRICHERS = []
 UNGATED = ["/static/", "/img/", "/lab/", "/whoami", "/health", "/favicon.ico"]
 ACTION_HOOKS = defaultdict(list)
+RESET_HOOKS = []
 ROBOTS = []
 
 
@@ -59,6 +65,11 @@ def is_ungated(path):
 
 def on_action(name, fn):
     ACTION_HOOKS[name].append(fn)
+
+
+def on_reset(fn):
+    """Register fn(app), run after POST /lab/reset clears the core store (reseed/clear ext tables)."""
+    RESET_HOOKS.append(fn)
 
 
 class Telemetry:

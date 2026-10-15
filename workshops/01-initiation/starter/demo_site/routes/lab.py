@@ -92,7 +92,10 @@ def scoreboard_data(since=None):
                                        "blocked": 0, "challenged": 0, "rate_limited": 0, "deceived": 0, "other": 0,
                                        "score_sum": 0, "ms_sum": 0.0})
         row["requests"] += 1
-        row[d.outcome if d.outcome in row else "other"] += 1
+        # Known outcomes keep their fixed column; a chapter-specific outcome (an ext setting g.outcome,
+        # e.g. paywalled/charged/mazed/held) gets its own column instead of being folded into "other".
+        oc = d.outcome or "other"
+        row[oc] = row.get(oc, 0) + 1
         row["score_sum"] += d.score or 0
         row["ms_sum"] += d.ms or 0
     for row in board.values():
@@ -151,6 +154,8 @@ def reset():
             os.truncate(cfg.decision_log, 0)
     except OSError:
         pass
+    for fn in hooks.RESET_HOOKS:                 # exts drop/reseed the tables and keys they own
+        fn(current_app)
     return jsonify(ok=True, **out)
 
 
