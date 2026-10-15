@@ -1,38 +1,58 @@
 """
-Chapter 9 — L4 login token binding (W2 Ch2), enabled at DEFENSE_LEVEL >= 4
+token_binding (Round 4): the login must carry a token that proves the page's JavaScript ran IN THIS
+SESSION. Enabled at DEFENSE_LEVEL >= 5.
 
-The login API is the soft spot: until Round 4 it accepts a bare POST, so a
-credential stuffer doesn't need a browser at all. From Level 4, a login must
-carry a token that proves the page's JavaScript ran *in this session*:
+The login API is the soft spot of every earlier round: it accepts a bare POST, so a credential stuffer
+needs no browser at all. From level 5 a login must carry a token (header `X-Login-Token`, or a
+`login_token` form or JSON field), minted like this:
 
-    1. the page sends telemetry; the server stores its fingerprint hash
-    2. GET /api/challenge  -> nonce (single use, 120 s)
-    3. the page finds a counter with sha256(nonce:fp_hash:counter) starting
-       with DIFFICULTY zero bits (~16k hashes, ~0.2 s in a browser)
-    4. POST /api/challenge/verify -> token = sid.fp_hash.expiry.HMAC
-    5. POST /api/login with X-Lab-Token; verify() checks HMAC, expiry, sid
-       and fingerprint hash
+    1. the page's sensor posts its report; the server derives a fingerprint hash from it
+    2. GET  /api/login/challenge   -> {nonce, bits, fp_hash}      (demo_site/ext/login9.py)
+    3. the page finds a counter with sha256(nonce:fp_hash:counter) starting with `bits` zero bits
+       (~16k hashes, a fraction of a second in a browser)
+    4. POST /api/login/token {nonce, counter} -> a token: Chapter 2's signed, expiring payload
+       {sid, fp, exp} (defenses/tokens.py, copied from W2 Ch2)
+    5. the login carries it; this check verifies the signature, the expiry, the session and the
+       fingerprint hash
 
-    No valid token  +60
+    No valid token  NO_TOKEN_POINTS
 
-Trade-off: the token is not a secret and not a CAPTCHA. Anyone who reads
-challenge.js can re-implement it (W2 Ch2), and the PoW costs a bot farm
-almost nothing. What it buys is *binding*: every attempt is now tied to one
-session and one fingerprint hash, so login_risk.py can count failures per
+Trade-off, and the lesson of W2 Ch2: the token is not a secret and not a CAPTCHA. Anyone who reads the
+page's JavaScript can reproduce it in Python (attacks/round4_stuffing.py --with-token does exactly
+that), and the proof of work costs a farm almost nothing. What it buys is BINDING: every login attempt
+is now tied to one session and one fingerprint hash, so login_risk.py can count failures per
 fingerprint instead of per IP. Residential proxies make per-IP counts useless.
 """
 
 import hashlib
-import hmac
+import json
 import secrets
 import time
 
-DIFFICULTY = 14
+from . import policy, tokens
+from .pipeline import Check, Signal
+
+KEY = b"w2-ch9-lab-token-key"          # lab only: a real key is a secret, rotated, kept out of the repo
 CHALLENGE_TTL_S = 120
-TOKEN_TTL_S = 120
+HEADER = "X-Login-Token"
+# What a browser reports about itself that does not change between page loads. A different value
+# here is, by definition, a different "device" to login_risk.
+STABLE = ("ua", "platform", "languages", "hardware_concurrency", "max_touch_points")
 
 
-def leading_zero_bits(digest):
+def fingerprint_hash(signals):
+    """A stable id for 'this browser on this machine', from the sensor report (W2 Ch1)."""
+    if not signals:
+        return ""
+    stable = {k: signals.get(k) for k in STABLE}
+    stable["gpu"] = (signals.get("webgl") or {}).get("renderer")
+    geometry = signals.get("geometry") or {}
+    stable["screen"] = [geometry.get("screen_w"), geometry.get("screen_h")]
+    stable["brands"] = (signals.get("uad") or {}).get("brands")
+    return hashlib.sha256(json.dumps(stable, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def zero_bits(digest):
     bits = 0
     for byte in digest:
         if byte == 0:
@@ -42,44 +62,41 @@ def leading_zero_bits(digest):
     return bits
 
 
-def issue_challenge(store, sid):
-    nonce = secrets.token_hex(16)
-    store.set(f"chal:{sid}:{nonce}", "1", ex=CHALLENGE_TTL_S)
-    return {"nonce": nonce, "difficulty": DIFFICULTY}
+def issue(redis, sid, fp_hash):
+    nonce = secrets.token_hex(8)
+    redis.set(f"lab:logintok:{nonce}", sid, ex=CHALLENGE_TTL_S)
+    return {"nonce": nonce, "bits": policy.TOKEN_BITS, "fp_hash": fp_hash}
 
 
-def _sign(secret, payload):
-    return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
-
-
-def redeem(store, sid, fp_hash, nonce, counter, secret):
-    """Check a challenge solution; return a login token or None."""
-    if not fp_hash or not nonce or not isinstance(counter, int):
+def redeem(redis, sid, fp_hash, nonce, counter):
+    """Check a solution and return a token, or None."""
+    if not fp_hash or not isinstance(counter, int):
         return None
-    if not store.delete(f"chal:{sid}:{nonce}"):  # unknown, expired or already used
+    if redis.getdel(f"lab:logintok:{nonce}") != sid:        # unknown, expired, used, or another session's
         return None
-    digest = hashlib.sha256(f"{nonce}:{fp_hash}:{counter}".encode()).digest()
-    if leading_zero_bits(digest) < DIFFICULTY:
+    if zero_bits(hashlib.sha256(f"{nonce}:{fp_hash}:{counter}".encode()).digest()) < policy.TOKEN_BITS:
         return None
-    payload = f"{sid}.{fp_hash}.{int(time.time()) + TOKEN_TTL_S}"
-    return f"{payload}.{_sign(secret, payload)}"
+    return tokens.sign({"sid": sid, "fp": fp_hash, "exp": time.time() + policy.TOKEN_TTL_S}, KEY)
 
 
-def verify(token, sid, fp_hash, secret):
-    try:
-        tok_sid, tok_fp, expiry, sig = token.split(".")
-    except ValueError:
-        return False
-    payload = f"{tok_sid}.{tok_fp}.{expiry}"
-    return (hmac.compare_digest(sig, _sign(secret, payload))
-            and tok_sid == sid and tok_fp == fp_hash and int(expiry) >= time.time())
+def token_ok(ctx):
+    from . import sensor
+    body = ctx.json if isinstance(ctx.json, dict) else {}
+    token = ctx.header(HEADER) or ctx.form.get("login_token") or body.get("login_token") or ""
+    payload = tokens.unsign(token, KEY)
+    return bool(payload and payload.get("sid") == ctx.session.sid
+                and payload.get("fp") == fingerprint_hash(sensor.report(ctx)))
 
 
-def score_token(token_ok):
-    if token_ok:
-        return 0, []
-    return 60, ["No valid login token: this session's page JavaScript never solved the challenge"]
+def _check(ctx):
+    if token_ok(ctx):
+        return None
+    return [Signal("token_binding", "no_valid_token", policy.NO_TOKEN_POINTS,
+                   "no valid login token: this session's page JavaScript never solved the challenge")]
 
 
-if __name__ == '__main__':
-    print(leading_zero_bits(bytes([0, 0, 0x0F, 0xFF])))  # 20
+CHECK = Check("token_binding", _check, phases=("action:login",))
+
+
+if __name__ == "__main__":
+    print(zero_bits(bytes([0, 0, 0x0F, 0xFF])))     # 20

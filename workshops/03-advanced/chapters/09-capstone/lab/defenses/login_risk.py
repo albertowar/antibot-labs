@@ -1,80 +1,80 @@
 """
-Chapter 9 — L4 login risk: failures per fingerprint cluster (W2 Ch6)
+login_risk (Round 4): failures per fingerprint cluster. Enabled at DEFENSE_LEVEL >= 5.
 
-Credential stuffing has one statistical signature no proxy pool can hide:
-most attempts fail. Real users mistype now and then; a combo list fails
-90–99% of the time. The question is what to count failures *per*:
+Credential stuffing has one statistical signature no proxy pool can hide: most attempts fail. Real users
+mistype now and then; a combo list fails 90 to 99 % of the time. The question is what to count failures
+PER:
 
-    per IP            useless once the attacker rotates residential proxies
+    per IP            useless once the attacker rotates residential proxies (login_throttle, W2 Ch6,
+                      is the per-IP and per-account layer, and it is on at level 1)
     per account       catches brute force, not stuffing (one try per account)
-    per fingerprint   what token binding makes possible: every attempt is tied
-                      to one JA4 + fingerprint hash, and a stuffer replays one
-                      captured fingerprint or runs one browser build
+    per fingerprint   what token binding makes possible: every attempt is tied to one JA4 and one
+                      fingerprint hash, and a stuffer replays one captured fingerprint or runs one
+                      browser build. W2 Ch6's population_signals counts per /24 network cohort; this
+                      is the same idea keyed on the device instead of the network.
 
-    cluster = JA4 + fingerprint hash
-    >= MIN_FAILURES failures and failure ratio >= MAX_FAILURE_RATIO in WINDOW_S  ->  +60
+    cluster = JA4 a+b + fingerprint hash
+    >= CLUSTER_MIN_FAILURES failures AND failure ratio >= CLUSTER_MAX_FAILURE_RATIO in CLUSTER_WINDOW_S
+        ->  CLUSTER_POINTS (a block)
 
-This check runs *before* the password is verified. That matters: a step-up
-("we emailed you a code") only answers after a correct password, so a stuffer
-that sees step-up replies has still learned which credentials work and can
-sell them. Blocking the cluster first means it learns nothing more.
+It decides BEFORE the password is verified (phase `action:login`), and counts the outcome afterwards
+(phase `action:login_result`, which W2 Ch6's ext/ato.py runs after the route has answered). That order
+matters: a step-up ("we emailed you a code") only answers after a correct password, so a stuffer that
+sees step-up replies has still learned which credentials work and can sell them. Blocking the cluster
+first means it learns nothing more.
 
 Where it fails:
-  - Identical corporate laptops share a fingerprint hash; one user locked
-    out by typos can drag the cluster's ratio up (that's why MIN_FAILURES).
-  - A patient attacker who rotates real devices (a phone farm) has many
-    clusters. That's W3 territory: device attestation.
+  - Identical corporate laptops share a fingerprint hash; one user locked out by typos can drag the
+    cluster's ratio up. That is what the minimum count is for.
+  - A stuffer that presents a new fingerprint per attempt makes every attempt its own cluster, so the
+    ratio never accumulates (attacks/round4_stuffing.py --rotate-fp). Counting across clusters without
+    blocking the shared office NAT needs something the browser cannot forge about the device:
+    attestation, which is W3 Ch1.
 """
 
 import hashlib
-import time
 
-WINDOW_S = 600
-MIN_FAILURES = 5
-MAX_FAILURE_RATIO = 0.5
+from . import ja4, policy, ratelimit, sensor, token_binding
+from .pipeline import Check, Signal
 
 
-def cluster_key(ctx, state):
-    return f"{ctx['ja4']}|{state['fp_hash'] or 'no-telemetry'}"
+def cluster_of(ctx):
+    fp = token_binding.fingerprint_hash(sensor.report(ctx)) or "no-fingerprint"
+    return f"{ja4.fingerprint(ctx).ja4_ab}|{fp}"
 
 
-def cluster_id(cluster):
-    return hashlib.sha256(cluster.encode()).hexdigest()[:12]
+def _keys(ctx):
+    cid = hashlib.sha256(cluster_of(ctx).encode()).hexdigest()[:12]
+    return f"lab:lr:{cid}:total", f"lab:lr:{cid}:fail"
 
 
-def _keys(cluster):
-    bucket = int(time.time() // WINDOW_S)
-    cid = cluster_id(cluster)
-    return f"lr:{cid}:{bucket}:total", f"lr:{cid}:{bucket}:fail"
+def counts(ctx):
+    total_key, fail_key = _keys(ctx)
+    return int(ctx.redis.get(total_key) or 0), int(ctx.redis.get(fail_key) or 0)
 
 
-def record_attempt(store, cluster, valid):
-    total_key, fail_key = _keys(cluster)
-    pipe = store.pipeline()
-    pipe.incr(total_key)
-    if not valid:
-        pipe.incr(fail_key)
-    pipe.expire(total_key, WINDOW_S * 2)
-    pipe.expire(fail_key, WINDOW_S * 2)
-    pipe.execute()
+def _pre_auth(ctx):
+    total, failures = counts(ctx)
+    ctx.note(cluster_total=total, cluster_failures=failures)
+    if failures >= policy.CLUSTER_MIN_FAILURES and failures / max(1, total) >= policy.CLUSTER_MAX_FAILURE_RATIO:
+        return [Signal("login_risk", "cluster_failing", policy.CLUSTER_POINTS,
+                       f"this fingerprint cluster failed {failures} of its last {total} logins")]
+    return None
 
 
-def cluster_counts(store, cluster):
-    total_key, fail_key = _keys(cluster)
-    return int(store.get(total_key) or 0), int(store.get(fail_key) or 0)
+def _record(ctx):
+    login = ctx.attrs.get("login")
+    if not login:
+        return None
+    total_key, fail_key = _keys(ctx)
+    ratelimit.incr_window(ctx.redis, total_key, policy.CLUSTER_WINDOW_S)
+    if not login["ok"]:
+        ratelimit.incr_window(ctx.redis, fail_key, policy.CLUSTER_WINDOW_S)
+    return None
 
 
-def score_cluster(store, cluster):
-    total, failures = cluster_counts(store, cluster)
-    # SOLUTION (Round 4): a credential-stuffing cluster fails most of its
-    # attempts. Once it has enough attempts to be sure (MIN_FAILURES) and its
-    # failure ratio is at least MAX_FAILURE_RATIO, block the whole cluster —
-    # before the password check, so a correct guess learns nothing more.
-    if failures >= MIN_FAILURES and total and failures / total >= MAX_FAILURE_RATIO:
-        return 60, [f"Login cluster failing {failures}/{total} in {WINDOW_S // 60} min "
-                    f"(>= {int(MAX_FAILURE_RATIO * 100)}% failure ratio): credential stuffing"]
-    return 0, []
+def _check(ctx):
+    return _pre_auth(ctx) if ctx.phase == "action:login" else _record(ctx)
 
 
-if __name__ == '__main__':
-    print(cluster_id("t13d1516h2_8daaf6152771_x|abcd"))
+CHECK = Check("login_risk", _check, phases=("action:login", "action:login_result"))

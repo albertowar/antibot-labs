@@ -1,170 +1,166 @@
 """
-Capstone — Round checkpoint (Section 9.7)
+Round checkpoint for the W3 capstone. Declares the rounds and hands over to checkpoint_core.
 
-Run at the end of every round to see where you stand, measuring BOTH sides:
+    python tools/checkpoint.py --round 2              # set round 2's level, run every attack next to the 43 people
+    python tools/checkpoint.py --round 2 --level 5    # the same attacks against the level below (the "before" column)
+    python tools/checkpoint.py --round 2 --catch-up   # install solutions/round1..2 (your files kept as .bak)
+    python tools/checkpoint.py --restore              # put your own files back
+    python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-    bots:   this round's attack — how many of its moves got through
-    humans: the 40 simulated browser customers (tools/legit_traffic.py) AND the
-            legit API clients (tools/api_traffic.py) — allowed, challenged or blocked
-    cost:   defender scoring time (Server-Timing) and attacker time per attempt
+This lab is PRE-WRITTEN (level style) with three small exercises: every layer ships complete, and Rounds 1 to 3 each
+leave one number for you to set (`TODO (Round N)`: api_hardening.py, stream_detectors.py, supply_chain.py), with the
+answer in solutions/roundN/. `--catch-up` installs those answers cumulatively, so the checkpoint can be run at any
+round without having done the ones before it. The checkpoint sets the store's level for you.
 
-A round passes when the attack is stopped at the round's level AND no legitimate
-customer or API client is blocked. Challenges count as friction, reported but
-not failed.
+    round  level  the attack it must stop                              the layer
+    -----  -----  ---------------------------------------------------  --------------------------------------------
+      0      4    requests, curl_cffi, stock Chromium                   L0..L4: the inherited Workshop 2 stack
+      1      5    introspection, a batch scrape, the REST walk,         L5: API hardening (api_hardening.py)
+                  a WebSocket flood
+      2      6    a micro-burst, a low-and-slow poll                    L6: streaming (stream_detectors.py)
+      3      7    a form skimmer                                        L7: CSP connect-src (supply_chain.py)
+      4      7    recon -> evade -> purchase                            the whole stack, read as a kill chain
 
-Each W3 round edits one defense module; --catch-up installs the reference solutions
-for rounds 1..N over your files (saving a .bak);
---restore puts your work back.
+Every round runs EVERY attack, so you see both what the current layers stop and what still gets through (the next
+round's problem). The 43 people (tools/personas_api.py: the 40 shoppers of the W2 Ch9 lab, plus a mobile app, a second
+phone and a partner integration) buy the drop and use the API in the same minute:
 
-    DEFENSE_LEVEL per round:  0->L4 (inherited stack), 1->L5, 2->L6, 3->L7, 4->L7
-Run (store at the round's level):
-    python tools/checkpoint.py --round 1
-    python tools/checkpoint.py --round 2 --catch-up
+    blocked      a false positive: the round FAILS on any blocked person (the no-JavaScript visitor is the accepted
+                 cost of the sensor gate, as in W2 Ch1 and Ch3)
+    challenged   friction, listed per profile: the round fails above the round's budget
+
+Defender cost: the gate's time on the drop POST (Server-Timing), which from level 6 includes the stream's inline work.
+
+Needs Chromium for Round 0's stock-browser bot and Round 3's browser proof: python -m playwright install chromium
 """
 
-import argparse
-import importlib
 import os
-import shutil
 import statistics
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "attacks"))
-import api_traffic  # noqa: E402
-import legit_traffic  # noqa: E402
-from lab import BASE_URL, admin, ensure_local, server_status  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 
-LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+import labclient  # noqa: E402
+import personas_api  # noqa: E402,F401  (registers the "capstone" scenario and adds the API clients)
+from checkpoint_core import Round, main  # noqa: E402
 
-# round -> attack module, the DEFENSE_LEVEL it runs at, the level that should stop
-# it, and the label for its success count.
+# The drop gets 200 pairs for the checkpoint (the story says 50) so that bots and shoppers never compete for stock
+# here: who gets the last pair is not this chapter's question. (STORE_CONTRACT: a lab cannot change the default,
+# but POST /lab/reset takes ?stock=.)
+CHECKPOINT_STOCK = 200
+_reset = labclient.reset
+labclient.reset = lambda mode="state", **params: _reset(mode, **dict({"stock": CHECKPOINT_STOCK}, **params))
+
+LEVELS = {0: 4, 1: 5, 2: 6, 3: 7, 4: 7}
+
+# name -> (script and flags, the ROUND from which it must be stopped)
+BOTS = {
+    "round0_requests": ("attacks/round0_naive.py --tool requests", 0),
+    "round0_curl_cffi": ("attacks/round0_naive.py --tool curl_cffi", 0),
+    "round0_playwright": ("attacks/round0_naive.py --tool playwright", 0),
+    "round1_introspection": ("attacks/round1_api.py --technique introspection", 1),
+    "round1_batch": ("attacks/round1_api.py --technique batch", 1),
+    "round1_rest": ("attacks/round1_api.py --technique rest", 1),
+    "round1_ws": ("attacks/round1_api.py --technique ws", 1),
+    "round2_burst": ("attacks/round2_streaming.py --pattern burst", 2),
+    "round2_slow": ("attacks/round2_streaming.py --pattern slow", 2),
+    "round3_skimmer": ("attacks/round3_skimmer.py", 3),
+    "round4_integrated": ("attacks/round4_integrated.py", 2),     # three stages: each layer stops its own, none left by level 6
+}
+# The layer that must be the one doing the stopping once the round is reached (a signal prefix in X-Lab-Signals).
+STOPPED_BY = {"round1_introspection": "api_hardening:", "round1_batch": "api_hardening:", "round1_rest": "api_hardening:",
+              "round2_burst": "streaming:", "round2_slow": "streaming:"}
+# recon -> L5, evade -> L6, purchase -> L0 (the W2 layers that also fire on a bare purchase are not asked about)
+KILL_CHAIN = {"recon": ["L5"], "evade": ["L6"], "purchase": ["L0"]}
+
+# People that may meet the "proof" challenge in a round (friction, not a loss: they solve it and buy). Measured on the
+# W2 Ch9 stack: the privacy-extension user (Chapter 1's lie detection reads the extension's wrapped navigator), the
+# voice-control user (a teleported click, text without keys: Chapter 3's own cost) and the password-manager user who
+# buys in 1.2 to 1.6 s (flow's dwell line). The W3 layers add none: an API client cannot solve a challenge, so for
+# the three of them any challenge or block is a loss.
+FRICTION_BUDGET = {0: 3, 1: 3, 2: 3, 3: 3, 4: 3}
+
+
+def bot_expectations(rnd):
+    """Stopped (<= 10 % succeeded) from its round on; below it a bot must still get through at least once ('some')."""
+    return {name: "blocked" if rnd >= first else "some" for name, (_, first) in BOTS.items()}
+
+
+def people(rnd):
+    def check(board, results, attacks):
+        by = {}
+        for r in results:
+            row = by.setdefault(r.get("behavior", "?"), {"n": 0, "challenged": 0, "blocked": 0, "done": 0})
+            row["n"] += 1
+            row["challenged"] += bool(r.get("challenged"))
+            row["blocked"] += r.get("outcome") == "blocked"
+            row["done"] += r.get("outcome") in ("bought", "browsed")
+        print("\npeople by behavior profile         n  done  challenged  blocked")
+        for name, row in sorted(by.items()):
+            print(f"  {name:<30}{row['n']:>3}{row['done']:>6}{row['challenged']:>12}{row['blocked']:>9}")
+        for r in results:
+            if r.get("challenged") or r.get("outcome") == "blocked":
+                print(f"    {r.get('outcome'):<8} {'(challenged) ' if r.get('challenged') else ''}{r.get('profile')}/{r.get('behavior')}: "
+                      f"score {r.get('score')}  {r.get('signals')}")
+        gate = [r["gate_ms"] for r in results if r.get("gate_ms") is not None]
+        if gate:
+            print(f"defender cost: gate median {statistics.median(gate):.2f} ms, max {max(gate):.2f} ms on the drop POST")
+        challenged = sum(bool(r.get("challenged")) for r in results)
+        budget = FRICTION_BUDGET[rnd]
+        # A person that ended in an error is not "blocked", and a report that only counted blocks would stay green while
+        # the store failed them. Every person must finish: buy, find the drop sold out, or (an API client) get their data.
+        unfinished = [r for r in results if r.get("outcome") not in ("bought", "sold_out", "browsed") and r.get("persona") != "no_js"]
+        for r in unfinished:
+            print(f"    UNFINISHED {r.get('actor')}: {r.get('outcome')} {r.get('status')} {r.get('error', '')} {r.get('stage', '')}")
+        return (challenged <= budget and not unfinished,
+                f"{challenged} shoppers met the proof challenge, budget {budget}" if challenged > budget
+                else f"{len(unfinished)} people did not finish what they came to do")
+    return check
+
+
+def stopped_by_the_right_layer(rnd):
+    """From its round on, each API and stream attack is refused by ITS layer (not by an earlier one by accident)."""
+    def check(board, results, attacks):
+        wrong = [name for name, prefix in STOPPED_BY.items()
+                 if rnd >= BOTS[name][1] and not any(s.startswith(prefix) for s in (attacks.get(name) or {}).get("signals", []))]
+        return not wrong, "refused, but not by the layer this round teaches: " + ", ".join(wrong)
+    return check
+
+
+def kill_chain(rnd):
+    def check(board, results, attacks):
+        chain = (attacks.get("round4_integrated") or {}).get("kill_chain")
+        ok = rnd < 3 or (chain is not None and all(set(want) <= set(chain.get(stage, [])) for stage, want in KILL_CHAIN.items())
+                         and chain["recon"] == ["L5"] and chain["evade"] == ["L6"])
+        print(f"\nkill chain: {chain}")
+        return ok, f"the kill chain should be {KILL_CHAIN} (purchase may carry more layers), got {chain}"
+    return check
+
+
+def skimmer_proof(rnd):
+    def check(board, results, attacks):
+        proof = (attacks.get("round3_skimmer") or {}).get("browser_proof", "skipped")
+        ok = rnd < 3 or proof == "skipped" or proof == "CSP refused the exfil in Chromium, same-origin telemetry still worked"
+        return ok, f"a real browser disagrees with the header check: {proof}"
+    return check
+
+
+def make_round(n, description, solutions=()):
+    return Round(level=LEVELS[n], description=description, scenario="capstone",
+                 attacks={name: script for name, (script, _) in BOTS.items()},
+                 expect=bot_expectations(n), allowed_fp=("no_js",),
+                 extra_checks=[people(n), stopped_by_the_right_layer(n), kill_chain(n), skimmer_proof(n)],
+                 solutions=solutions)
+
+
 ROUNDS = {
-    0: {"attack": "round0_naive", "level": 4, "blocks_at": 4, "label": "pairs bought"},
-    1: {"attack": "round1_api", "level": 5, "blocks_at": 5, "label": "API techniques"},
-    2: {"attack": "round2_streaming", "level": 6, "blocks_at": 6, "label": "patterns evaded"},
-    3: {"attack": "round3_skimmer", "level": 7, "blocks_at": 7, "label": "exfiltrations"},
-    4: {"attack": "round4_integrated", "level": 7, "blocks_at": 7, "label": "pairs bought"},
-}
-# Which defense file each round edits (filename, directory under lab/), and its
-# reference solution in solutions/roundN/.
-SOLUTIONS = {
-    1: ("api_hardening.py", "defenses"),
-    2: ("detectors.py", "defenses/streaming"),
-    3: ("supply_chain.py", "defenses"),
+    0: make_round(0, "naive fleet vs the inherited Workshop 2 stack (levels 1 to 4)"),
+    1: make_round(1, "API abuse vs API hardening", ("defenses/api_hardening.py",)),
+    2: make_round(2, "streaming evasion vs the stream detectors", ("defenses/stream_detectors.py",)),
+    3: make_round(3, "form skimmer vs CSP connect-src", ("defenses/supply_chain.py",)),
+    4: make_round(4, "the integrated assault vs the whole stack"),
 }
 
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-import labnet  # noqa: E402
-
-
-def catch_up(rnd):
-    """Install the reference solutions for rounds 1..rnd (each of your files is kept once as .bak)."""
-    installed = labnet.catch_up(LAB_DIR, rnd)
-    for f in installed:
-        print(f"  installed solutions -> {f}   (your version kept as {f}.bak; --restore puts it back)")
-    if not installed:
-        print("  nothing to install up to this round")
-    print("   Restart the demo site for the change to take effect.\n")
-
-
-def run_attack(spec):
-    module = importlib.import_module(spec["attack"])
-    importlib.reload(module)
-    return module.run()
-
-
-def measure_humans():
-    """Browser customers + API clients, with a normalized result shape."""
-    rows = legit_traffic.run()
-    for r in rows:
-        r.setdefault("kind", "browser")
-    api = api_traffic.run()
-    for r in api:
-        r["kind"] = "api"
-    return rows + api
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--round", type=int, required="--restore" not in sys.argv, choices=sorted(ROUNDS))
-    parser.add_argument("--catch-up", action="store_true", help="install the reference solutions up to this round")
-    parser.add_argument("--restore", action="store_true", help="put your .bak files back, then exit")
-    parser.add_argument("--skip-bot", action="store_true", help="only measure the legitimate traffic")
-    args = parser.parse_args()
-    if args.restore:
-        restored = labnet.restore(LAB_DIR)
-        print("restored: " + (", ".join(restored) or "nothing to restore (no .bak files)"))
-        return 0
-    ensure_local()
-    spec = ROUNDS[args.round]
-
-    if args.catch_up:
-        catch_up(args.round)
-
-    try:
-        status = server_status()
-    except Exception:
-        print(f"❌ Demo store not reachable on {BASE_URL}. Start it and the services.")
-        return 1
-    level = status["level"]
-    print(f"=== Checkpoint: Round {args.round} (store at DEFENSE_LEVEL={level}) ===\n")
-    if level != spec["level"]:
-        print(f"❌ This round needs DEFENSE_LEVEL={spec['level']}. Restart the store:")
-        print(f"     DEFENSE_LEVEL={spec['level']} python demo_site/app.py")
-        return 1
-    if not status.get("model_loaded"):
-        print("⚠️  L3 session model not loaded (python tools/train_model.py). The inherited L3 layer\n"
-              "    scores 0 until you train it; the W3 layers in this round are unaffected.\n")
-
-    admin("POST", "/admin/reset")  # clear the drop so counts start from zero
-    failures = 0
-
-    if not args.skip_bot:
-        result = run_attack(spec)
-        got = result["succeeded"]
-        should_stop = level >= spec["blocks_at"]
-        ok = (got == 0) if should_stop else (got > 0)
-        failures += not ok
-        verb = "stopped" if should_stop else "expected to get through"
-        print("Bot traffic")
-        print(f"  {'✅' if ok else '❌'} {spec['attack']:<22} {got} {spec['label']} "
-              f"({verb} at level {spec['blocks_at']})")
-        for reason in result["top_reasons"]:
-            print(f"       - {reason}")
-        if result.get("browser_proof"):
-            print(f"       browser proof: {result['browser_proof']}")
-        print(f"  attacker cost: {result['wall_s_per_attempt']} s wall per attempt "
-              f"({result['wall_s']} s total)\n")
-
-    print("Legitimate traffic (40 browser customers + 3 API clients)")
-    legit = measure_humans()
-    blocked = [r for r in legit if r["outcome"] == "block"]
-    challenged = [r for r in legit if r["outcome"] == "challenge"]
-    errors = [r for r in legit if r["outcome"] not in ("allow", "block", "challenge")]
-    failures += bool(blocked)
-    allowed = len(legit) - len(blocked) - len(challenged) - len(errors)
-    print(f"  {'✅' if not blocked else '❌'} {allowed}/{len(legit)} allowed, "
-          f"{len(challenged)} challenged, {len(blocked)} blocked, {len(errors)} errored/other")
-    for r in blocked:
-        print(f"       ❌ {r['persona']:<16} {r['stage']:<10} {r['reasons'][:2]}")
-    if challenged:
-        names = sorted({r["persona"] for r in challenged})
-        print(f"       ⚠️  challenged (friction): {', '.join(names)}")
-
-    timings = [r["score_ms"] for r in legit if r.get("score_ms") is not None]
-    if timings:
-        p95 = statistics.quantiles(timings, n=20)[-1] if len(timings) >= 2 else timings[0]
-        print(f"\nDefender cost: scoring median {statistics.median(timings):.1f} ms, p95 {p95:.1f} ms per action")
-
-    print()
-    if failures:
-        print(f"❌ Round {args.round}: {failures} check(s) differ from what this round expects.")
-        return 1
-    print(f"✅ Round {args.round} checkpoint passed.")
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    main(ROUNDS)

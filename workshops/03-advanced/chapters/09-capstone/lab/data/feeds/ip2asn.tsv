@@ -1,0 +1,25 @@
+192.0.2.0	192.0.2.63	64496	US	Example Broadband
+192.0.2.64	192.0.2.127	64497	US	Example Cable
+192.0.2.128	192.0.2.191	64498	US	Example Fiber
+192.0.2.192	192.0.2.255	64499	DE	Example Telecom EU
+198.51.100.0	198.51.100.3	64500	US	Example Mobile (CGNAT)
+198.51.100.16	198.51.100.31	64505	US	Example Corp Egress
+198.51.100.32	198.51.100.47	64506	GB	Example University
+198.51.100.64	198.51.100.95	64507	US	Example Privacy Relay
+203.0.113.128	203.0.113.159	64502	NL	Example VPN
+203.0.113.0	203.0.113.63	64501	US	Example Cloud
+203.0.113.64	203.0.113.127	64504	DE	Example Hosting GmbH
+203.0.113.192	203.0.113.223	64503	DE	Tor exits (simulated)
+203.0.113.224	203.0.113.255	64508	US	Example Hosting LLC
+2001:db8:a::	2001:db8:a:ffff:ffff:ffff:ffff:ffff	64496	US	Example Broadband
+2001:db8:b::	2001:db8:b:ffff:ffff:ffff:ffff:ffff	64497	US	Example Cable
+198.51.100.96	198.51.100.127	65537	US	Example Cloud Platform
+2001:db8:c1::	2001:db8:c1:0:ffff:ffff:ffff:ffff	65536	NL	Example VPS Hosting
+198.51.100.128	198.51.100.191	65539	US	Example Hosting LLC West
+198.51.100.192	198.51.100.223	65538	NL	Example Bulletproof Hosting
+2001:db8:100::	2001:db8:100:ffff:ffff:ffff:ffff:ffff	65540	US	Example Cable West
+2001:db8:101::	2001:db8:101:ffff:ffff:ffff:ffff:ffff	65541	GB	Example Broadband UK
+2001:db8:102::	2001:db8:102:ffff:ffff:ffff:ffff:ffff	65542	FR	Example Telecom FR
+2001:db8:103::	2001:db8:103:ffff:ffff:ffff:ffff:ffff	65543	BR	Example Fibra BR
+2001:db8:104::	2001:db8:104:ffff:ffff:ffff:ffff:ffff	65544	JP	Example Hikari JP
+2001:db8:105::	2001:db8:105:ffff:ffff:ffff:ffff:ffff	65545	IN	Example Broadband IN

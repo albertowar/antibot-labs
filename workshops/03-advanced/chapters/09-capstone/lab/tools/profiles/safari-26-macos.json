@@ -1,0 +1,283 @@
+{
+ "name": "safari-26-macos",
+ "description": "Safari 26 on macOS. No Client Hints, no userAgentData; reports a fixed 'Apple GPU'.",
+ "source": "synthetic: Firefox/Safari header order from Workshop 1 captures and vendor documentation",
+ "navigation_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "document"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+  ],
+  [
+   "Upgrade-Insecure-Requests",
+   "1"
+  ],
+  [
+   "Accept",
+   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "none"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "navigate"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Priority",
+   "u=0, i"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ]
+ ],
+ "fetch_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Priority",
+   "u=3, i"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ]
+ ],
+ "post_headers": [
+  [
+   "Host",
+   "localhost:5000"
+  ],
+  [
+   "Accept",
+   "*/*"
+  ],
+  [
+   "Sec-Fetch-Site",
+   "same-origin"
+  ],
+  [
+   "Accept-Language",
+   "en-US,en;q=0.9"
+  ],
+  [
+   "Accept-Encoding",
+   "gzip, deflate"
+  ],
+  [
+   "Sec-Fetch-Mode",
+   "cors"
+  ],
+  [
+   "Content-Type",
+   "application/json"
+  ],
+  [
+   "Origin",
+   "http://localhost:5000"
+  ],
+  [
+   "User-Agent",
+   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+  ],
+  [
+   "Referer",
+   "http://localhost:5000/"
+  ],
+  [
+   "Content-Length",
+   "0"
+  ],
+  [
+   "Sec-Fetch-Dest",
+   "empty"
+  ],
+  [
+   "Cookie",
+   "sid=REPLACED"
+  ],
+  [
+   "Priority",
+   "u=3, i"
+  ],
+  [
+   "Connection",
+   "keep-alive"
+  ]
+ ],
+ "signals": {
+  "webdriver": false,
+  "suspicious_keys": [],
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+  "platform": "MacIntel",
+  "languages": [
+   "en-US",
+   "en"
+  ],
+  "uad": null,
+  "geometry": {
+   "outer_w": 1512,
+   "outer_h": 944,
+   "inner_w": 1512,
+   "inner_h": 860,
+   "screen_w": 1512,
+   "screen_h": 982,
+   "avail_w": 1512,
+   "avail_h": 944,
+   "dpr": 2
+  },
+  "notification_permission": "default",
+  "permission_query": "prompt",
+  "plugins": 5,
+  "has_chrome_object": false,
+  "webgl": {
+   "vendor": "Apple Inc.",
+   "renderer": "Apple GPU"
+  },
+  "hardware_concurrency": 8,
+  "max_touch_points": 0,
+  "native": {
+   "Navigator.webdriver": {
+    "src": "function webdriver() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Navigator.userAgent": {
+    "src": "function userAgent() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Navigator.platform": {
+    "src": "function platform() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Navigator.languages": {
+    "src": "function languages() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Navigator.plugins": {
+    "src": "function plugins() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Navigator.hardwareConcurrency": {
+    "src": "function hardwareConcurrency() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Screen.width": {
+    "src": "function width() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Screen.height": {
+    "src": "function height() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Screen.availHeight": {
+    "src": "function availHeight() {\n    [native code]\n}",
+    "proto": false
+   },
+   "window.outerWidth": {
+    "src": "function outerWidth() {\n    [native code]\n}",
+    "proto": false
+   },
+   "window.outerHeight": {
+    "src": "function outerHeight() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Notification.permission": {
+    "src": "function permission() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Permissions.query": {
+    "src": "function query() {\n    [native code]\n}",
+    "proto": false
+   },
+   "WebGLRenderingContext.getParameter": {
+    "src": "function getParameter() {\n    [native code]\n}",
+    "proto": false
+   },
+   "Function.toString": {
+    "src": "function toString() {\n    [native code]\n}",
+    "proto": false
+   }
+  },
+  "navigator_own_props": [],
+  "iframe": {
+   "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+   "platform": "MacIntel",
+   "webdriver": false
+  },
+  "worker": {
+   "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+   "platform": "MacIntel",
+   "languages": [
+    "en-US",
+    "en"
+   ],
+   "hardware_concurrency": 8,
+   "brands": null,
+   "webdriver": false
+  },
+  "collect_ms": 95.0
+ },
+ "interaction": {
+  "is_trusted": true,
+  "pointer_type": "mouse",
+  "detail": 1,
+  "offset_x": -9.7,
+  "offset_y": -2.2,
+  "moves_before": 27
+ }
+}

