@@ -1,0 +1,5 @@
+{
+  "defenses/httpsig.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/defenses/httpsig.py",
+  "defenses/key_directory.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/defenses/key_directory.py",
+  "defenses/web_bot_auth.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/solutions/round5/defenses/web_bot_auth.py"
+}

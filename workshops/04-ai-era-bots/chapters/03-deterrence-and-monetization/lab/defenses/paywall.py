@@ -1,33 +1,42 @@
 """Round 4 defense [STUDENT FILE] — pay-per-crawl over HTTP 402.
 
-A clone of the Cloudflare pay-per-crawl exchange (2025-26), the first deployed
-protocol that turns "no" into "yes, for a price":
+A clone of the Cloudflare pay-per-crawl exchange (2025-26), the first deployed protocol that turns
+"no" into "yes, for a price":
 
   reactive   crawler GET /product/x                 -> 402, `crawler-price: USD 0.01`
              crawler GET /product/x + `crawler-exact-price: USD 0.01`
                                                      -> 200, `crawler-charged: USD 0.01`
   proactive  crawler GET /product/x + `crawler-max-price: USD 0.05`
-                                                     -> 200, charged the configured
-                                                        price if <= max, else 402
+                                                     -> 200, charged the configured price if
+                                                        <= max, else 402
 
-Only one price-declaration header per request; anything malformed is a 402. A
-billing event exists only for a *verified* identity (bot_identity.py): the
-ledger is keyed on the operator the signature names. That is why Round 2's
-enforcement sits in front: an unverified "LabTrainBot" is refused, never billed.
+Only one price-declaration header per request; anything malformed is a 402. A billing event exists
+only for a *verified* identity (bot_identity.py): the ledger is keyed on the operator the signature
+names. That is why Round 2's enforcement sits in front: an unverified "LabTrainBot" is refused,
+never billed.
 
-TODO 1 is evaluate(). TODO 2 is the lesson most teams learn in production: the
-paywall was wired on the HTML pages and the catalogue leaked for free through the
-JSON API, search and the sitemap. Every content carrier must sit behind the same
-policy. Fell behind? python tools/checkpoint.py --round 4 --catch-up
+How it reaches the wire: a 402 and a "charged" 200 are not new verdicts either (the gate's set is
+closed). The CHECK below runs at LADDER[4], calls evaluate() and records the answer in
+`ctx.attrs["paywall"]`; `demo_site/ext/deterrence.py` turns it into the 402 (`g.outcome =
+"paywalled"`) or lets the page through and stamps `crawler-charged`, writes the ledger under
+`lab:ledger:*` and sets `g.outcome = "charged"`. The scoreboard counts each in its own column.
 
-What this never reaches: the stealth crawler of Round 3. Monetization governs
-the honest; deterrence and detection handle the rest. And the honest can still
-walk away: most 402s in the wild are never paid.
+TODO 1 is evaluate(). TODO 2 is the lesson most teams learn in production: the paywall was wired on
+the HTML pages and the catalogue leaked for free through the JSON API, search, the sitemap and the
+feed. Every content carrier must sit behind the same policy.
+Fell behind? python tools/checkpoint.py --round 4 --catch-up
+
+What this never reaches: the stealth crawler of Round 3. Monetization governs the honest;
+deterrence and detection handle the rest. And the honest can still walk away: most 402s in the wild
+are never paid.
 """
 
 from __future__ import annotations
 
-from store import allow, block, charged, paywall, Decision
+from collections import namedtuple
+
+from . import bot_identity, crawl_policy
+from .pipeline import Check, Signal, Verdict
 
 PAYWALL = {
     "enabled": True,
@@ -35,9 +44,29 @@ PAYWALL = {
     "purposes": ("ai-train", "ai-input"),   # search stays free: we want the referrals
 }
 
-# TODO 2 (Round 4): every carrier of catalogue data, not just the pages a human
-# sees. Which other routes serve the same products? Add them here.
-PAID_PATHS = ("/catalog", "/product/")
+# TODO 2 (Round 4): every carrier of catalogue data, not just the pages a human sees. Which other
+# routes serve the same products? Add them here. (Hint: curl the store's /sitemap.xml, /feed.xml,
+# /api/products and /search?q=a with a verified crawler's identity and see what comes back free.)
+PAID_PATHS = ("/products", "/product/")
+
+# What evaluate() answers. action: "free" | "block" | "paywall" | "charged".
+Offer = namedtuple("Offer", "action reason price")
+
+
+def free(reason: str) -> Offer:
+    return Offer("free", reason, 0.0)
+
+
+def block(reason: str) -> Offer:
+    return Offer("block", reason, 0.0)
+
+
+def paywall(reason: str, price: float) -> Offer:
+    return Offer("paywall", reason, price)
+
+
+def charged(reason: str, price: float) -> Offer:
+    return Offer("charged", reason, price)
 
 
 def applies(path: str) -> bool:
@@ -57,17 +86,35 @@ def _parse(value):
         return None
 
 
-def evaluate(ctx) -> Decision:
-    """TODO 1 (Round 4): the 402 exchange. ctx has "identity", "price" (configured
-    USD price), "exact" and "max" (the raw crawler-exact-price / crawler-max-price
-    header values, or None).
-      * unverified identity                  -> block("cannot bill an unverified crawler", score=80.0)
-      * both headers present                 -> paywall("only one price declaration header allowed", price)
-      * a header present but malformed       -> paywall("malformed price declaration", price)
-      * exact == price                       -> charged(..., price); any other exact -> paywall(..., price)
-      * max >= price                         -> charged(..., price); lower -> paywall(..., price)
-      * no header                            -> paywall("price discovery", price)
+def evaluate(ident, price: float, exact, cap) -> Offer:
+    """TODO 1 (Round 4): the 402 exchange. `ident` is the crawler's identity, `price` the configured
+    USD price, `exact` and `cap` the raw crawler-exact-price / crawler-max-price header values (or None).
+      * unverified identity             -> block("cannot bill an unverified crawler")
+      * both headers present            -> paywall("only one price declaration header allowed", price)
+      * a header present but malformed  -> paywall("malformed price declaration", price)
+      * exact == price                  -> charged(..., price); any other exact -> paywall(..., price)
+      * cap >= price                    -> charged(..., price); lower -> paywall(..., price)
+      * no header                       -> paywall("price discovery", price)
     _parse() turns "USD 0.01" into 0.01 (None when malformed).
     Until then every crawler gets the content for free.
     """
-    return allow("TODO (Round 4): no paywall yet")
+    return free("TODO (Round 4): no paywall yet")
+
+
+def _check(ctx):
+    """Given: price a licensed purpose's request for a paid path."""
+    if crawl_policy.exempt(ctx.path) or not applies(ctx.path):
+        return None
+    ident = bot_identity.identify(ctx)
+    if not ident.operator or crawl_policy.effective_rules(ctx.level).get(ident.purpose) != "licensed":
+        return None
+    offer = evaluate(ident, float(PAYWALL["price_usd"]), ctx.header("crawler-exact-price"),
+                     ctx.header("crawler-max-price"))
+    ctx.attrs["paywall"] = offer
+    ctx.note(paywall=offer.action, paywall_reason=offer.reason[:120], price=offer.price)
+    if offer.action == "block":
+        return Verdict("block", 80, (Signal("paywall", "unbillable", 80, offer.reason[:160]),))
+    return [Signal("paywall", offer.action, 0, offer.reason[:120])]
+
+
+CHECK = Check("paywall", _check)

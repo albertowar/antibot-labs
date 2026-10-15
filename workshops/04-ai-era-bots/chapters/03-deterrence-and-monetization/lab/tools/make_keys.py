@@ -1,88 +1,78 @@
-"""Generate the two lab crawler operators' Ed25519 signing keys (run by tools/seed.py).
+"""Generate the lab's Ed25519 keypairs at setup. Nothing secret is committed.
 
-Round 2 (enforcement by identity) and Round 4 (pay-per-crawl) need crawlers that
-sign their requests the way a registered operator would (Web Bot Auth, RFC 9421).
-A real operator generates its key pair once, keeps the private half, and
-publishes the public half; the site's registry (defenses/crawler_registry.py)
-holds only the public key. This script plays the operator for both lab bots:
+    python tools/make_keys.py            # create any missing key (what every tool does on first use)
+    python tools/make_keys.py --force    # rotate: replace both keys
 
-    trainbot    LabTrainBot    keyid trainbot-2026-10    (the one we govern)
-    searchbot   LabSearchBot   keyid searchbot-2026-10   (the one we must not hurt)
+Two synthetic crawler operators need a key: `trainbot.example` (LabTrainBot, the crawler we govern
+and bill) and `labsearch.example` (LabSearchBot, the search crawler we must not hurt). The mock
+internet plays their websites: it publishes each operator's signed key directory, and the crawler
+scripts sign their requests with the matching private key. Neither operator exists outside this lab,
+and no key is committed: they are written to `tools/fixtures/keys/` (gitignored) the first time
+anything asks for them, and a fresh clone gets fresh keys. No checkpoint prints a thumbprint, so
+rotating changes no expected result.
 
-Writes, under attacks/keys/ (gitignored):
-    <name>_ed25519.pem   the private key the attack scripts sign with
-    registry.json        the public keys, as the registry would publish them
+In production the private key never leaves the operator's signing service. Here it sits in a file on
+your disk because the lab has to play both ends; do not reuse it anywhere.
 
-Nothing here is committed. A private key in git, even a synthetic one, trips
-every secret scanner and teaches the wrong habit; generating at seed time costs
-nothing and models what an operator actually does. Idempotent: existing keys
-are kept unless --force, so a running store keeps verifying the keys it loaded.
-
-Run (from lab/):
-    python tools/make_keys.py            # usually via: python tools/seed.py
-    python tools/make_keys.py --force    # rotate; restart the store afterwards
+Other code asks for a key with `load(owner)`; it creates the file if it is missing.
 """
 
 from __future__ import annotations
 
-import argparse
-import base64
 import json
 import os
-
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-KEYS_DIR = os.path.join(LAB_DIR, "attacks", "keys")
-REGISTRY_JSON = os.path.join(KEYS_DIR, "registry.json")
+sys.path.insert(0, os.path.dirname(HERE))          # lab root: defenses/
+from defenses import httpsig  # noqa: E402
 
-# pem stem -> (operator name in crawler_registry.OPERATORS, keyid)
-CRAWLERS = {
-    "trainbot": ("trainbot.example", "trainbot-2026-10"),
-    "searchbot": ("labsearch.example", "searchbot-2026-10"),
-}
+KEYS_DIR = os.path.join(HERE, "fixtures", "keys")
+OWNERS = ["trainbot.example", "labsearch.example"]
 
 
-def _b64url(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+def _path(owner: str) -> str:
+    return os.path.join(KEYS_DIR, f"{owner}.json")
 
 
-def _pem_path(stem: str) -> str:
-    return os.path.join(KEYS_DIR, f"{stem}_ed25519.pem")
-
-
-def _load_or_create(stem: str, force: bool) -> tuple[Ed25519PrivateKey, bool]:
-    path = _pem_path(stem)
-    if os.path.exists(path) and not force:
-        with open(path, "rb") as fh:
-            return serialization.load_pem_private_key(fh.read(), password=None), False
-    key = Ed25519PrivateKey.generate()
+def create(owner: str) -> dict:
+    """Write a fresh keypair for `owner` (atomically: two processes may race on first use)."""
+    seed, jwk, kid = httpsig.generate()
+    doc = {"owner": owner, "seed_hex": seed, "jwk": jwk, "thumbprint": kid}
     os.makedirs(KEYS_DIR, exist_ok=True)
-    with open(path, "wb") as fh:
-        fh.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                   serialization.NoEncryption()))
-    return key, True
+    fd, tmp = tempfile.mkstemp(dir=KEYS_DIR, suffix=".tmp")
+    with os.fdopen(fd, "w") as fh:
+        json.dump(doc, fh, indent=2)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, _path(owner))
+    return doc
 
 
-def main(force: bool = False) -> dict:
-    """Create missing keys and (re)write registry.json. Returns the published keys."""
-    published: dict[str, dict[str, str]] = {}
-    for stem, (operator, keyid) in CRAWLERS.items():
-        key, created = _load_or_create(stem, force)
-        raw_pub = key.public_key().public_bytes(serialization.Encoding.Raw,
-                                                serialization.PublicFormat.Raw)
-        published.setdefault(operator, {})[keyid] = _b64url(raw_pub)
-        rel = os.path.relpath(_pem_path(stem), LAB_DIR)
-        print(f"{'wrote' if created else 'kept '} {rel}  ({keyid})")
-    with open(REGISTRY_JSON, "w") as fh:
-        json.dump(published, fh, indent=1)
-    print(f"wrote {os.path.relpath(REGISTRY_JSON, LAB_DIR)}  (public keys for the registry)")
-    return published
+def load(owner: str) -> dict:
+    """{"owner", "seed_hex", "jwk", "thumbprint"} for `owner`, creating the key on first use."""
+    try:
+        with open(_path(owner)) as fh:
+            return json.load(fh)
+    except (FileNotFoundError, ValueError):
+        create(owner)
+        with open(_path(owner)) as fh:     # re-read: if another process won the race, use its key
+            return json.load(fh)
+
+
+def ensure() -> None:
+    for owner in OWNERS:
+        load(owner)
+
+
+def main() -> None:
+    force = "--force" in sys.argv
+    for owner in OWNERS:
+        existed = os.path.exists(_path(owner))
+        doc = create(owner) if force else load(owner)
+        state = "rotated" if force and existed else ("kept" if existed and not force else "created")
+        print(f"{owner:20} {state:8} keyid={doc['thumbprint']}  -> {os.path.relpath(_path(owner))}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--force", action="store_true", help="regenerate even if keys exist")
-    main(parser.parse_args().force)
+    main()

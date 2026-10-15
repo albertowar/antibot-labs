@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block page %}register{% endblock %}{% block title %}Create account · {{ store_name }}{% endblock %}
+{% block content %}
+<form id="register-form" class="card narrow" action="/register" method="post">
+  <h1>Create an account</h1>
+  <p class="muted">Loyalty points on every order, saved details, early drop access.</p>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% with label="Name", name="name", required=True, autocomplete="name", value=name %}{% include "partials/_field.html" %}{% endwith %}
+  {% with label="Email", name="email", type="email", required=True, autocomplete="email", value=email %}{% include "partials/_field.html" %}{% endwith %}
+  {% with label="Password (8+ characters)", name="password", type="password", required=True, autocomplete="new-password" %}{% include "partials/_field.html" %}{% endwith %}
+  {{ slot("form:register") }}
+  <button class="btn big" type="submit">Create account</button>
+  <p class="muted small">Already have one? <a href="/login">Log in</a>.</p>
+</form>
+{% endblock %}

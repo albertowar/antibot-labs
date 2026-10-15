@@ -1,80 +1,55 @@
-"""Scoreboard — the debrief view.
+"""
+Scoreboard: bots stopped next to shoppers hurt, from the store's decision log.
 
-Reads the decision log and, per defense level, shows how the store treated each
-actor cohort (allow / block / maze / paywall / charged), the crawlers' catalogue
-coverage, revenue booked, and the maze's cost. Run it any time; it never
-resets anything.
-
-    python tools/scoreboard.py
-    python tools/scoreboard.py --level 3
+    python tools/scoreboard.py              # table
+    python tools/scoreboard.py --markdown   # paste into a README expected-results table
 """
 
-from __future__ import annotations
-
 import argparse
-import collections
-import os
-import statistics
-import sys
+import json
 
-import httpx
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attacks"))
-from _common import BASE_URL, require_local  # noqa: E402
-
-RUNG = {0: "no governance", 1: "policy published", 2: "policy enforced",
-        3: "maze for the rest", 4: "pay-per-crawl"}
+from labclient import scoreboard
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--level", type=int, choices=[0, 1, 2, 3, 4], default=None)
-    ap.add_argument("--url", default=BASE_URL)
-    a = ap.parse_args()
-    require_local(a.url)
-    rows = httpx.get(f"{a.url}/lab/decisions", timeout=10).json()
-    stats = httpx.get(f"{a.url}/lab/stats", timeout=5).json()
-    if not rows:
-        print("No decisions recorded yet. Run a round's crawlers or checkpoint first.")
-        return 0
-    by_level = collections.defaultdict(list)
-    for r in rows:
-        by_level[r["level"]].append(r)
-    print(f"=== Scoreboard ({len(rows)} decisions) ===")
-    for lvl in ([a.level] if a.level is not None else sorted(by_level)):
-        rr = by_level.get(lvl, [])
-        if not rr:
+def rows(board):
+    out = []
+    for a in board["actors"]:
+        if a["kind"] not in ("human", "bot"):
             continue
-        print(f"\n[L{lvl}] {RUNG[lvl]}  ({len(rr)} decisions)")
-        for actor in ("human", "prefetch", "reader", "search", "bot"):
-            sel = [r for r in rr if r["actor"] == actor]
-            if not sel:
-                continue
-            t = collections.Counter(r["outcome"] for r in sel)
-            line = "  ".join(f"{k}={v}" for k, v in sorted(t.items()))
-            skus = set()
-            for r in sel:
-                if r["outcome"] in ("allow", "charged") and r["skus"]:
-                    skus.update(r["skus"].split(","))
-            extra = f"  coverage {len(skus) / 300:.0%}" if actor in ("bot", "search") else ""
-            print(f"   {actor:9s} ({len(sel):4d}): {line}{extra}")
-        lat = [r["latency_ms"] for r in rr if r["latency_ms"]]
-        if lat:
-            print(f"   median gate cost: {statistics.median(lat):.2f} ms")
-        reasons = collections.Counter(r["reason"].split(":")[0] for r in rr if r["outcome"] == "block")
-        if reasons:
-            print("   top block reasons: " + "  ".join(f"{w}×{n}" for w, n in reasons.most_common(3)))
-        viol = sum(1 for r in rr if "robots-violation" in r["reason"])
-        if viol:
-            print(f"   robots.txt violations logged: {viol}")
-    if stats["ledger"]:
-        print(f"\nrevenue booked: " + "  ".join(f"{k}=${v:.2f}" for k, v in stats["ledger"].items()))
-    m = stats["maze"]
-    if m["pages"]:
-        print(f"maze cost: {m['pages']} pages, {m['gen_ms_total'] / m['pages']:.2f} ms/page, "
-              f"{m['bytes'] / 1024:.0f} KB, cap hit {m['capped']}x")
-    return 0
+        out.append({"actor": a["actor"], "requests": a["requests"], "served": a["served"] + a["purchased"],
+                    "purchased": a["purchased"], "stopped": a["stopped"], "avg_score": a["avg_score"], "avg_ms": a["avg_ms"]})
+    return out
+
+
+def render(board, markdown=False):
+    s = board["summary"]
+    head = ["actor", "requests", "served", "purchased", "stopped", "avg score", "gate ms"]
+    lines = []
+    if markdown:
+        lines.append("| " + " | ".join(head) + " |")
+        lines.append("|" + "---|" * len(head))
+        for r in rows(board):
+            lines.append(f"| {r['actor']} | {r['requests']} | {r['served']} | {r['purchased']} | {r['stopped']} | {r['avg_score']} | {r['avg_ms']} |")
+        lines.append("")
+        lines.append(f"Bots stopped: **{s['bots_stopped']}/{s['bot_requests']}** requests · shoppers hurt: **{s['humans_hurt']}/{s['humans']}** people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped, including challenges they then solved) · "
+                     f"purchases: {s['purchases']} · drop stock left: {s['drops']}")
+    else:
+        lines.append(f"{'actor':<28}{'req':>6}{'served':>8}{'bought':>8}{'stopped':>9}{'score':>7}{'ms':>8}")
+        for r in rows(board):
+            lines.append(f"{r['actor']:<28}{r['requests']:>6}{r['served']:>8}{r['purchased']:>8}{r['stopped']:>9}{r['avg_score']:>7}{r['avg_ms']:>8}")
+        lines.append("")
+        lines.append(f"bots stopped {s['bots_stopped']}/{s['bot_requests']} requests   shoppers hurt {s['humans_hurt']}/{s['humans']} people "
+                     f"({s['human_requests_stopped']}/{s['human_requests']} requests stopped)   "
+                     f"purchases {s['purchases']}   drop stock {s['drops']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--since", default=None)
+    args = ap.parse_args()
+    board = scoreboard(args.since)
+    print(json.dumps(board, indent=1) if args.json else render(board, args.markdown))

@@ -1,13 +1,15 @@
 # W4 Ch3 lab. Python 3.12+. Pins verified October 2026.
-# Runs dependency-free: fakeredis + SQLite, no server and no Docker needed.
+# One venv per chapter: python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt. No browser, no Ollama: governing a crawler is plain HTTP.
 Flask==3.1.3
 Flask-SQLAlchemy==3.1.1
-httpx==0.28.1
-requests==2.34.2
-# Redis client plus an in-process fake, so the lab runs with no Redis server.
+SQLAlchemy==2.1.4
 redis==8.1.0
-fakeredis==2.39.0
-# Ed25519 for the Web Bot Auth-style crawler signatures (defenses/bot_identity.py).
+# [lua]: the token bucket (defenses/store.py) is a Lua script, which plain fakeredis cannot run
+fakeredis[lua]==2.39.0
+requests==2.34.2
+httpx==0.28.1
+# Ed25519 keys and signatures for RFC 9421 / Web Bot Auth (defenses/httpsig.py, the verifier copied from W4 Ch2).
 cryptography==50.0.2
-# Optional: only for the Dockerised PostgreSQL backend (set DATABASE_URL).
-psycopg[binary]==3.3.6
+# Unused on the default SQLite path. Only the Docker-backed PostgreSQL path (docker-compose.yml) needs it:
+# uncomment, or `pip install 'psycopg[binary]==3.3.6'`, before starting the store with DATABASE_URL=postgresql+psycopg://...
+# psycopg[binary]==3.3.6

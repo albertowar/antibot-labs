@@ -1,99 +1,101 @@
 """Shared crawler engine, signer and the ethics guardrail for every attack script.
 
-Rules of engagement are absolute: these scripts run ONLY against the local demo
-store you run yourself. ``require_local`` enforces it in code: a non-loopback
-target raises before a single request is sent. Lab traffic never touches a
-third party, a public proxy, or anyone else's infrastructure. Every operator,
-key, IP and user agent here is synthetic.
+Rules of engagement are absolute: these scripts run ONLY against the local demo store you run
+yourself. ``tools/labclient.py`` asks the lab-root ``labnet.py`` guard for the store URL, and that
+guard refuses a non-loopback target before a single request is sent. Lab traffic never touches a
+third party, a public proxy, or anyone else's infrastructure. Every operator, key, address and user
+agent here is synthetic.
 
-The IPs are RFC 5737 documentation ranges, honoured by the store only from
-loopback (``X-Lab-Client-IP``). 203.0.113.0/26 and /26+64 are the two lab
-operators' *published* ranges (defenses/crawler_registry.py); 192.0.2.0/24 is
-"a datacenter nobody published"; 198.51.100.0/24 is "residential".
+Source addresses are rented from ``data/world.json`` (RFC 5737 / 3849 documentation ranges) and sent
+in ``X-Lab-Client-IP``, which the store's edge honours only from loopback and only inside a pool.
+The two lab operators are ordinary tenants of ``cloud_vm`` and ``cloud_gcp`` that publish a slice
+of their pool (defenses/crawler_registry.py); the "datacenter nobody published" is ``hosting_asn``
+and "residential" is the ``residential_proxy`` pool. Each attack gets its own slice of addresses, so
+a maze tag earned by one never follows another.
 
-``Crawler`` is a deliberately simple breadth-first fetcher: a frontier, a page
-budget, link extraction with the stdlib HTML parser, and hooks for the choices
-each round makes (obey robots.txt or not, sign or not, pay or not, follow hidden
-links or not). Just strong enough to beat the previous round; not a tool.
+``Crawler`` is a deliberately simple breadth-first fetcher: a frontier, a request budget, link
+extraction with the stdlib HTML parser, and hooks for the choices each round makes (obey robots.txt
+or not, sign or not, pay or not, follow hidden links or not). Just strong enough to beat the
+previous round; not a tool.
 """
 
 from __future__ import annotations
 
-import base64
+import json
 import os
-import sys
 import re
-import secrets
+import sys
 import time
 import urllib.robotparser
-import zlib
 from collections import Counter, deque
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urldefrag, urljoin, urlparse
 
-import httpx
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.join(os.path.dirname(HERE), "tools")
+sys.path.insert(0, TOOLS)
+from labclient import BASE_URL, LabClient, world_pool  # noqa: E402  (runs the labnet guard on import)
+import make_keys  # noqa: E402  (generates the Ed25519 fixtures on first use; nothing secret is committed)
+from defenses import httpsig  # noqa: E402  (labclient put the lab root on sys.path)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://127.0.0.1:5000")
-
-KEYS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys")
+CATALOG = 120      # products p001..p120 that a listing shows (the two drops are not catalogue)
 
 TRAINBOT_UA = "Mozilla/5.0 (compatible; LabTrainBot/1.0; +https://trainbot.example/bot)"
 SEARCHBOT_UA = "Mozilla/5.0 (compatible; LabSearchBot/2.1; +https://labsearch.example/bot)"
 CHROME_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-             "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
+             "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36")
 
-TRAINBOT_RANGE = [f"203.0.113.{i}" for i in range(1, 63)]      # published
-SEARCHBOT_RANGE = [f"203.0.113.{i}" for i in range(65, 127)]   # published
-DATACENTER = [f"192.0.2.{i}" for i in range(1, 255)]           # unpublished
-RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)]
+# Published: slices of the /27 each operator publishes (203.0.113.0/27, 198.51.100.96/27).
+TRAINBOT_RANGE = world_pool("cloud_vm")[0:8]
+PAYING_RANGE = world_pool("cloud_vm")[8:16]
+LEAK_RANGE = world_pool("cloud_vm")[16:24]
+SEARCHBOT_RANGE = world_pool("cloud_gcp")[0:4]
+# Unpublished: a datacenter nobody listed, and rented residential egress.
+DATACENTER = world_pool("hosting_asn")[0:24]
+STEALTH_POOL = world_pool("residential_proxy")[0:24]
+AWARE_POOL = world_pool("residential_proxy")[24:48]
 
 SKU_RE = re.compile(r"/product/(p\d{3})")
+PRODUCT_PAGE_RE = re.compile(r"/product/(p\d{3})$")
+GUID_RE = re.compile(r"<guid>(p\d{3})</guid>")
+UNINTERESTING = ("/cart", "/checkout", "/account", "/login", "/logout", "/register", "/orders",
+                 "/gift-cards", "/drop/", "/img/", "/static/", "/newsletter", "/lab/", "/whoami")
 
 
-# --- Web Bot Auth-style signer (the crawler side of defenses/bot_identity.py) ------
+def authority() -> str:
+    """The Host the store sees (and so the @authority a signature must cover). verify.py picks a free port."""
+    return urlparse(BASE_URL).netloc
+
+
+# --- Web Bot Auth signer (the crawler side of defenses/bot_identity.py) -------------------------
 
 class Signer:
-    """Signs requests the way a registered operator would (RFC 9421, Ed25519).
+    """Signs requests the way a registered operator would (RFC 9421, Ed25519, W4 Ch2's httpsig).
 
-    The operator holds the private key (attacks/keys/*.pem, generated by
-    tools/make_keys.py, never committed); the site holds the
-    public key under ``keyid``. Covered components: @authority and
-    signature-agent, as in the Web Bot Auth examples. W4 Ch2 owns the full
-    protocol (nonces, key directories); this is the minimum the paywall needs.
+    The operator holds the private key (tools/fixtures/keys/<owner>.json, generated by
+    tools/make_keys.py, never committed) and publishes the public half in its key directory (the
+    mock internet). Covered components: @authority and signature-agent, a fresh nonce per request
+    (the 402 retry is a second request and must not look like a replay).
     """
 
-    def __init__(self, pem_name: str, keyid: str, signature_agent: str):
-        from cryptography.hazmat.primitives import serialization
-        try:
-            with open(os.path.join(KEYS, pem_name), "rb") as fh:
-                self.key = serialization.load_pem_private_key(fh.read(), password=None)
-        except FileNotFoundError:
-            raise SystemExit(f"Operator key {pem_name} not found under {KEYS}: run "
-                             f"`python tools/seed.py` (it generates the lab's signing keys).")
-        self.keyid, self.agent = keyid, signature_agent
+    def __init__(self, owner: str):
+        k = make_keys.load(owner)
+        self.key, self.keyid, self.agent = httpsig.load_private(k["seed_hex"]), k["thumbprint"], f"https://{owner}"
 
-    def headers(self, authority: str) -> dict:
-        now = int(time.time())
-        params = (f'("@authority" "signature-agent");created={now};expires={now + 300};'
-                  f'nonce="{secrets.token_hex(8)}";keyid="{self.keyid}";alg="ed25519";tag="web-bot-auth"')
-        base = "\n".join([f'"@authority": {authority}', f'"signature-agent": {self.agent}',
-                          f'"@signature-params": {params}']).encode()
-        sig = base64.b64encode(self.key.sign(base)).decode()
-        return {"Signature-Agent": self.agent, "Signature-Input": f"sig1={params}",
-                "Signature": f"sig1=:{sig}:"}
+    def headers(self, path: str, query: str = "") -> dict:
+        ctx = httpsig.MessageContext("GET", authority(), path, {}, "http", query)
+        return httpsig.agent_headers(self.key, self.keyid, self.agent, ctx)
 
 
 def trainbot_signer():
-    return Signer("trainbot_ed25519.pem", "trainbot-2026-10", "https://trainbot.example")
+    return Signer("trainbot.example")
 
 
 def searchbot_signer():
-    return Signer("searchbot_ed25519.pem", "searchbot-2026-10", "https://labsearch.example")
+    return Signer("labsearch.example")
 
 
-# --- link extraction ------------------------------------------------------------------
+# --- link extraction ------------------------------------------------------------------------------
 
 class Links(HTMLParser):
     def __init__(self):
@@ -107,8 +109,9 @@ class Links(HTMLParser):
         href = a.get("href")
         if not href:
             return
-        hidden = ("nofollow" in (a.get("rel") or "") or "hp" in (a.get("class") or "")
-                  or a.get("aria-hidden") == "true" or a.get("tabindex") == "-1")
+        hidden = ("nofollow" in (a.get("rel") or "") or "hp" in (a.get("class") or "").split()
+                  or a.get("aria-hidden") == "true" or a.get("tabindex") == "-1"
+                  or "display:none" in (a.get("style") or "").replace(" ", ""))
         self.links.append((href, hidden))
 
 
@@ -121,9 +124,8 @@ def extract_links(html_text: str):
 def babble_score(text: str) -> float:
     """Crude 'is this page junk?' heuristic: the share of repeated 3-word phrases.
 
-    Markov babble repeats short phrases far more than catalogue prose does. A
-    maze-aware crawler bails on pages above a threshold. Real crawlers use
-    perplexity from a small LM; the idea is the same.
+    Markov babble repeats short phrases far more than catalogue prose does. A maze-aware crawler
+    bails on pages above a threshold. Real crawlers use perplexity from a small LM; the idea is the same.
     """
     words = re.sub(r"<[^>]+>", " ", text).lower().split()
     if len(words) < 60:
@@ -132,33 +134,36 @@ def babble_score(text: str) -> float:
     return 1 - len(grams) / max(1, sum(grams.values()))
 
 
-# --- the crawler ------------------------------------------------------------------------
+def is_decoy(response) -> bool:
+    """The store marks every decoy page `X-Robots-Tag: noindex` (a courtesy to search engines)."""
+    return "noindex" in response.headers.get("X-Robots-Tag", "")
+
+
+# --- the crawler ------------------------------------------------------------------------------------
 
 class Crawler:
-    def __init__(self, base, ua, ips, actor="bot", budget=400, obey_robots=False,
-                 follow_hidden=True, signer=None, pay=None, max_depth=None, trap_hints=False,
-                 babble_limit=None, workers=4, label="crawler", robots_token=None, purpose="ai-train"):
-        self.base = require_local(base).rstrip("/")
-        self.ua, self.ips, self.actor = ua, list(ips), actor
-        # RFC 9309 matches groups on the crawler's *product token*, not the whole
-        # UA string. urllib.robotparser compares the text before the first "/",
-        # so "Mozilla/5.0 (compatible; LabTrainBot/1.0)" would match nothing and
-        # fall through to "*". Real crawlers pass their token explicitly; so do we.
+    def __init__(self, name, ua, ips, budget=400, obey_robots=False, follow_hidden=True, signer=None,
+                 pay=None, max_depth=None, trap_hints=False, babble_limit=None, label="crawler",
+                 robots_token=None, purpose="ai-train", order="dfs"):
+        self.client = LabClient(f"bot:{name}:00", pool=list(ips))
+        self.ua, self.ips = ua, list(ips)
+        # RFC 9309 matches groups on the crawler's *product token*, not the whole UA string.
+        # urllib.robotparser compares the text before the first "/", so "Mozilla/5.0 (compatible;
+        # LabTrainBot/1.0)" would match nothing and fall through to "*". Real crawlers pass their
+        # token explicitly; so do we.
         self.robots_token = robots_token or ua.split("/")[0]
         self.purpose = purpose   # which AIPREF / RSL key applies to this crawler
+        self.order = order       # "dfs": follow the last-discovered link first (a stack); "bfs": a queue
         self.budget, self.obey_robots, self.follow_hidden = budget, obey_robots, follow_hidden
         self.signer, self.pay, self.max_depth = signer, pay, max_depth
         self.trap_hints, self.babble_limit, self.label = trap_hints, babble_limit, label
-        self.workers = workers
-        self.authority = urlparse(self.base).netloc
         self.rp = None
+        self.robots_text = ""
         self.disallowed_prefixes = []
-        self.seen = set()
-        self.skus = set()
+        self.seen, self.skus = set(), set()
         self.stats = Counter()
         self.spent = 0.0
         self._ip_i = 0
-        self.client = httpx.Client(timeout=10)
 
     # -- helpers --
     def _ip(self):
@@ -166,18 +171,17 @@ class Crawler:
         self._ip_i += 1
         return ip
 
-    def _headers(self, extra=None):
-        h = {"User-Agent": self.ua, "X-Lab-Client-IP": self._ip(), "X-Lab-Actor": self.actor,
-             "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8"}
+    def _headers(self, path, extra=None):
+        h = [("User-Agent", self.ua),
+             ("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")]
         if self.signer:
-            h.update(self.signer.headers(self.authority))
-        if extra:
-            h.update(extra)
+            p, _, q = path.partition("?")
+            h += list(self.signer.headers(p, q).items())
+        h += list((extra or {}).items())
         return h
 
     def read_robots(self):
-        r = self.client.get(f"{self.base}/robots.txt", headers=self._headers())
-        self.stats["requests"] += 1
+        r = self._get("/robots.txt")
         self.rp = urllib.robotparser.RobotFileParser()
         self.rp.parse(r.text.splitlines())
         self.robots_text = r.text
@@ -186,97 +190,114 @@ class Crawler:
                                            if ln.lower().startswith("disallow:") and ln.split(":", 1)[1].strip()})
         return r.text
 
-    def allowed(self, url: str) -> bool:
-        path = urlparse(url).path
-        if self.obey_robots and self.rp and not self.rp.can_fetch(self.robots_token, url):
+    def _get(self, path, extra=None):
+        self.client.http.cookies.clear()                 # a crawler keeps no session
+        r = self.client.get(path, headers=self._headers(path, extra), ip=self._ip())
+        self.stats["requests"] += 1
+        self.stats[str(r.status_code)] += 1
+        return r
+
+    def allowed(self, path: str) -> bool:
+        if self.obey_robots and self.rp and not self.rp.can_fetch(self.robots_token, BASE_URL + path):
             return False
-        if self.trap_hints and any(path.startswith(p) for p in self.disallowed_prefixes if p != "/"):
+        if self.trap_hints and any(urlparse(path).path.startswith(p) for p in self.disallowed_prefixes if p != "/"):
             return False
         return True
 
-    def fetch(self, url: str):
+    def fetch(self, path: str):
         """One request, with the Round 4 402 negotiation if `pay` is set."""
         extra = {}
         if self.pay and self.pay.get("mode") == "proactive":
             extra["crawler-max-price"] = f"USD {self.pay['max']:.2f}"
-        try:
-            r = self.client.get(url, headers=self._headers(extra))
-        except httpx.HTTPError as exc:
-            # A dripped decoy page or a dropped keep-alive connection: a real
-            # crawler logs it and moves on, so does this one.
-            self.stats["requests"] += 1
-            self.stats["errors"] += 1
-            return httpx.Response(599, request=httpx.Request("GET", url), text=str(exc))
-        self.stats["requests"] += 1
-        if r.status_code == 402:
+        r = self._get(path, extra)
+        if r.status_code == 402 and self.pay and self.pay.get("mode") == "reactive":
+            self.stats["paywalled"] += 1
             price = r.headers.get("crawler-price", "")
-            if self.pay and self.pay.get("mode") == "reactive":
-                amount = float(price.split()[-1]) if price else None
-                if amount is not None and amount <= self.pay["max"]:
-                    r = self.client.get(url, headers=self._headers({"crawler-exact-price": f"USD {amount:.2f}"}))
-                    self.stats["requests"] += 1
+            amount = float(price.split()[-1]) if price else None
+            if amount is not None and amount <= self.pay["max"]:
+                r = self._get(path, {"crawler-exact-price": f"USD {amount:.2f}"})
+        elif r.status_code == 402:
+            self.stats["paywalled"] += 1
         if r.headers.get("crawler-charged"):
             self.spent += float(r.headers["crawler-charged"].split()[-1])
             self.stats["charged"] += 1
-        self.stats[str(r.status_code)] += 1
         return r
+
+    def absorb(self, path, r):
+        """Collect the product *records* a 200 response carries, whatever carrier it came on.
+
+        A product counts when the crawler holds its record: the product page itself, a JSON item
+        (the API, search or bulk feed) or a feed item. Listing pages, search results and the
+        sitemap only name products; they feed the frontier, not the haul.
+        """
+        ctype = r.headers.get("content-type", "")
+        if "json" in ctype:
+            doc = r.json()
+            for p in (doc.get("items") or doc.get("products") or []):
+                if str(p.get("sku", "")).startswith("p"):
+                    self.skus.add(p["sku"])
+        elif "rss" in ctype:
+            self.skus.update(GUID_RE.findall(r.text))
+        elif "html" in ctype:
+            m = PRODUCT_PAGE_RE.match(path)
+            if m:
+                self.skus.add(m.group(1))
 
     # -- the crawl --
     def crawl(self, start="/", seeds=()):
         if self.obey_robots or self.trap_hints:
             self.read_robots()
-        frontier = deque([(urljoin(self.base, s), 0) for s in (start, *seeds)])
+        frontier = deque([(s, 0) for s in (start, *seeds)])
         t0 = time.time()
         while frontier and self.stats["requests"] < self.budget:
-            url, depth = frontier.popleft()
-            if url in self.seen or not url.startswith(self.base):
+            path, depth = frontier.pop() if self.order == "dfs" else frontier.popleft()
+            if path in self.seen:
                 continue
-            self.seen.add(url)
-            if not self.allowed(url):
+            self.seen.add(path)
+            if not self.allowed(path):
                 self.stats["skipped_by_policy"] += 1
                 continue
             if self.max_depth is not None and depth > self.max_depth:
                 self.stats["skipped_by_depth"] += 1
                 continue
-            r = self.fetch(url)
-            path = urlparse(url).path
-            if path.startswith("/maze/"):
+            r = self.fetch(path)
+            if is_decoy(r):
                 self.stats["maze_pages"] += 1
             if r.status_code != 200:
                 continue
             if "Content-Usage" in r.headers and self.obey_robots:
-                self._content_usage = r.headers["Content-Usage"]
                 key = {"ai-train": "train-ai", "ai-input": "ai-use", "search": "search"}[self.purpose]
                 if f"{key}=n" in r.headers["Content-Usage"].replace(" ", ""):
                     self.stats["stopped_by_content_usage"] += 1
                     break
-            ctype = r.headers.get("content-type", "")
-            if "html" in ctype:
-                self.skus.update(SKU_RE.findall(r.text))
+            self.absorb(path, r)
+            if "html" in r.headers.get("content-type", ""):
                 if self.babble_limit is not None and babble_score(r.text) > self.babble_limit:
                     self.stats["bailed_on_babble"] += 1
                     continue
-                for href, hidden in extract_links(r.text):
+                links = extract_links(r.text)
+                for href, hidden in (reversed(links) if self.order == "dfs" else links):   # dfs: first link fetched first
                     if hidden and not self.follow_hidden:
                         self.stats["ignored_hidden_links"] += 1
                         continue
-                    frontier.append((urljoin(url, href), depth + 1))
-            elif "json" in ctype:
-                for p in r.json().get("products", []):
-                    self.skus.add(p["sku"])
-            elif "xml" in ctype:
-                self.skus.update(SKU_RE.findall(r.text))
+                    nxt = urldefrag(urljoin(BASE_URL + path, href))[0]
+                    if not nxt.startswith(BASE_URL):
+                        continue
+                    nxt = nxt[len(BASE_URL):] or "/"
+                    if not nxt.startswith(UNINTERESTING):
+                        frontier.append((nxt, depth + 1))
         self.stats["seconds"] = round(time.time() - t0, 1)
         return self.report()
 
     def report(self):
-        cov = len(self.skus) / 300
-        out = {"label": self.label, "requests": self.stats["requests"], "coverage": round(cov, 3),
-               "products": len(self.skus), "maze_pages": self.stats["maze_pages"],
-               "status": {k: v for k, v in self.stats.items() if k.isdigit()},
-               "spent_usd": round(self.spent, 2), "seconds": self.stats["seconds"]}
+        n = len(self.skus)
+        out = {"label": self.label, "attempted": CATALOG, "succeeded": n, "requests": self.stats["requests"],
+               "coverage": round(n / CATALOG, 3), "products": n, "maze_pages": self.stats["maze_pages"],
+               "paywalled": self.stats["paywalled"], "charged": self.stats["charged"],
+               "spent_usd": round(self.spent, 2), "seconds": self.stats["seconds"],
+               "status": {k: v for k, v in self.stats.items() if k.isdigit()}}
         for k in ("skipped_by_policy", "stopped_by_content_usage", "ignored_hidden_links",
-                  "skipped_by_depth", "bailed_on_babble", "errors"):
+                  "skipped_by_depth", "bailed_on_babble"):
             if self.stats[k]:
                 out[k] = self.stats[k]
         return out
@@ -284,9 +305,17 @@ class Crawler:
 
 def print_report(rep):
     print(f"[{rep['label']}] {rep['requests']} requests in {rep['seconds']}s -> "
-          f"{rep['products']}/300 products ({rep['coverage']:.0%} coverage), "
-          f"maze pages {rep['maze_pages']}, spent ${rep['spent_usd']:.2f}, statuses {rep['status']}")
+          f"{rep['products']}/{CATALOG} products ({rep['coverage']:.0%} coverage), "
+          f"decoy pages {rep['maze_pages']}, 402s {rep['paywalled']}, charged {rep['charged']} (${rep['spent_usd']:.2f}), "
+          f"statuses {rep['status']}")
     extras = {k: v for k, v in rep.items() if k.endswith(("_by_policy", "_by_content_usage",
-                                                           "_hidden_links", "_by_depth", "_on_babble", "errors"))}
+                                                           "_hidden_links", "_by_depth", "_on_babble"))}
     if extras:
         print(f"    {extras}")
+
+
+def finish(rep: dict) -> dict:
+    """Print the report, then the one JSON line tools/checkpoint.py reads, and return it."""
+    print_report(rep)
+    print(json.dumps(rep))
+    return rep
