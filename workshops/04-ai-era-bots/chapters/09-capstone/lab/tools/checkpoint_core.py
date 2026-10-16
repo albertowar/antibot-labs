@@ -33,10 +33,16 @@ least {"attempted": n, "succeeded": k}; anything else it adds (bits, cpu_s, pric
     python tools/checkpoint.py --round 2 --level 1   # same round against the previous level (the "before" column)
     python tools/checkpoint.py --all --markdown       # every round, README table
     python tools/checkpoint.py --all --with-before --markdown  # rounds + their "before" runs, one process
+    python tools/checkpoint.py --write-readme         # the above + rebuild the README's results block
 
 --with-before reruns each judged round at level-1 right after it, so one invocation yields the
 README table and every "before" column. Before runs report only: they never affect the exit code
 (an earlier level may legitimately hurt a persona the round fixes).
+
+--write-readme (implies --all --with-before) assembles the per-round attack results and replaces
+the `| Round |` table inside the README's `<!-- results:start -->…<!-- results:end -->` block
+(prose and <details> scoreboards in the block survive; annotations inside table cells do not) —
+review `git diff` before committing.
 """
 
 import argparse
@@ -208,6 +214,10 @@ def check_round(rounds, n, markdown=False, reset_store=True, level=None, caught_
             problems.append(f"{name}: no attempted/succeeded in its output")
         elif not EXPECT[want](rate):
             problems.append(f"{name}: expected {want}, got {rate:.0%}")
+    stopped_personas = {}
+    for r in results:
+        if r.get("outcome") in population.HURT:
+            stopped_personas[r["persona"]] = stopped_personas.get(r["persona"], 0) + 1
     hurt = [r for r in results if r.get("outcome") in population.HURT and r["persona"] not in rnd.allowed_fp]
     if len(hurt) > rnd.humans_hurt_max:
         problems.append(f"{len(hurt)} shoppers stopped who should not be: " + ", ".join(sorted({r['actor'] for r in hurt})))
@@ -221,7 +231,70 @@ def check_round(rounds, n, markdown=False, reset_store=True, level=None, caught_
     ok = not problems
     print(f"\nRound {n} at level {rnd.level}: {'PASS' if ok else 'FAIL'}" + ("" if ok else "\n  - " + "\n  - ".join(problems)))
     return {"round": n, "level": rnd.level, "ok": ok, "bot_success": round(share, 3), "humans_hurt": len(hurt),
+            "stopped_personas": stopped_personas,   # every stopped shopper, allowed_fp included (README column)
             "problems": problems, "attacks": attacks, "summary": board["summary"]}
+
+
+RESULTS_START, RESULTS_END = "<!-- results:start -->", "<!-- results:end -->"
+
+
+def results_table(rounds, judged, before):
+    """The README expected-results table, from judged runs and their 'before' runs (dicts keyed by round)."""
+    lines = ["| Round | Attack | Before (level N-1) | After (level N) | Shoppers stopped after |",
+             "|---|---|---|---|---|"]
+
+    def cell(out, name):
+        a = (out or {}).get("attacks", {}).get(name)
+        if not isinstance(a, dict) or not a.get("attempted"):
+            return "—"
+        return f"{a.get('succeeded', 0)}/{a['attempted']}"
+
+    for n in sorted(judged):
+        stopped = judged[n].get("stopped_personas", {})
+        summary = ", ".join(f"{p} {c}" for p, c in sorted(stopped.items())) or "none"
+        names = list(rounds[n].attack_specs()) or ["—"]
+        for i, name in enumerate(names):
+            attack = f"`{name}`" if name != "—" else "—"
+            lines.append(f"| {n if i == 0 else ''} | {attack} | {cell(before.get(n), name)}"
+                         f" | {cell(judged[n], name)} | {summary if i == 0 else ''} |")
+    return "\n".join(lines)
+
+
+def write_results_block(table):
+    """Replace the before/after table inside the README's results:start/end block, in place.
+
+    Only the contiguous `|`-table starting at the block's `| Round |` header is replaced; the
+    prose and <details> scoreboards that share the block survive. Returns False when the markers
+    (or the table header inside them) are missing.
+    """
+    path = os.path.join(LAB, "README.md")
+    if not os.path.exists(path):
+        return False
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().splitlines(keepends=True)
+    try:
+        start = next(i for i, ln in enumerate(lines) if RESULTS_START in ln)
+        end = next(i for i, ln in enumerate(lines) if RESULTS_END in ln)
+        first = next(i for i in range(start, end) if lines[i].lstrip().startswith("| Round |"))
+    except StopIteration:
+        return False
+    last = first
+    while last + 1 < end and lines[last + 1].lstrip().startswith("|"):
+        last += 1
+    lines[first:last + 1] = [table + "\n"]
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("".join(lines))
+    return True
+
+
+def report_results_block(rounds, out, before):
+    table = results_table(rounds, {o["round"]: o for o in out}, before)
+    print("\n" + table)
+    if write_results_block(table):
+        print("\nwrote the README.md results table (annotations in table cells are replaced - review `git diff`)")
+    else:
+        print("\nno results:start/end block with a '| Round |' table in README.md; paste the table into its"
+              " Expected results section")
 
 
 def main(rounds):
@@ -230,6 +303,8 @@ def main(rounds):
     ap.add_argument("--level", type=int, default=None, help="run the round's attacks at another level (e.g. N-1: the 'before')")
     ap.add_argument("--with-before", action="store_true",
                     help="after each judged round, rerun it at level-1 (the 'before' column); reported, not judged")
+    ap.add_argument("--write-readme", action="store_true",
+                    help="rebuild the README's results:start/end block from this run (implies --all --with-before)")
     ap.add_argument("--catch-up", action="store_true", help="install solutions/round1..N before checking")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--markdown", action="store_true")
@@ -241,16 +316,20 @@ def main(rounds):
         for rel in labnet.restore(LAB):
             print(f"  restored {rel}")
         return
+    if args.write_readme:
+        args.all = args.with_before = True
     if args.round is None and not args.all:
         ap.error("--round N, --all or --restore")
     todo = sorted(rounds) if args.all else [args.round]
     if args.catch_up:
         catch_up(rounds, max(todo))
-    out = []
+    out, before = [], {}
     for n in todo:
         out.append(check_round(rounds, n, args.markdown, not args.no_reset, args.level, args.catch_up))
         if args.with_before and args.level is None and rounds[n].level > 0:
-            check_round(rounds, n, args.markdown, not args.no_reset, rounds[n].level - 1, args.catch_up)
+            before[n] = check_round(rounds, n, args.markdown, not args.no_reset, rounds[n].level - 1, args.catch_up)
+    if args.write_readme:
+        report_results_block(rounds, out, before)
     if args.json:
         print(json.dumps(out, indent=1, default=str))
     sys.exit(0 if all(o["ok"] for o in out) else 1)

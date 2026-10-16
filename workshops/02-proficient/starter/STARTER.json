@@ -4,7 +4,7 @@
   "source": "skeleton+manifest",
   "skeleton": "workshops/01-initiation/starter",
   "manifest": "workshops/02-proficient/starter.manifest.json",
-  "built_from": "54c99e71",
+  "built_from": "c624e58e",
   "default_level": 0,
   "baseline_checks": [],
   "pending_checks": [],

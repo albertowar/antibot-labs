@@ -5,6 +5,7 @@ Which changed Python files changed in *code*, not just in docstrings and comment
     python scripts/code_diff.py                 # working tree vs HEAD
     python scripts/code_diff.py --base main     # working tree vs main
     python scripts/code_diff.py --base main -v  # also print the code-level diff
+    python scripts/code_diff.py --labs          # just the labs/starters those files live in, one per line
 
 Each changed .py file (renames followed) is parsed at the base ref and in the working tree,
 docstrings are dropped (the AST already drops comments) and the two trees are compared.
@@ -12,6 +13,8 @@ A sweep that edits prose across many files (a renumber, a rename in docstrings) 
 only the files you meant to change in code; run those files' labs, not every lab.
 
 Exit status: 0 if no file changed in code, 1 if some did (listed), 2 on a parse error.
+--labs is a listing for scripting (`make verify-changed` loops over it), so it always exits 0;
+a changed starter prints its path too — remember its copies propagate (scripts/starter_check.py).
 """
 
 import argparse
@@ -70,6 +73,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--base", default="HEAD", help="git ref to compare against (default HEAD)")
     ap.add_argument("-v", "--verbose", action="store_true", help="print the code-level diff")
+    ap.add_argument("--labs", action="store_true",
+                    help="print only the lab/starter dirs holding the changed files, one per line (exit 0)")
     args = ap.parse_args()
 
     pairs = changed_py(args.base)
@@ -88,6 +93,21 @@ def main():
             added.remove(twin)
             changed.remove(twin)
             changed.remove(gone)
+    if args.labs:
+        dirs = []
+        for old, new, _, _ in changed:
+            parts = (new or old).split("/")
+            d = None
+            if len(parts) > 4 and parts[0] == "workshops" and parts[2] == "chapters" and parts[4] == "lab":
+                d = "/".join(parts[:5])
+            elif len(parts) > 2 and parts[0] == "workshops" and parts[2] == "starter":
+                d = "/".join(parts[:3])
+            if d and d not in dirs:
+                dirs.append(d)
+                if d.endswith("/starter"):
+                    print(f"note: {d} changed; its copies propagate - run scripts/starter_check.py", file=sys.stderr)
+        print("\n".join(dirs))
+        return 0
     print(f"{len(pairs)} changed .py file(s) vs {args.base}; {len(changed)} changed in code:")
     for old, new, before, after in changed:
         name = new if old in (None, new) else f"{old} -> {new}"

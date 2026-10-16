@@ -12,6 +12,7 @@ and with several agents verifying different labs at once.
     python tools/verify.py --round 2 --catch-up      # install solutions/round1..2 first
     python tools/verify.py --all --markdown          # every round: the README expected-results table
     python tools/verify.py --all --with-before --markdown  # rounds + their "before" columns, one process
+    python tools/verify.py --write-readme            # the above + rebuild the README's results block
 
 --with-before reruns each judged round at level-1 right after it (the README "before" column),
 so the whole exit-criteria sweep is one invocation plus --smoke. Before runs report only: they
@@ -61,11 +62,15 @@ def main():
     ap.add_argument("--level", type=int, default=None)
     ap.add_argument("--with-before", action="store_true",
                     help="after each judged round, rerun it at level-1 (the 'before' column); reported, not judged")
+    ap.add_argument("--write-readme", action="store_true",
+                    help="rebuild the README's results:start/end block from this run (implies --all --with-before)")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--catch-up", action="store_true")
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--markdown", action="store_true")
     args = ap.parse_args()
+    if args.write_readme:
+        args.all = args.with_before = True
     if args.smoke:
         # The contract test sees the bare store: the gate runs an empty ladder at every level,
         # so a lab with a permanent baseline at LADDER[0] still passes (contract 1.7).
@@ -83,11 +88,14 @@ def main():
         rounds = sorted(checkpoint.ROUNDS) if args.all else [args.round or 0]
         if args.catch_up:
             checkpoint_core.catch_up(checkpoint.ROUNDS, max(rounds))
-        outs = []
+        outs, before = [], {}
         for n in rounds:
             outs.append(checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True, args.level, args.catch_up))
             if args.with_before and args.level is None and checkpoint.ROUNDS[n].level > 0:
-                checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True, checkpoint.ROUNDS[n].level - 1, args.catch_up)
+                before[n] = checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True,
+                                                        checkpoint.ROUNDS[n].level - 1, args.catch_up)
+        if args.write_readme:
+            checkpoint_core.report_results_block(checkpoint.ROUNDS, outs, before)
         return 0 if all(o["ok"] for o in outs) else 1
     finally:
         srv.shutdown()
