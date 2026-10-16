@@ -32,6 +32,11 @@ least {"attempted": n, "succeeded": k}; anything else it adds (bits, cpu_s, pric
     python tools/checkpoint.py --restore             # put your own files back (the .bak copies)
     python tools/checkpoint.py --round 2 --level 1   # same round against the previous level (the "before" column)
     python tools/checkpoint.py --all --markdown       # every round, README table
+    python tools/checkpoint.py --all --with-before --markdown  # rounds + their "before" runs, one process
+
+--with-before reruns each judged round at level-1 right after it, so one invocation yields the
+README table and every "before" column. Before runs report only: they never affect the exit code
+(an earlier level may legitimately hurt a persona the round fixes).
 """
 
 import argparse
@@ -219,6 +224,8 @@ def main(rounds):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--round", type=int, default=None)
     ap.add_argument("--level", type=int, default=None, help="run the round's attacks at another level (e.g. N-1: the 'before')")
+    ap.add_argument("--with-before", action="store_true",
+                    help="after each judged round, rerun it at level-1 (the 'before' column); reported, not judged")
     ap.add_argument("--catch-up", action="store_true", help="install solutions/round1..N before checking")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--markdown", action="store_true")
@@ -235,7 +242,11 @@ def main(rounds):
     todo = sorted(rounds) if args.all else [args.round]
     if args.catch_up:
         catch_up(rounds, max(todo))
-    out = [check_round(rounds, n, args.markdown, not args.no_reset, args.level, args.catch_up) for n in todo]
+    out = []
+    for n in todo:
+        out.append(check_round(rounds, n, args.markdown, not args.no_reset, args.level, args.catch_up))
+        if args.with_before and args.level is None and rounds[n].level > 0:
+            check_round(rounds, n, args.markdown, not args.no_reset, rounds[n].level - 1, args.catch_up)
     if args.json:
         print(json.dumps(out, indent=1, default=str))
     sys.exit(0 if all(o["ok"] for o in out) else 1)

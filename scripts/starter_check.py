@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 STARTERS = ["workshops/01-initiation/starter", "workshops/02-proficient/starter", "workshops/03-advanced/starter", "workshops/04-ai-era-bots/starter"]
@@ -43,16 +44,22 @@ def main():
         failures += 1
     if not args.no_boot:
         print("== boot + smoke")
-        for s in STARTERS:
+
+        def boot(s):
             d = os.path.join(ROOT, s)
-            if not os.path.isdir(d):
-                continue
             py = os.path.join(d, ".venv", "bin", "python")
             py = py if os.path.exists(py) else sys.executable
-            r = subprocess.run([py, "tools/verify.py", "--smoke"], cwd=d, capture_output=True, text=True, env=dict(os.environ, PORT="8431"))
+            env = dict(os.environ)
+            env.pop("PORT", None)  # each verify.py picks its own free port, so the boots can overlap
+            r = subprocess.run([py, "tools/verify.py", "--smoke"], cwd=d, capture_output=True, text=True, env=env)
             tail = [line for line in r.stdout.splitlines() if line.startswith(("smoke:", "  FAIL"))]
-            print(f"   {s}: {'OK' if r.returncode == 0 else 'FAIL'}  " + " | ".join(tail[-5:]))
-            failures += r.returncode != 0
+            return s, r.returncode, tail
+
+        dirs = [s for s in STARTERS if os.path.isdir(os.path.join(ROOT, s))]
+        with ThreadPoolExecutor(max_workers=len(dirs) or 1) as ex:
+            for s, rc, tail in ex.map(boot, dirs):
+                print(f"   {s}: {'OK' if rc == 0 else 'FAIL'}  " + " | ".join(tail[-5:]))
+                failures += rc != 0
     print("\nstarters:", "OK" if not failures else f"{failures} problem(s)")
     sys.exit(1 if failures else 0)
 
