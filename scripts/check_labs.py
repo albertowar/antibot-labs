@@ -34,6 +34,7 @@ Starter chain only (starters and the labs copied from them)
 
 from __future__ import annotations
 
+import functools
 import glob
 import os
 import re
@@ -80,18 +81,24 @@ def rel(path: str) -> str:
     return os.path.relpath(path, os.path.join(ROOT, "workshops"))
 
 
+@functools.lru_cache(maxsize=None)
 def read(path: str) -> str:
     with open(path, encoding="utf-8", errors="replace") as fh:
         return fh.read()
 
 
-def py_files(*dirs: str) -> list[str]:
+@functools.lru_cache(maxsize=None)
+def _py_files(*dirs: str) -> tuple[str, ...]:
     out = []
     for d in dirs:
         for dirpath, dirnames, files in os.walk(d):
             dirnames[:] = [x for x in dirnames if x not in ("__pycache__", "node_modules", ".venv")]
             out += [os.path.join(dirpath, f) for f in files if f.endswith(".py")]
-    return sorted(out)
+    return tuple(sorted(out))
+
+
+def py_files(*dirs: str) -> list[str]:
+    return list(_py_files(*dirs))
 
 
 def uses_network(src: str) -> bool:
