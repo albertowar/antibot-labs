@@ -262,7 +262,7 @@ Redis is `redis:8.10.2-alpine`, PostgreSQL `postgres:18.6-alpine` (volume at `/v
 - **Interop with a real Web Bot Auth signer.** The verifier is W4 Ch2's and the signer is this lab's own; both speak RFC 9421 and the web-bot-auth draft, and neither has been tested against a vendor's.
 - **Real card-network agentic payments.** The mandate is a sketch in the spirit of AP2: scoped, time-boxed, single-use, bound to an operator and a SKU. It moves no money and is not an AP2 implementation.
 - **Cart checkout.** The gate acts on the drop purchase (`POST /drop/<sku>`, `POST /api/buy`); a verified agent that buys an ordinary product through the cart is not gated. Extending the phase list to `action:checkout` needs the order's SKU, which the cart route does not put in the notes.
-- **Held orders.** A step-up here is a challenge before the order exists. Holding an order that is already paid and restocking it on a timeout is a different design, and the store has no cancel path (`TODO.md` §1.2, W4 Ch4 gap (a)).
+- **Held orders.** A step-up here is a challenge before the order exists. Holding an order that is already paid and restocking it on a timeout is a different design, and this lab's store (pre-1.7) has no cancel path. Contract 1.7 later added held orders and `demo_site/orders.py cancel_order` (`STORE_CONTRACT.md` changelog); this lab keeps its pre-write `block`.
 
 ## Troubleshooting
 
