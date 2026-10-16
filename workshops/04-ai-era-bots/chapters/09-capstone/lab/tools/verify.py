@@ -1,156 +1,86 @@
 """
-W4 Ch9 Capstone — in-process verification harness (build-time only; not part of the lab)
+In-process verification harness (build time; not part of the student flow).
 
-Starts the store on a background thread in THIS process at a chosen
-DEFENSE_LEVEL, waits for it, then runs the round's attack and the legitimate
-traffic against 127.0.0.1, and prints the scoreboard. One foreground process,
-so it works where detached servers get reaped.
+Starts the store on a background thread in THIS process on a free port (or $PORT),
+waits for it, then runs the checkpoint (or the smoke test) against it and exits with
+its status. One foreground process, so it works in CI, in sandboxes that reap daemons,
+and with several agents verifying different labs at once.
 
-    DEFENSE_LEVEL is set from --round. Student catch-up (solutions -> defenses)
-    is applied cumulatively for rounds 1..N when --defended is passed.
-
-    python tools/verify.py --round 0
-    python tools/verify.py --round 2 --defended
+    python tools/verify.py --smoke
+    python tools/verify.py --round 2                 # round 2 at its own level
+    python tools/verify.py --round 2 --level 1       # round 2's attacks against level 1 (the "before")
+    python tools/verify.py --round 2 --catch-up      # install solutions/round1..2 first
+    python tools/verify.py --all --markdown          # every round: the README expected-results table
 """
 
 import argparse
 import os
-import shutil
+import socket
 import sys
 import threading
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LAB_DIR = os.path.dirname(HERE)
-sys.path.insert(0, LAB_DIR)  # lab root: labnet.py
-import labnet  # noqa: E402
-PORT = int(os.environ.get("PORT", "8412"))
+LAB = os.path.abspath(os.path.join(HERE, ".."))
+sys.path[:0] = [LAB, HERE]
+
+
+def free_port():
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+PORT = int(os.environ.get("PORT") or free_port())
 BASE = f"http://127.0.0.1:{PORT}"
-# Every file a round's reference solution replaces (solutions/roundN/<path relative to lab>).
-STUDENT_FILES = sorted({dst for _src, dst in labnet.solution_files(LAB_DIR, 4)})
-_BACKUPS = {}
+# labclient reads DEMO_URL at import time, so set it before anything imports it.
+os.environ["PORT"], os.environ["DEMO_URL"] = str(PORT), BASE
 
 
-def apply_solutions(upto):
-    for path in STUDENT_FILES:          # back up the student state so we can restore it after
-        with open(path) as f:
-            _BACKUPS[path] = f.read()
-    for src, dst in labnet.solution_files(LAB_DIR, upto):
-        shutil.copy2(src, dst)
-
-
-def restore_backups():
-    for path, text in _BACKUPS.items():
-        with open(path, "w") as f:
-            f.write(text)
-
-
-def restore_stubs():
-    """Put the student stubs back (git-tracked); solutions are only copied for the defended run."""
-    import subprocess
-    subprocess.run(["git", "-C", LAB_DIR, "checkout", "--",
-                    "defenses/crawl_governance.py", "defenses/agent_governance.py", "defenses/deception_limits.py",
-                    "defenses/llm_guard.py", "defenses/oracle_guard.py", "policies/agent_policy.json"],
-                   capture_output=True)
+def start_store(level):
+    os.environ["DEFENSE_LEVEL"] = str(level)
+    os.environ.setdefault("REDIS_URL", "memory://")
+    os.environ.setdefault("DATABASE_URL", f"sqlite:///{os.path.join(LAB, 'instance', f'verify-{PORT}.db')}")
+    from werkzeug.serving import make_server
+    from demo_site.app import create_app
+    app = create_app()
+    srv = make_server("127.0.0.1", PORT, app, threaded=True)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return app, srv
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--round", type=int, required=True)
-    ap.add_argument("--defended", action="store_true", help="apply solutions 1..round first")
-    ap.add_argument("--attack-only", action="store_true")
-    ap.add_argument("--checkpoint", action="store_true", help="run the real tools/checkpoint.py in-process")
-    ap.add_argument("--ops", action="store_true", help="round 4: triage -> approve -> onboard -> audit")
+    ap.add_argument("--round", type=int, default=None)
+    ap.add_argument("--level", type=int, default=None)
+    ap.add_argument("--all", action="store_true")
+    ap.add_argument("--catch-up", action="store_true")
+    ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--markdown", action="store_true")
     args = ap.parse_args()
-
-    if args.defended and args.round >= 1:
-        apply_solutions(args.round)
-
-    os.environ["DEFENSE_LEVEL"] = str(args.round if args.defended else 0)
-    os.environ["PORT"] = str(PORT)
-    os.environ["DEMO_URL"] = BASE
-    os.environ.setdefault("LAB_TIME_SCALE", "0.05")
-    sys.path.insert(0, os.path.join(LAB_DIR, "demo_site"))
-    sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-    sys.path.insert(0, LAB_DIR)
-    sys.path.insert(0, HERE)
-    sys.path.insert(0, os.path.join(LAB_DIR, "attacks"))
-
-    from werkzeug.serving import make_server
-    import app as store_app
-    srv = make_server("127.0.0.1", PORT, store_app.app, threaded=True)
-    t = threading.Thread(target=srv.serve_forever, daemon=True)
-    t.start()
-    import requests
-    for _ in range(40):
-        try:
-            requests.get(f"{BASE}/admin/status", timeout=2)
-            break
-        except Exception:
-            time.sleep(0.25)
-    print(f"store up at DEFENSE_LEVEL={os.environ['DEFENSE_LEVEL']}  ({BASE})\n")
-    import hashlib
-    secret = open(os.path.join(LAB_DIR, "instance", "lab_secret")).read().strip()
-    admin = {"X-Lab-Admin": hashlib.sha256(f"admin:{secret}".encode()).hexdigest()[:32]}
-    requests.post(f"{BASE}/admin/reset?decisions=1&fresh_accounts=1", headers=admin, timeout=10)
-
-    import importlib
-    import legit_traffic
+    if args.smoke:
+        # The contract test sees the bare store: the gate runs an empty ladder at every level,
+        # so a lab with a permanent baseline at LADDER[0] still passes (contract 1.7).
+        os.environ["LAB_SMOKE"] = "1"
+    app, srv = start_store(args.level if args.level is not None else (args.round or 0))
+    print(f"[verify] store on {BASE}")
     try:
-        if args.checkpoint:
-            import checkpoint
-            sys.argv = ["checkpoint.py", "--round", str(args.round)]
-            if args.round == 4:
-                sys.argv += ["--record", os.path.join(LAB_DIR, "solutions", "round4", "governance_record.md")]
-            return checkpoint.main()
-        if args.ops:
-            import audit
-            import triage
-            import subprocess
-            print("--- run the agent farm to populate the decision log:")
-            importlib.import_module("round2_agent_farm").run(BASE)
-            print("\n--- triage proposes a rule from the log:")
-            triage.run(BASE)
-            import json
-            pend = json.load(open(os.path.join(LAB_DIR, "rules", "pending.json")))
-            rid = pend["rules"][0]["id"]
-            print(f"\n--- a person approves {rid}:")
-            subprocess.run([sys.executable, os.path.join(HERE, "approve.py"), "--approve", rid, "--by", "capstone-instructor"])
-            print("\n--- a person onboards the new vendor:")
-            subprocess.run([sys.executable, os.path.join(HERE, "approve.py"), "onboard-operator",
-                            "--host", "agents.newvendor.test", "--by", "capstone-instructor"])
-            print("\n--- audit the live store:")
-            audit.run(BASE, os.path.join(LAB_DIR, "solutions", "round4", "governance_record.md"))
-            return 0
-        if args.round == 0:
-            importlib.import_module("round0_naive").run(BASE)
-        elif args.round == 1:
-            importlib.import_module("round1_crawler_fleet").run(BASE)
-        elif args.round == 2:
-            importlib.import_module("round2_agent_farm").run(BASE)
-        elif args.round == 3:
-            importlib.import_module("round3_llm_extract").run(BASE)
-            print()
-            importlib.import_module("round3_injector").run(BASE)
-        elif args.round == 4:
-            importlib.import_module("round4_integrated").run(BASE)
-        if not args.attack_only:
-            print("\n=== legitimate traffic ===")
-            res = legit_traffic.run(BASE)
-            import personas
-            for cohort in personas.COHORTS + personas.CRAWLER_COHORTS:
-                row = legit_traffic.summarize(res).get(cohort)
-                if row:
-                    hurt = row["block"] + row["maze"]
-                    print(f"  {'OK ' if hurt == 0 else 'BAD'} [{cohort:<16}] allow {row['allow']} challenge {row['challenge']} "
-                          f"block {row['block']} maze {row['maze']} other {row['other']}")
-            for r in res:
-                if r["outcome"] in ("block", "maze", "error"):
-                    print(f"       BAD {r['cohort']:<14} {r.get('persona','?'):<16} {r['outcome']:<7} {r.get('reasons', [])[:2]}")
+        import labclient
+        labclient.wait_for_store()
+        if args.smoke:
+            import smoke
+            return smoke.run()
+        import checkpoint
+        import checkpoint_core
+        rounds = sorted(checkpoint.ROUNDS) if args.all else [args.round or 0]
+        if args.catch_up:
+            checkpoint_core.catch_up(checkpoint.ROUNDS, max(rounds))
+        outs = [checkpoint_core.check_round(checkpoint.ROUNDS, n, args.markdown, True, args.level, args.catch_up) for n in rounds]
+        return 0 if all(o["ok"] for o in outs) else 1
     finally:
         srv.shutdown()
-        restore_backups()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -25,7 +25,7 @@ Three TODOs:
 `tools/checkpoint.py --round 2 --catch-up` drops in the reference module AND policy.
 """
 
-import policy_engine
+from . import policy_engine
 
 PER_ACCOUNT_CAP = 1
 PER_DEVICE_CAP = 1

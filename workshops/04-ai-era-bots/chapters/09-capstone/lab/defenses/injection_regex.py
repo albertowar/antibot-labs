@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 
-from decision import allow, block, Decision
+from .decision import allow, block, Decision
 
 PATTERNS = [
     r"\[SYSTEM[:\s\]]",

@@ -29,8 +29,8 @@ The contract (reservation/):
 `tools/checkpoint.py --round 1 --catch-up` drops in the reference.
 """
 
-import paywall
-from decision import allow, block, maze
+from . import paywall
+from .decision import allow, block, maze
 
 STEALTH_PAGES_PER_MIN = 30   # undeclared + datacenter + above this -> maze
 

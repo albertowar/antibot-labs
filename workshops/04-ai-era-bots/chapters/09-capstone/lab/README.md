@@ -1,5 +1,7 @@
 # W4 Ch9 Capstone Lab — Govern the Agents
 
+Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: the whole Workshop 4 stack wired as one ladder — crawl governance, agent governance, deception within limits, the LLM guard and the decision-oracle guard (`defenses/`), a store extension that binds them to content, checkout, the LLM features and the policy surface (`demo_site/ext/capstone_store.py`), Web Bot Auth reused byte-for-byte from W4 Ch2 (`defenses/httpsig.py`, `defenses/web_bot_auth.py`), the agent/crawler-aware legitimate mix and the five rounds of attackers (`tools/`, `attacks/`), and the operate-and-audit tooling (`tools/approve.py`, `tools/audit.py`, `tools/make_keys.py`).
+
 The last lab of the series. One store, the whole Workshop 4 stack, five rounds
 of 🔴 attack ⚔️ 🔵 defend, run under the AI governance record you wrote in
 W4 Ch8.
@@ -15,7 +17,7 @@ three-column scoreboard.
 | 1 | crawl governance: identity × purpose → allow / 402 / charge / maze / block | `defenses/crawl_governance.py` | 1 |
 | 2 | agent governance: your Ch8 policy, live at checkout | `defenses/agent_governance.py` + `policies/agent_policy.json` | 2 |
 | 3 | deception within limits + the LLM guard | `defenses/deception_limits.py`, `defenses/llm_guard.py` | 3 |
-| 4 | operate: human-approved rules + the oracle guard | `defenses/oracle_guard.py` (+ `tools/triage.py`/`approve.py`/`audit.py`, run-only) | 4 |
+| 4 | operate and audit: the decision-oracle guard, onboard a new vendor, run the audit | `defenses/oracle_guard.py` (+ `tools/approve.py`/`tools/audit.py`, run-only) | 4 |
 
 Score scale is the series' usual: `score < 30` allow, `30–59` challenge, `≥ 60` block.
 
@@ -134,19 +136,21 @@ python tools/checkpoint.py --round 3
 python attacks/round4_integrated.py             # all of it + a score prober + a new vendor
 # edit TODO (Round 4) in defenses/oracle_guard.py, then:
 DEFENSE_LEVEL=4 PORT=8409 python demo_site/app.py
-# operate:
-python tools/triage.py                          # the LLM proposes a rule from the log; the gate replays it
-python tools/approve.py --approve <id> --by <you>        # a person ships it
-python tools/approve.py onboard-operator --host agents.newvendor.test --by <you>
-python tools/audit.py --record exercises/<your-record>.md
-python tools/checkpoint.py --round 4 --record exercises/<your-record>.md
+# operate: a person onboards the new vendor (the drift the ops round is about)
+python tools/approve.py onboard-operator --origin https://agents.newvendor.test --by <you>
+python tools/audit.py --record exercises/<your-record>.md   # the 7 live cards + the 12-item record
+python tools/checkpoint.py --round 4
 ```
+
+Drafting and approving a *detection rule* — triage proposing one, the gate testing it
+against the shopper cohorts, a person signing it — is W4 Ch7's subject and is not
+repeated here; the capstone's human-in-the-loop action is onboarding the vendor.
 
 | Step | Do | Expected |
 |---|---|---|
 | 🗡️ Attack | `round4_integrated.py` at L4 | every earlier target holds; prober reads **no** score; new vendor blocked |
-| 🩺 Operate | triage → approve → onboard | one rule approved by a name; vendor now buys |
-| 📝 Audit | `audit.py` (7 cards) + `--record` | 7/7 cards; record ≥ 10/12 |
+| 🩺 Operate | `approve.py onboard-operator` | the vendor is trusted by a named person; it now buys |
+| 📝 Audit | `audit.py` (7 cards) + `--record` | 7/7 cards; record ≥ 12/12 |
 | ✅ Checkpoint | `checkpoint.py --round 4` | caps hold, oracle hides the score, audit passes, 0 legit blocked |
 
 **Discuss:** the oracle guard turns a 200-request probe into a 2,000-account one. It did not stop the attacker. What did it buy you, and what finishes the job?
@@ -160,15 +164,15 @@ weighted friction and decide whether it is worth it.
 
 ## Expected results (self-check)
 
-Verified on 2026-10-11 with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1,
-SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, cryptography 50.0.2, requests 2.34.2
-and httpx 0.28.1, on fakeredis + SQLite with the deterministic mock LLM, through
-`tools/verify.py --round N --defended --checkpoint` (reference solutions applied
-cumulatively; `--ops` for Round 4). The `docker compose` path is verified separately.
+Verified on 2026-10-16 with Python 3.12, Flask 3.1, Flask-SQLAlchemy 3.1,
+SQLAlchemy 2.1, redis 8.1, fakeredis 2.39, cryptography 50.0, requests 2.34 and
+httpx 0.28, on fakeredis + SQLite with the deterministic mock LLM, through
+`tools/verify.py --round N --catch-up` (reference solutions applied cumulatively).
+Regenerate this table with `tools/verify.py --all --catch-up --markdown`.
 
 | Round (level) | Attack result | Legit |
 |---|---|---|
-| 0 (L0) | crawler 120/120 free · agent buys · extractor 12 records/page | 0 blocked |
+| 0 (L0) | crawler 120/120 free · agent buys · extractor 24 records/page | 0 blocked |
 | 1 (L1) | training **402** (0 free) · impostor **403** (0) · stealth 2nd pass **0** · paying **charged** 120/120 · leaks **0/3** | 0 blocked/mazed (readers & prefetch served) |
 | 2 (L2) | farm **1/36** drop orders · forged signature **0** · dark cloud agent **0** · a11y mimic **0** | signed agents buy · a11y challenged non-visually · 0 blocked |
 | 3 (L3) | extractor poisoned (3 honeypots, canary in every record) · injections **0/9** · 3 real reviewers published | honoured crawler & a11y: **0** decoys · 0 blocked |
@@ -192,3 +196,72 @@ is ~60–90 s. Defender cost: checkout scoring median a few ms; the maze costs b
 2. **A real model.** `export LLM_URL=…` and re-run Round 3. Which injection variants does a real model resist that the mock follows, and which does it fall for?
 3. **A browser agent.** `attacks/bonus_playwright_agent.py` drives a real Chromium agent against checkout (needs `pip install playwright==1.63.0 && python -m playwright install chromium`). Does the HTTP-level story hold?
 4. **Pay-per-use.** Extend the ledger so a crawl is billed only when the page is later served in an answer, not on fetch (Cloudflare's 2026 shift). Where does the accounting move?
+
+<!-- lab-diff:start -->
+**Adds** (files not in the starter):
+
+- `defenses/agent_behavior.py`
+- `defenses/agent_governance.py`
+- `defenses/agent_identity.py`
+- `defenses/agent_policy.py`
+- `defenses/automation.py`
+- `defenses/babble.py`
+- `defenses/behavior_flow.py`
+- `defenses/capstone.py`
+- `defenses/challenges.py`
+- `defenses/content_heuristics.py`
+- `defenses/crawl_governance.py`
+- `defenses/crawl_policy.py`
+- `defenses/crawler_identity.py`
+- `defenses/crawler_registry.py`
+- `defenses/deception_limits.py`
+- `defenses/decision.py`
+- `defenses/extractor_traps.py`
+- `defenses/fingerprint_coherence.py`
+- `defenses/httpsig.py`
+- `defenses/injection_regex.py`
+- `defenses/key_directory.py`
+- `defenses/llm_guard.py`
+- `defenses/mandates.py`
+- `defenses/maze.py`
+- `defenses/oracle_guard.py`
+- `defenses/paywall.py`
+- `defenses/policy_engine.py`
+- `defenses/request_checks.py`
+- `defenses/risk_engine.py`
+- `defenses/rules.py`
+- `defenses/signals.py`
+- `defenses/web_bot_auth.py`
+- `demo_site/ext/capstone_store.py`
+- `demo_site/ext/templates/capstone/traps.html`
+- `demo_site/ext/templates/partials/_card.html`
+- `demo_site/static/collector.js`
+- `demo_site/static/js/capstone.js`
+- `demo_site/static/shop.js`
+- `tools/approve.py`
+- `tools/audit.py`
+- `tools/crawl.py`
+- `tools/lab.py`
+- `tools/legit_traffic.py`
+- `tools/llm.py`
+- `tools/make_keys.py`
+- `tools/personas.py`
+- `tools/profiles/brave-win.json`
+- `tools/profiles/chrome-mac.json`
+- `tools/profiles/chrome-win.json`
+- `tools/profiles/firefox-linux.json`
+- `tools/profiles/firefox-rfp.json`
+- `tools/profiles/office-win.json`
+- `tools/profiles/safari-ios.json`
+- `tools/profiles/vdi-citrix.json`
+- `tools/record_checklist.py`
+- `tools/seed.py`
+- `tools/synthetic_input.py`
+- `tools/triage.py`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
+- `tools/checkpoint.py`
+<!-- lab-diff:end -->

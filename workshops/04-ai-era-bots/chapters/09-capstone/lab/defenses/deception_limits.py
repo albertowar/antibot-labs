@@ -21,7 +21,7 @@ auditor's card 5 is about. `tools/checkpoint.py --round 3 --catch-up` drops in
 the reference.
 """
 
-import extractor_traps
+from . import extractor_traps
 
 EMPTY = {"hidden_records": [], "canary_note": None, "decoy_paragraphs": []}
 

@@ -24,7 +24,7 @@ quotes a reviewer's link to the manufacturer. Log every withheld output.
 
 import re
 
-from decision import allow, block, Decision
+from .decision import allow, block, Decision
 
 MARK = "^"
 _URL = re.compile(r"(?:https?://)?((?:[a-z0-9][a-z0-9\-]*\.)+[a-z]{2,})", re.I)

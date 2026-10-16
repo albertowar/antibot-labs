@@ -1,104 +1,95 @@
 """
-W4 Ch9 Capstone — Generate the lab's agent-operator keys and their key directories
+W4 Ch9 Capstone — generate the operators' signing keys and their key directories
 
-Three operators, all local, all synthetic:
+Four synthetic operators sign requests in this lab:
 
-    agents.lab-provider.test   the operator the store TRUSTS (defenses/trusted_operators.json).
-                               Its key signs the verified agent (Round 3) and the agent-user personas.
-    agents.newvendor.test      a vendor that appears on launch day (Round 4). Honest, signed, unknown to
-                               trusted_operators.json until someone onboards it.
-    agents.evil.test           an operator that published a perfectly valid key directory of its own.
-                               Nobody at the store has ever heard of it (Round 3's third case).
+    trainbot.example             the licensed training crawler (pays the RSL price)
+    labsearch.example            the search crawler the reservation protects
+    agents.lab-provider.test     the trusted shopping-agent vendor (mandated checkouts)
+    agents.newvendor.test        a NEW vendor: its directory exists from day one, but the
+                                 store does not trust it until Round 4's onboarding
 
-Writes data/keys/<name>.pem (private) and data/directories/<host>.json (what
-the operator would serve at /.well-known/http-message-signatures-directory).
+Each gets an Ed25519 key pair: the private half in instance/keys/<name>.key (hex seed,
+gitignored — a private key in git, even synthetic, trips secret scanners and teaches the
+wrong habit), and the public half as a SIGNED key directory in
+instance/keys/<authority>.json — `{"jwks": …, "headers": …}`, the JWK Set plus the
+origin-binding signature headers it would have been served with
+(defenses/key_directory.py reads these files; defenses/web_bot_auth.py verifies them).
 
-Plus the two crawler operators from defenses/crawler_registry.py (the L1 crawl
-governance layer, from W4 Ch3):
+The attacker's own origin (attacker.example) gets a pair too: Round 2's dark cloud agent
+signs correctly with a key its own origin publishes — a VALID signature from an origin
+the store does not trust, which is exactly the lesson.
 
-    trainbot    LabTrainBot    keyid trainbot-2026-10
-    searchbot   LabSearchBot   keyid searchbot-2026-10
-
-Writes attacks/keys/<name>_ed25519.pem (private, used by tools/crawl.py) and
-attacks/keys/registry.json (the public keys the registry loads).
-
-Idempotent: existing keys are kept unless --force. Nothing here is committed
-(data/keys/ and attacks/keys/ are gitignored): a private key in git, even a
-synthetic one, trips secret scanners and teaches the wrong habit.
-
-Run (from lab/):
-    python tools/make_keys.py
+    python tools/make_keys.py            # create any missing key (seed.py runs this)
+    python tools/make_keys.py --force    # rotate: replace every key
 """
 
-import argparse
 import json
 import os
 import sys
 
-LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-import httpsig  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+LAB = os.path.dirname(HERE)
+sys.path.insert(0, LAB)
 
-OPERATORS = {"lab-provider": "agents.lab-provider.test", "evil": "agents.evil.test",
-             "newvendor": "agents.newvendor.test"}
+from defenses import httpsig  # noqa: E402
 
-
-# pem stem -> (operator name in crawler_registry.OPERATORS, keyid)
-CRAWLERS = {"trainbot": ("trainbot.example", "trainbot-2026-10"),
-            "searchbot": ("labsearch.example", "searchbot-2026-10")}
-CRAWLER_KEYS = os.path.join(LAB_DIR, "attacks", "keys")
+KEYS = os.path.join(LAB, "instance", "keys")
+OPERATORS = {
+    "trainbot.example": "https://trainbot.example",
+    "labsearch.example": "https://labsearch.example",
+    "agents.lab-provider.test": "https://agents.lab-provider.test",
+    "agents.newvendor.test": "https://agents.newvendor.test",
+    "attacker.example": "https://attacker.example",
+}
 
 
 def key_path(name):
-    return os.path.join(LAB_DIR, "data", "keys", f"{name}.pem")
+    return os.path.join(KEYS, f"{name}.key")
 
 
-def crawler_key_path(stem):
-    return os.path.join(CRAWLER_KEYS, f"{stem}_ed25519.pem")
+def load_signer(name):
+    """(private_key, keyid) for an operator; generates the pair on first use."""
+    make(force=False, only=name)
+    with open(key_path(name)) as fh:
+        seed = fh.read().strip()
+    private = httpsig.load_private(seed)
+    jwk = httpsig.jwk_from_public(private.public_key())
+    return private, httpsig.thumbprint(jwk)
 
 
-def make_crawler_keys(force=False):
-    """The crawler operators' key pairs, published as attacks/keys/registry.json."""
-    from cryptography.hazmat.primitives import serialization
-    published = {}
-    for stem, (operator, keyid) in CRAWLERS.items():
-        pem = crawler_key_path(stem)
-        if os.path.exists(pem) and not force:
-            key = httpsig.load_private_key(pem)
-            print(f"  kept   {os.path.relpath(pem, LAB_DIR)}")
-        else:
-            key = httpsig.generate_private_key()
-            httpsig.save_private_key(key, pem)
-            print(f"✅ wrote  {os.path.relpath(pem, LAB_DIR)}")
-        raw = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        published.setdefault(operator, {})[keyid] = httpsig.b64url(raw)
-    out = os.path.join(CRAWLER_KEYS, "registry.json")
-    with open(out, "w") as f:
-        json.dump(published, f, indent=1)
-    print(f"✅ wrote  {os.path.relpath(out, LAB_DIR)}  (crawler public keys for defenses/crawler_registry.py)")
-    return published
+# A lab session may run long after the keys were first generated, so the signed directory
+# carries a generous validity window and is re-signed on every make() (store start / seed):
+# the private key stays put, so signers and verifiers always agree, and the directory
+# signature is never stale. (Request signatures still use httpsig's short default window.)
+DIRECTORY_TTL = 30 * 24 * 3600
 
 
-def main(force=False):
-    for name, host in OPERATORS.items():
-        pem = key_path(name)
-        if os.path.exists(pem) and not force:
-            key = httpsig.load_private_key(pem)
-            print(f"  kept   {os.path.relpath(pem, LAB_DIR)}")
-        else:
-            key = httpsig.generate_private_key()
-            httpsig.save_private_key(key, pem)
-            print(f"✅ wrote  {os.path.relpath(pem, LAB_DIR)}")
-        directory = httpsig.directory_for(key)
-        out = os.path.join(httpsig.DIRECTORIES, f"{host}.json")
-        os.makedirs(httpsig.DIRECTORIES, exist_ok=True)
-        with open(out, "w") as f:
-            json.dump(directory, f, indent=1)
-        print(f"✅ wrote  {os.path.relpath(out, LAB_DIR)}  (kid {directory['keys'][0]['kid'][:16]}…)")
-    make_crawler_keys(force)
+def make(force=False, only=None):
+    os.makedirs(KEYS, exist_ok=True)
+    made = []
+    for name, origin in OPERATORS.items():
+        if only and name != only:
+            continue
+        kp = key_path(name)
+        authority = origin.removeprefix("https://")
+        dirp = os.path.join(KEYS, f"{authority}.json")
+        fresh_key = force or not os.path.exists(kp)
+        if fresh_key:
+            with open(kp, "w") as fh:
+                fh.write(os.urandom(32).hex() + "\n")
+        private = httpsig.load_private(open(kp).read().strip())
+        jwk = httpsig.jwk_from_public(private.public_key())
+        jwks = {"keys": [jwk]}
+        headers = httpsig.sign_directory(jwks, {httpsig.thumbprint(jwk): private}, authority,
+                                         ttl=DIRECTORY_TTL)
+        with open(dirp, "w") as fh:
+            json.dump({"jwks": jwks, "headers": headers}, fh, indent=1)
+        if fresh_key:
+            made.append(name)
+    return made
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--force", action="store_true", help="regenerate even if keys exist")
-    main(parser.parse_args().force)
+if __name__ == "__main__":
+    made = make(force="--force" in sys.argv)
+    print(f"keys under {os.path.relpath(KEYS)}: " + (", ".join(made) if made else "all present"))

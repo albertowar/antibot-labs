@@ -24,12 +24,12 @@ L1 and L3 act on content responses and are applied by the store directly;
 this module scores requests and checkouts.
 """
 
-import agent_behavior
-import agent_governance
-import automation
-import behavior_flow
-import fingerprint_coherence
-import request_checks
+from . import agent_behavior
+from . import agent_governance
+from . import automation
+from . import behavior_flow
+from . import fingerprint_coherence
+from . import request_checks
 
 ALLOW_BELOW = 30
 BLOCK_AT = 60

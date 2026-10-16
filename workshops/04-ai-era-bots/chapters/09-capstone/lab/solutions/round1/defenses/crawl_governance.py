@@ -24,8 +24,8 @@ opens 30+ product tabs in a minute; a reader on a corporate proxy that
 happens to sit in a cloud range. Both heal with the TAG_TTL in maze.py.
 """
 
-import paywall
-from decision import allow, block, maze
+from . import paywall
+from .decision import allow, block, maze
 
 STEALTH_PAGES_PER_MIN = 30
 

@@ -7,8 +7,12 @@ operator publishes an Ed25519 key and signs requests (Web Bot Auth, an IETF
 working-group draft built on RFC 9421 HTTP Message Signatures).
 
 This chapter needs both as inputs, so this module is the registry a site would
-keep (or buy from its CDN): declared UA token -> operator -> purpose, published
-egress ranges, and the operator's public signing key. Two synthetic operators:
+keep (or buy from its CDN): declared UA token -> operator -> purpose and the
+operator's published egress ranges. The strong path — Ed25519 keys and Web Bot
+Auth signatures — lives in defenses/web_bot_auth.py over the signed key
+directories tools/make_keys.py generates (defenses/key_directory.py reads them);
+this registry only maps a verified Signature-Agent origin back to a purpose.
+Two synthetic operators:
 
     LabTrainBot   trains models        (purpose ai-train)   -- the one we govern
     LabSearchBot  builds a search index (purpose search)    -- the one we must not hurt
@@ -39,42 +43,15 @@ OPERATORS = {
         "purpose": "ai-train",
         "ranges": ["203.0.113.0/26"],
         "signature_agent": "https://trainbot.example",
-        "keys": {},  # keyid -> public key, filled from attacks/keys/registry.json below
     },
     "labsearch.example": {
         "ua_token": "LabSearchBot",
         "purpose": "search",
         "ranges": ["203.0.113.64/26"],
         "signature_agent": "https://labsearch.example",
-        "keys": {},
     },
 }
 
-# The operators' public keys are not hard-coded: tools/make_keys.py (run by
-# tools/seed.py) generates each operator's key pair and "publishes" the public
-# halves to attacks/keys/registry.json, exactly as a real operator would publish
-# a key directory. Nothing under attacks/keys/ is committed; a private key in
-# git, even a synthetic one, trips secret scanners and teaches the wrong habit.
-PUBLISHED_KEYS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                              "attacks", "keys", "registry.json")
-
-
-def load_published_keys(path: str = PUBLISHED_KEYS) -> bool:
-    """Fill OPERATORS[*]["keys"] from the generated registry. False if it is missing."""
-    try:
-        with open(path) as fh:
-            published = json.load(fh)
-    except FileNotFoundError:
-        print(f"[crawler_registry] {path} not found: no crawler signature can verify until "
-              f"you run `python tools/seed.py` (then restart the store).", file=sys.stderr)
-        return False
-    for operator, keys in published.items():
-        if operator in OPERATORS:
-            OPERATORS[operator]["keys"].update(keys)
-    return True
-
-
-load_published_keys()
 
 _BY_TOKEN = {op["ua_token"].lower(): (name, op) for name, op in OPERATORS.items()}
 _BY_AGENT = {op["signature_agent"]: (name, op) for name, op in OPERATORS.items()}

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 
-from decision import allow, block, challenge, Decision
+from .decision import allow, block, challenge, Decision
 
 MIN_CHARS = 20
 SHINGLE = 5

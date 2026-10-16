@@ -1,157 +1,95 @@
 """
-W4 Ch9 Capstone — human approval: the only writer of rules/active.json (from W4 Ch7)
+W4 Ch9 Capstone — human approval: onboarding a trusted agent operator (Round 4)
 
-triage.py drafts; a person approves. A rule reaches the live engine only when
-someone with a name approved a candidate the gate passed (OWASP "Excessive
-Agency": an LLM never writes an enforcement rule by itself). The same tool
-onboards a trusted agent operator, because that is the other change a human
-makes to the live policy on launch day (Round 4's new vendor).
+Launch day's drift: a new vendor's agent (agents.newvendor.test) is honest,
+signed and carries a mandate, but the store has never heard of it, so agent
+governance refuses it (a valid signature from an unknown origin is identity, not
+entitlement — W4 Ch2). Trusting an operator is a business decision a *person*
+makes, never the model: this tool is how they make it, writing the origin into
+rules/trusted_operators.json, which defenses/policy.TRUSTED_AGENTS reads live
+(POST /lab/reset restores the seed). Every onboarding is stamped with who did it.
+
+Rule drafting and approval — triage proposing a detection rule, the gate testing
+it against the shopper cohorts, a person approving it — is the subject of W4 Ch7
+and is not repeated here; the capstone's human-in-the-loop action is onboarding.
 
     python tools/approve.py --list
-    python tools/approve.py --approve r-ab12cd --by alice
-    python tools/approve.py --revoke r-ab12cd --by alice
-    python tools/approve.py onboard-operator --host agents.newvendor.test --by alice
-
-active.json is written atomically and its version bumped; every change is
-appended to rules/audit.jsonl. Rule notes are printed through safe_text():
-they may have been drafted from attacker-controlled data.
+    python tools/approve.py onboard-operator --origin https://agents.newvendor.test --by alice
+    python tools/approve.py onboard-operator --origin https://agents.newvendor.test --by alice \
+        --category "shopping-agent vendor"
 """
 
 import argparse
 import json
 import os
-import re
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses"))
-from rules import ACTIVE_FILE, AUDIT_FILE, PENDING_FILE, check_rule  # noqa: E402
-
-TRUSTED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "defenses", "trusted_operators.json")
-
-
-def safe_text(s, n=80):
-    s = re.sub(r"[\x00-\x1f\x7f]", " ", str(s))
-    return s[:n]
+HERE = os.path.dirname(os.path.abspath(__file__))
+LAB = os.path.dirname(HERE)
+TRUSTED = os.path.join(LAB, "rules", "trusted_operators.json")
 
 
-def load(path, default):
-    if os.path.exists(path):
-        with open(path) as fh:
-            return json.load(fh)
-    return default
+def _load():
+    if os.path.exists(TRUSTED):
+        try:
+            with open(TRUSTED) as fh:
+                doc = json.load(fh)
+        except (ValueError, OSError):
+            doc = {}
+    else:
+        doc = {}
+    doc.setdefault("trusted", {})
+    return doc
 
 
-def save_active(doc):
-    doc["version"] = doc.get("version", 0) + 1
-    tmp = ACTIVE_FILE + ".tmp"
+def _save(doc):
+    os.makedirs(os.path.dirname(TRUSTED), exist_ok=True)
+    tmp = TRUSTED + ".tmp"
     with open(tmp, "w") as fh:
         json.dump(doc, fh, indent=2)
-    os.replace(tmp, ACTIVE_FILE)
+        fh.write("\n")
+    os.replace(tmp, TRUSTED)
 
 
-def audit(action, rule_id, by, extra=None):
-    os.makedirs(os.path.dirname(AUDIT_FILE), exist_ok=True)
-    with open(AUDIT_FILE, "a") as fh:
-        fh.write(json.dumps({"ts": time.time(), "action": action, "rule_id": rule_id, "by": by, **(extra or {})}) + "\n")
+def onboard(origin, by, category):
+    if not origin.startswith("https://"):
+        raise SystemExit("origin must be an https:// Signature-Agent origin, e.g. https://agents.newvendor.test")
+    if not by:
+        raise SystemExit("--by <name>: an onboarding is a decision a named person makes")
+    doc = _load()
+    doc["trusted"][origin] = {"category": category, "by": by,
+                              "onboarded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    _save(doc)
+    print(f"onboarded {origin} as '{category}' (by {by}). Trusted operators now: "
+          + ", ".join(sorted(doc["trusted"])))
 
 
-def conds_str(rule):
-    return " AND ".join(f"{c['field']} {c['op']} {c['value']!r}" for c in rule.get("when", {}).get("all", []))
-
-
-def pending_index():
-    return {r.get("id"): r for r in load(PENDING_FILE, {"rules": []}).get("rules", [])}
-
-
-def cmd_list():
-    pend = pending_index()
-    active = {r.get("id") for r in load(ACTIVE_FILE, {"rules": []}).get("rules", [])}
-    if not pend:
-        print("no candidates (run tools/triage.py first)")
+def list_onboarded():
+    doc = _load()
+    if not doc["trusted"]:
+        print("no operators onboarded at runtime (the seed in defenses/policy.py is still the whole trust set)")
         return
-    for rid, r in pend.items():
-        g = r.get("gate", {})
-        state = "ACTIVE" if rid in active else g.get("decision", "ungated").upper()
-        print(f"  {rid}  [{state:<6}] {safe_text(conds_str(r)):<60} "
-              f"(bots {g.get('would_block_bots', 0)}, legit {g.get('would_block_legit', 0)})")
-
-
-def approve_one(rid, rule, by, active):
-    g = rule.get("gate", {})
-    if g.get("decision") != "pass":
-        print(f"  refuse {rid}: the gate said {g.get('decision', 'nothing')} — a person cannot approve what the gate failed")
-        return False
-    try:
-        check_rule({k: v for k, v in rule.items() if k in ("when", "action")})
-    except ValueError as e:
-        print(f"  refuse {rid}: {e}")
-        return False
-    if any(r.get("id") == rid for r in active["rules"]):
-        print(f"  {rid} already active")
-        return False
-    clean = {"id": rid, "when": rule["when"], "action": rule["action"]}
-    active["rules"].append(clean)
-    audit("approve", rid, by, {"conds": conds_str(clean)})
-    print(f"  approved {rid}: {safe_text(conds_str(clean))}  (by {by})")
-    return True
-
-
-def onboard_operator(host, by):
-    doc = load(TRUSTED, {"trusted": []})
-    if host in doc["trusted"]:
-        print(f"{host} is already trusted")
-        return
-    doc["trusted"].append(host)
-    with open(TRUSTED, "w") as fh:
-        json.dump(doc, fh, indent=2)
-    audit("onboard-operator", host, by)
-    print(f"onboarded {host} as a trusted agent operator (by {by}). "
-          f"Signed requests from it now verify; re-run the audit.")
+    for origin, rec in sorted(doc["trusted"].items()):
+        print(f"  {origin}  {rec.get('category', '?')}  (by {rec.get('by', '?')} at {rec.get('onboarded_at', '?')})")
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    sub = ap.add_argument
-    sub("command", nargs="?", default="", help="(blank) rule approval, or 'onboard-operator'")
-    sub("--list", action="store_true")
-    sub("--approve", metavar="ID")
-    sub("--revoke", metavar="ID")
-    sub("--host", help="onboard-operator: the operator host to trust")
-    sub("--by", default=os.environ.get("USER", "analyst"))
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    sub = ap.add_subparsers(dest="cmd")
+    on = sub.add_parser("onboard-operator")
+    on.add_argument("--origin", required=True)
+    on.add_argument("--by", required=True)
+    on.add_argument("--category", default="agent operator")
+    ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
-
-    if args.command == "onboard-operator":
-        if not args.host:
-            ap.error("onboard-operator needs --host")
-        onboard_operator(args.host.strip().lower(), args.by)
-        return 0
-
-    if args.list or not (args.approve or args.revoke):
-        cmd_list()
-        return 0
-
-    active = load(ACTIVE_FILE, {"version": 0, "rules": []})
-    if args.revoke:
-        before = len(active["rules"])
-        active["rules"] = [r for r in active["rules"] if r.get("id") != args.revoke]
-        if len(active["rules"]) < before:
-            save_active(active)
-            audit("revoke", args.revoke, args.by)
-            print(f"revoked {args.revoke} (active version now {active['version']})")
-        else:
-            print(f"{args.revoke} was not active")
-        return 0
-
-    pend = pending_index()
-    if args.approve not in pend:
-        print(f"no candidate {args.approve}; run tools/triage.py")
-        return 1
-    if approve_one(args.approve, pend[args.approve], args.by, active):
-        save_active(active)
-        print(f"active.json version now {active['version']} ({len(active['rules'])} rules)")
-    return 0
+    if args.cmd == "onboard-operator":
+        onboard(args.origin, args.by, args.category)
+    elif args.list:
+        list_onboarded()
+    else:
+        ap.print_help()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

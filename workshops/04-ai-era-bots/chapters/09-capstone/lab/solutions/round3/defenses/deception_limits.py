@@ -16,7 +16,7 @@ poisoned here. It is caught by what it does next (honeypot fetches, volume,
 W2 Ch4 clustering), not by what it read.
 """
 
-import extractor_traps
+from . import extractor_traps
 
 EMPTY = {"hidden_records": [], "canary_note": None, "decoy_paragraphs": []}
 

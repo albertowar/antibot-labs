@@ -29,9 +29,9 @@ Nothing here reads X-Lab-* headers. The scoreboard knows the truth; the engine
 does not.
 """
 
-import agent_behavior
-import automation
-import fingerprint_coherence
+from . import agent_behavior
+from . import automation
+from . import fingerprint_coherence
 
 FP_REUSE_ACCOUNTS = 3
 ROBOTIC_POINTS = 20

@@ -14,7 +14,7 @@ average day's traffic:
                     first-timer              1  registers during the drop: a fresh account, like a farm's
     shared_ip       office-nat               4  four identical laptops behind one IP
                     rpa-macro                1  procurement macro: teleport clicks AND instant fills
-    vpn             vpn                      3  a person on a datacenter egress (W1 Ch3's classic FP)
+    vpn             vpn                      3  a person on a VPN exit (datacenter ASN) (W1 Ch3's classic FP)
     privacy         brave-win, firefox-rfp   4  farbled / resistFingerprinting browsers
     a11y            screen-reader            3  Tab, Tab, Enter; accessibility API in use
                     voice-control            1  activates controls through the accessibility tree
@@ -47,9 +47,9 @@ PERSONAS = [
     {"name": "autofill", "count": 2, "profile": "chrome-mac", "behavior": "autofill", "cohort": "shopper"},
     {"name": "power-user", "count": 1, "profile": "chrome-mac", "behavior": "fast", "cohort": "shopper"},
     {"name": "first-timer", "count": 1, "profile": "firefox-linux", "behavior": "mouse", "register": True, "cohort": "shopper"},
-    {"name": "office-nat", "count": 4, "profile": "office-win", "behavior": "mouse", "egress": "203.0.113.210", "cohort": "shared_ip"},
-    {"name": "rpa-macro", "count": 1, "profile": "office-win", "behavior": "rpa", "egress": "203.0.113.210", "cohort": "shared_ip"},
-    {"name": "vpn", "count": 3, "profile": "chrome-win", "behavior": "mouse", "egress_pool": "datacenter", "cohort": "vpn"},
+    {"name": "office-nat", "count": 4, "profile": "office-win", "behavior": "mouse", "egress_pool": "office", "cohort": "shared_ip"},
+    {"name": "rpa-macro", "count": 1, "profile": "office-win", "behavior": "rpa", "egress_pool": "office", "cohort": "shared_ip"},
+    {"name": "vpn", "count": 3, "profile": "chrome-win", "behavior": "mouse", "egress_pool": "vpn", "cohort": "vpn"},
     {"name": "brave-win", "count": 2, "profile": "brave-win", "behavior": "mouse", "cohort": "privacy"},
     {"name": "firefox-rfp", "count": 2, "profile": "firefox-rfp", "behavior": "mouse", "cohort": "privacy"},
     {"name": "screen-reader", "count": 3, "profile": "chrome-win", "behavior": "keyboard", "a11y": True, "can_see": False, "cohort": "a11y"},
@@ -63,7 +63,14 @@ PERSONAS = [
 COHORTS = ["shopper", "shared_ip", "vpn", "privacy", "a11y", "agent_shopper", "cloud_signed", "a11y_agent"]
 CRAWLER_COHORTS = ["search", "licensed_crawler", "reader", "prefetch"]
 LAB_OPERATOR = "agents.lab-provider.test"
-DATACENTER = [f"192.0.2.{i}" for i in range(200, 254)]        # the VPN exit and the cloud agents' egress
+
+# Egress comes from the shared world (data/world.json), so defenses/netinfo.py reads the
+# same network types every other lab sees: residential homes, one corporate NAT for the
+# office cohort, a consumer-VPN exit (datacenter ASN) and an unpublished cloud range for
+# the vendors' agents. The crawlers' PUBLISHED ranges are cloud_vm (LabTrainBot) and
+# hosting_asn (LabSearchBot) — the same CIDRs defenses/crawler_registry.py lists.
+EGRESS_POOLS = {"office": ["corporate"], "vpn": ["consumer_vpn"], "datacenter": ["cloud_gcp"],
+                "residential": ["home_broadband", "home_cable", "home_fiber", "home_eu"]}
 
 FIRST = ["maria", "james", "aisha", "chen", "lucas", "sofia", "omar", "emma", "ravi", "noah", "yuki", "elena",
          "kofi", "anna", "diego", "fatima", "liam", "mei", "jonas", "zara", "pablo", "ines", "tomas", "leila"]

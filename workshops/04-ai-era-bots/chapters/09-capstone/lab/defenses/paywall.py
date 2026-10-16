@@ -26,7 +26,7 @@ walk away: most 402s in the wild are never paid.
 
 from __future__ import annotations
 
-from decision import allow, block, charged, paywall, Decision
+from .decision import allow, block, charged, paywall, Decision
 
 PAYWALL = {
     "enabled": True,

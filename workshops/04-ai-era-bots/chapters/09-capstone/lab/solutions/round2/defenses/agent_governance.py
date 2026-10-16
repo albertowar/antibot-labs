@@ -19,7 +19,7 @@ Same GIVEN composition as the stub; the three TODOs resolved:
       90-day retention).
 """
 
-import policy_engine
+from . import policy_engine
 
 PER_ACCOUNT_CAP = 1
 PER_DEVICE_CAP = 1

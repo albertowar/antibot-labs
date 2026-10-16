@@ -1,15 +1,16 @@
 """
 W4 Ch9 Capstone — Shared attacker helpers (rules of engagement built in)
 
-Every attack script imports this module. It enforces the lab's rules:
+Every attack script imports this module, and this module imports
+tools/labclient.py, which runs the labnet.py loopback guard on import:
 
-  - target() only returns http://localhost / 127.0.0.1 / ::1 URLs and exits on
-    anything else. These scripts must never point at a site you don't own.
-  - Egress IPs are *claimed* with the X-Lab-Egress header from RFC 5737
-    documentation ranges. No real proxy, no proxy list, no third-party
-    infrastructure, no third-party LLM API is ever used.
-  - Accounts, emails and addresses are synthetic (@mail.example), seeded by
-    tools/seed.py or registered during the run.
+  - target() only returns URLs on this machine and exits on anything else.
+    These scripts must never point at a site you don't own.
+  - Egress IPs are *claimed* with X-Lab-Client-IP from the shared world
+    (data/world.json: RFC 5737 / 3849 documentation ranges). No real proxy, no
+    proxy list, no third-party infrastructure, no third-party LLM API is ever used.
+  - Accounts, emails and addresses are synthetic (@mail.example), seeded by the
+    store extension or registered during the run.
   - X-Lab-Actor labels every session for the scoreboard. No defense reads it.
 
 It also measures what each attack costs the attacker (wall time and CPU),
@@ -33,27 +34,29 @@ except ImportError:
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "tools"))
-sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
-import personas  # noqa: E402
-from challenges import solve_pow  # noqa: E402,F401
-from crawl import (BASE_URL, BROWSER_HEADERS, CHROME_UA, DATACENTER, RESIDENTIAL, SEARCHBOT_RANGE,  # noqa: E402,F401
-                   SEARCHBOT_UA, TRAINBOT_RANGE, TRAINBOT_UA, Crawler, extract_links, print_report,
-                   require_local, searchbot_signer, trainbot_signer)
+sys.path.insert(0, LAB_DIR)
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target as _target, require_local, require_local_env  # noqa: E402
-BASE_URL = _target("DEMO_URL", BASE_URL)
+import labclient  # noqa: E402  (runs the labnet guard on import)
+import personas  # noqa: E402
+from labclient import world_pool  # noqa: E402
+from crawl import (BROWSER_HEADERS, CHROME_UA, DATACENTER, RESIDENTIAL, SEARCHBOT_RANGE,  # noqa: E402,F401
+                   SEARCHBOT_UA, TRAINBOT_RANGE, TRAINBOT_UA, Crawler, extract_links, print_report,
+                   searchbot_signer, trainbot_signer)
+from defenses.challenges import solve_pow  # noqa: E402,F401
+
+BASE_URL = labclient.BASE_URL
 
 
 def target():
-    """The guarded demo-store URL (see labnet.py)."""
+    """The guarded demo-store URL (labnet.py via labclient)."""
     return BASE_URL
 
 
 DROP_SKU = "lab-runner-9"
+DROP_SIZE = "9"
 LAB_AGENT_UA = CHROME_UA + " LabAgent/1.0 (+https://agents.lab-provider.test)"
-FARM_RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 120)]
-CLOUD = [f"192.0.2.{i}" for i in range(100, 199)]
+FARM_RESIDENTIAL = world_pool("residential_proxy")   # a residential proxy network (v6 homes)
+CLOUD = world_pool("cloud_gcp")                      # a datacenter nobody published
 FIRST = ["alex", "sam", "jordan", "taylor", "casey", "riley", "morgan", "jamie", "drew", "quinn", "avery", "rowan"]
 LAST = ["miller", "davis", "clark", "lewis", "walker", "young", "hall", "allen", "king", "wright", "scott", "green"]
 
@@ -75,23 +78,26 @@ def fleet_identity(rng):
 
 def mailbox_code(base, email):
     r = requests.get(f"{base}/lab/mailbox/{email}", timeout=10)
-    msg = (r.json() or {}).get("message") or {}
-    return msg.get("code")
+    msgs = (r.json() or {}).get("messages") or []
+    for msg in reversed(msgs):
+        if msg.get("code"):
+            return msg["code"]
+    return None
 
 
 def grant_mandate(base, account, operator, sku=DROP_SKU, ttl_min=15, egress=None):
     """The account holder, in their OWN browser session, approves a purchase by an operator."""
     s = requests.Session()
-    s.headers.update({"User-Agent": CHROME_UA, **BROWSER_HEADERS, "X-Lab-Actor": "agent-owner"} |
-                     ({"X-Lab-Egress": egress} if egress else {}))
+    s.headers.update({"User-Agent": CHROME_UA, **BROWSER_HEADERS, "X-Lab-Actor": "human:agent-owner"} |
+                     ({"X-Lab-Client-IP": egress} if egress else {}))
     s.get(f"{base}/login")
     r = s.post(f"{base}/api/login", json={"email": account["email"], "password": account["password"]})
-    if r.json().get("outcome") != "allow":
-        return None, f"owner login failed: {r.json().get('message')}"
+    if r.status_code >= 400 or not (r.json() or {}).get("ok", True):
+        return None, f"owner login failed ({r.status_code})"
     r = s.post(f"{base}/api/account/mandates", json={"operator": operator, "sku": sku, "ttl_min": ttl_min})
-    body = r.json()
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
     if body.get("outcome") != "allow":
-        return None, body.get("message", "mandate refused")
+        return None, body.get("message", f"mandate refused ({r.status_code})")
     return body["mandate"]["id"], None
 
 
@@ -126,14 +132,14 @@ def summary(name, results, cost):
     succeeded = sum(1 for r in results if r.get("success"))
     cost_wall = getattr(cost, "wall_s", 0.0) if cost else 0.0
     cost_cpu = getattr(cost, "cpu_s", 0.0) if cost else 0.0
-    return {"attack": name, "attempts": len(results), "succeeded": succeeded, "outcomes": outcomes,
+    return {"attack": name, "attempted": len(results), "succeeded": succeeded, "outcomes": outcomes,
             "challenges": kinds, "top_reasons": sorted(reasons, key=reasons.get, reverse=True)[:4],
             "wall_s": round(cost_wall, 2), "cpu_s": round(cost_cpu, 2),
-            "wall_s_per_attempt": round(cost_wall / max(1, len(results)), 2), "results": results}
+            "wall_s_per_attempt": round(cost_wall / max(1, len(results)), 2)}
 
 
 def report(s, success_label="orders placed"):
-    print(f"  [{s['attack']}] {s['succeeded']}/{s['attempts']} {success_label}; outcomes {json.dumps(s['outcomes'])}"
+    print(f"  [{s['attack']}] {s['succeeded']}/{s['attempted']} {success_label}; outcomes {json.dumps(s['outcomes'])}"
           f"{'; challenges ' + json.dumps(s['challenges']) if s['challenges'] else ''}")
     for reason in s["top_reasons"]:
         print(f"      - {reason[:140]}")

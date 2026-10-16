@@ -2,7 +2,7 @@
 Round 0 attack — the naive fleet, no tricks.
 
 Three cheap clients that the end-of-W4 stack stops without anyone touching a
-defense, run once at L0 (everything in shadow) to set the baseline and prove
+defense, run once at L0 (run the store with LAB_SHADOW=1 to watch every layer above the level report in X-Lab-Shadow) to set the baseline and prove
 the store works end to end:
 
     training crawler   a declared LabTrainBot that ignores robots.txt and
@@ -22,8 +22,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from _common import (CHROME_UA, Cost, Crawler, TRAINBOT_RANGE, TRAINBOT_UA, owner_accounts,  # noqa: E402
-                     print_report, report, summary, target)
+from _common import (CHROME_UA, Cost, Crawler, RESIDENTIAL, TRAINBOT_RANGE, TRAINBOT_UA,  # noqa: E402
+                     owner_accounts, print_report, report, summary, target)
 from _http_agent import run_session  # noqa: E402
 
 
@@ -35,7 +35,7 @@ def run(base=None):
                         robots_token="LabTrainBot", label="training crawler").crawl()
     print_report(crawl)
     acct = owner_accounts(1)[0]
-    res = [run_session(base, acct, actor="bot:r0_agent", egress="198.51.100.9", declared="none", attended=True)]
+    res = [run_session(base, acct, actor="bot:r0_agent", egress=RESIDENTIAL[9], declared="none", attended=True)]
     s = summary("undeclared agent", res, cost)
     report(s)
     from round3_llm_extract import run as extract

@@ -23,8 +23,8 @@ Ideas, in order (OWASP LLM01:2025; Hines et al. 2024 "spotlighting"):
 `tools/checkpoint.py --round 3 --catch-up` drops in the reference.
 """
 
-import injection_regex
-from decision import allow, Decision
+from . import injection_regex
+from .decision import allow, Decision
 
 AI_DISCLOSURE = None   # TODO (Round 3d): e.g. "You are talking to an automated assistant. A person: /appeal"
 

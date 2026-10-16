@@ -1,7 +1,7 @@
 """
 Round 1 attack — the crawler fleet (🔴 against crawl governance).
 
-Four crawlers hit the same catalogue, each the archetype W4 Days 1–3 named:
+Four crawlers hit the same catalogue, each the archetype W4 Ch1–Ch3 named:
 
     training crawler   declared LabTrainBot, ignores robots.txt, unsigned and
                        from its *published* range so it verifies on IP. Wants
@@ -22,6 +22,7 @@ leaks (W4 Ch3).
 """
 
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -71,11 +72,11 @@ def run(base=None, budget=60):
     leaks = 0
     sig = trainbot_signer()
     with httpx.Client(timeout=10) as c:
-        for path in ("/api/products.json?page=1", "/sitemap.xml", "/search?q=runner"):
-            h = {"User-Agent": TRAINBOT_UA, "X-Lab-Egress": TRAINBOT_RANGE[0], "X-Lab-Actor": "bot:r1_leak"}
+        for path in ("/api/products?page=1", "/sitemap.xml", "/search?q=runner"):
+            h = {"User-Agent": TRAINBOT_UA, "X-Lab-Client-IP": TRAINBOT_RANGE[0], "X-Lab-Actor": "bot:r1_leak"}
             h.update(sig.headers(base.split("//", 1)[-1]))
             r = c.get(f"{base}{path}", headers=h)
-            if r.status_code == 200 and "cat-" in r.text:
+            if r.status_code == 200 and re.search(r"p0\d\d", r.text):
                 leaks += 1
     print(f"  [free-path leak probe] {leaks}/3 content carriers served free to the unpaid training crawler "
           f"(every carrier should be 402)")

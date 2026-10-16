@@ -29,7 +29,7 @@ LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(LAB_DIR, "defenses"))
 from lab import BASE_URL, admin, ensure_local  # noqa: E402
-from rules import PENDING_FILE, check_rule, matches  # noqa: E402
+from defenses.rules import PENDING_FILE, check_rule, matches  # noqa: E402
 
 CANDIDATE_FIELDS = ("client", "egress_kind", "declared")
 

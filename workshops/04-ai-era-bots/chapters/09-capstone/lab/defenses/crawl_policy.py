@@ -24,7 +24,7 @@ through the 402 exchange (W4 Ch3 Round 4). The price lives in paywall.PAYWALL.
 import json
 import os
 
-import paywall
+from . import paywall
 
 LAB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RESERVATION = os.path.join(LAB_DIR, "reservation")

@@ -23,7 +23,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, LAB_DIR)
-from _common import CHROME_UA, DATACENTER, require_local, target  # noqa: E402
+from _common import CHROME_UA, DATACENTER, target  # noqa: E402
+import labclient  # noqa: E402
 from tools.llm import LLM, reset_usage, usage  # noqa: E402
 from _htmltext import html_to_text  # noqa: E402
 
@@ -31,12 +32,12 @@ PAGES = 5
 
 
 def run(base=None, pages=PAGES, actor="bot:r3_extract", quiet=False):
-    base = require_local(target() if base is None else base)
+    base = labclient.assert_local(target() if base is None else base)
     llm = LLM()
     reset_usage()
-    headers = {"User-Agent": CHROME_UA, "X-Lab-Egress": DATACENTER[7], "X-Lab-Actor": actor}
+    headers = {"User-Agent": CHROME_UA, "X-Lab-Client-IP": DATACENTER[7], "X-Lab-Actor": actor}
     s = requests.Session()
-    cj = requests.get(f"{base}/whoami", headers=headers)  # establish a session id
+    s.get(f"{base}/", headers=headers)  # establish a session id (the gate sets the cookie)
     harvested, canaries, seen = [], set(), []
     for page in range(1, pages + 1):
         html = s.get(f"{base}/catalog?page={page}", headers=headers, timeout=15).text

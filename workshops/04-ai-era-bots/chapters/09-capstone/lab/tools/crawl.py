@@ -4,87 +4,85 @@ W4 Ch9 Capstone — shared crawler engine and Web Bot Auth signer (from W4 Ch3)
 Used by both sides: tools/legit_traffic.py drives the verified search crawler,
 the licensed (paying) crawler and the prefetching browsers with it, and
 attacks/round1_crawler_fleet.py drives the impostors. The ethics guardrail is
-built in: a non-loopback target raises before a single request is sent.
+built in: a non-loopback target raises before a single request is sent
+(labnet.py via tools/labclient.py).
 
-The IPs are RFC 5737 documentation ranges, honoured by the store only from
-loopback (X-Lab-Egress). 203.0.113.0/26 and /26+64 are the two lab crawler
-operators' *published* ranges (defenses/crawler_registry.py); 192.0.2.0/24 is
-"a datacenter nobody published"; the rest of 198.51.100.0/24 and
-203.0.113.0/24 is "residential".
+Egress comes from the shared world (data/world.json), claimed with
+X-Lab-Client-IP and honoured by the store only from loopback. The two lab
+operators' *published* ranges are the cloud_vm pool (LabTrainBot, 203.0.113.0/26)
+and the hosting_asn pool (LabSearchBot, 203.0.113.64/26) — the same CIDRs
+defenses/crawler_registry.py lists. cloud_gcp is "a datacenter nobody
+published"; the home_* pools are residential.
 
 ``Crawler`` is a deliberately simple breadth-first fetcher: a frontier, a page
 budget, link extraction with the stdlib HTML parser, and hooks for the choices
 each round makes (obey robots.txt or not, sign or not, pay or not, follow
 hidden links or not). Just strong enough to beat the previous round.
+
+Signing is the canonical Ch2 stack: tools/make_keys.py generates each operator's
+Ed25519 key and signed key directory; ``Signer`` adds Signature-Agent and an
+RFC 9421 signature over ("@authority" "signature-agent") to every request,
+with a fresh nonce (defenses/web_bot_auth.py replays-checks it).
 """
 
-import base64
 import os
-import sys
 import re
-import secrets
+import sys
 import time
 import urllib.robotparser
 from collections import Counter, deque
-from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import httpx
+from html.parser import HTMLParser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAB_DIR = os.path.dirname(HERE)
-KEYS = os.path.join(LAB_DIR, "attacks", "keys")
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))  # lab root: labnet.py
-from labnet import target, require_local, require_local_env  # noqa: E402
-BASE_URL = target("DEMO_URL", "http://127.0.0.1:8409")
+sys.path.insert(0, HERE)
+sys.path.insert(0, LAB_DIR)
 
+import labclient  # noqa: E402  (runs the labnet guard on import)
+import make_keys  # noqa: E402
+from labclient import world_pool  # noqa: E402
+from defenses import httpsig  # noqa: E402
+
+BASE_URL = labclient.BASE_URL
 CATALOGUE_SIZE = 120
 
 TRAINBOT_UA = "Mozilla/5.0 (compatible; LabTrainBot/1.0; +https://trainbot.example/bot)"
 SEARCHBOT_UA = "Mozilla/5.0 (compatible; LabSearchBot/2.1; +https://labsearch.example/bot)"
-GOOGLEBOT_UA = "Mozilla/5.0 (compatible; LabSearchBot/2.1; +https://labsearch.example/bot) impostor"
 CHROME_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
              "Chrome/150.0.0.0 Safari/537.36")
 BROWSER_HEADERS = {"Accept-Language": "en-US,en;q=0.9", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document"}
 
-TRAINBOT_RANGE = [f"203.0.113.{i}" for i in range(1, 63)]      # published
-SEARCHBOT_RANGE = [f"203.0.113.{i}" for i in range(65, 127)]   # published
-DATACENTER = [f"192.0.2.{i}" for i in range(1, 200)]           # unpublished cloud
-RESIDENTIAL = [f"198.51.100.{i}" for i in range(1, 255)]
+TRAINBOT_RANGE = world_pool("cloud_vm")       # published: 203.0.113.0/26
+SEARCHBOT_RANGE = world_pool("hosting_asn")   # published: 203.0.113.64/26
+DATACENTER = world_pool("cloud_gcp")          # unpublished cloud
+RESIDENTIAL = (world_pool("home_broadband") + world_pool("home_cable")
+               + world_pool("home_fiber") + world_pool("home_eu"))
 
-SKU_RE = re.compile(r"/product/([a-z0-9\-]+)")
-MD_SKU = re.compile(r"\b(cat-\d{3})\b")
+SKU_RE = re.compile(r"/product/(p\d{3})\b")
+MD_SKU = re.compile(r"\b(p\d{3})\b")
 
 
 class Signer:
     """Signs requests the way a registered crawler operator would (RFC 9421, Ed25519, Web Bot Auth tag)."""
 
-    def __init__(self, pem_name, keyid, signature_agent):
-        from cryptography.hazmat.primitives import serialization
-        try:
-            with open(os.path.join(KEYS, pem_name), "rb") as fh:
-                self.key = serialization.load_pem_private_key(fh.read(), password=None)
-        except FileNotFoundError:
-            raise SystemExit(f"Operator key {pem_name} not found under {KEYS}: run "
-                             f"`python tools/seed.py` (it generates the lab's signing keys).")
-        self.keyid, self.agent = keyid, signature_agent
+    def __init__(self, key_name, agent_origin):
+        self.key, self.keyid = make_keys.load_signer(key_name)
+        self.agent = agent_origin
 
     def headers(self, authority):
-        now = int(time.time())
-        params = (f'("@authority" "signature-agent");created={now};expires={now + 300};'
-                  f'nonce="{secrets.token_hex(8)}";keyid="{self.keyid}";alg="ed25519";tag="web-bot-auth"')
-        base = "\n".join([f'"@authority": {authority}', f'"signature-agent": {self.agent}',
-                          f'"@signature-params": {params}']).encode()
-        sig = base64.b64encode(self.key.sign(base)).decode()
-        return {"Signature-Agent": self.agent, "Signature-Input": f"sig1={params}", "Signature": f"sig1=:{sig}:"}
+        ctx = httpsig.MessageContext("GET", authority, "/", {}, "http", "")
+        return httpsig.agent_headers(self.key, self.keyid, self.agent, ctx)
 
 
 def trainbot_signer():
-    return Signer("trainbot_ed25519.pem", "trainbot-2026-10", "https://trainbot.example")
+    return Signer("trainbot.example", "https://trainbot.example")
 
 
 def searchbot_signer():
-    return Signer("searchbot_ed25519.pem", "searchbot-2026-10", "https://labsearch.example")
+    return Signer("labsearch.example", "https://labsearch.example")
 
 
 class Links(HTMLParser):
@@ -118,7 +116,7 @@ class Crawler:
     def __init__(self, base, ua, ips, actor="bot", budget=200, obey_robots=False, follow_hidden=True,
                  signer=None, pay=None, label="crawler", robots_token=None, purpose="ai-train",
                  browser_headers=False, delay=0.0, licensed=False):
-        self.base = require_local(base).rstrip("/")
+        self.base = labclient.assert_local(base).rstrip("/")
         self.ua, self.ips, self.actor = ua, list(ips), actor
         self.robots_token = robots_token or ua.split("/")[0]
         self.purpose = purpose
@@ -138,7 +136,7 @@ class Crawler:
         return ip
 
     def _headers(self, extra=None):
-        h = {"User-Agent": self.ua, "X-Lab-Egress": self._ip(), "X-Lab-Actor": self.actor,
+        h = {"User-Agent": self.ua, "X-Lab-Client-IP": self._ip(), "X-Lab-Actor": self.actor,
              "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8"}
         if self.browser_headers:
             h.update(BROWSER_HEADERS)
@@ -236,7 +234,7 @@ class Crawler:
         return self.report()
 
     def report(self):
-        skus = {s for s in self.skus if s.startswith("cat-")}
+        skus = {s for s in self.skus if re.fullmatch(r"p\d{3}", s)}
         out = {"label": self.label, "requests": self.stats["requests"], "products": len(skus),
                "coverage": round(len(skus) / CATALOGUE_SIZE, 3), "maze_pages": self.stats["maze_pages"],
                "status": {k: v for k, v in self.stats.items() if k.isdigit()},
@@ -253,6 +251,6 @@ def print_report(rep):
           f"{rep['products']}/{CATALOGUE_SIZE} products ({rep['coverage']:.0%}), maze pages {rep['maze_pages']}, "
           f"charged {rep['charged_pages']} (${rep['spent_usd']:.2f}), statuses {rep['status']}")
     extras = {k: v for k, v in rep.items() if k in ("skipped_by_policy", "stopped_by_content_usage",
-                                                   "ignored_hidden_links", "errors")}
+                                                    "ignored_hidden_links", "errors")}
     if extras:
         print(f"      {extras}")

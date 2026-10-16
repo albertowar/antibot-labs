@@ -265,7 +265,7 @@ def _mock_solve_image(system, user, images):
 # extraction ---------------------------------------------------------------------
 
 _PRICE = re.compile(r"[€$]\s?(\d+(?:\.\d{2})?)")
-_SKU = re.compile(r"\bSKU\s+([a-z]+-\d{3})\b", re.I)
+_SKU = re.compile(r"\bSKU\s+([a-z]{1,3}-?\d{3})\b", re.I)
 
 
 def _mock_extract(system, user, images):
@@ -274,11 +274,12 @@ def _mock_extract(system, user, images):
     text = _normalize(user)
     directives = _record_directives(text)
     records = []
-    for line in text.splitlines():
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
         sku = _SKU.search(line)
         if not sku:
             continue
-        price = _PRICE.search(line)
+        price = next((m for m in (_PRICE.search(nxt) for nxt in lines[i:i + 4]) if m), None)
         name = _SKU.sub("", _PRICE.sub("", line))
         name = re.sub(r"[·|•\-–]+", " ", name)
         name = re.sub(r"\s{2,}", " ", name).strip(" ·|:-")
