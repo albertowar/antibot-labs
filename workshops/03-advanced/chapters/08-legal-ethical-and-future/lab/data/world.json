@@ -1,10 +1,13 @@
 {
   "_comment": [
-    "The simulated internet for the W2 Ch8 lab. Every address is from a documentation range",
-    "(RFC 5737 / RFC 3849) and every ASN from the documentation ASN range (RFC 5398), so none of",
-    "this can ever point at a real network. The demo site's edge (demo_site/edge.py) uses this file",
-    "as its ASN/geo database; the traffic generators use it to pick source addresses.",
-    "Rules of engagement: attack scripts may only use addresses from these pools."
+    "A purpose-built simulated internet for this lab's policy rounds, kept to 8 pools so each",
+    "cohort's exposure under a policy stays legible (the starter's 25-pool world would blur it).",
+    "`vpn` is typed `datacenter` on purpose: that is what makes a blunt 'block datacenter ASNs'",
+    "policy visibly catch work-VPN users as collateral, which is Round 2's lesson. Every address",
+    "is from a documentation range (RFC 5737 / RFC 3849) and every ASN from the documentation ASN",
+    "range (RFC 5398), so none of it can ever point at a real network. The lab's generators read",
+    "this file to pick source addresses and ASN/geo; there is no demo_site in this lab.",
+    "Rules of engagement: scripts may only use addresses from these pools."
   ],
   "pools": {
     "isp-a":  {"cidr": "2001:db8:a::/48",    "asn": 64496, "org": "Example Broadband",    "type": "residential", "country": "US", "tz": "America/New_York"},

@@ -11,7 +11,7 @@ Nothing in this lab touches a network. The crawler fleet and the agent farm are 
 ```
 lab/
   requirements.txt            Python 3.12+ standard library only. No Docker, no demo-site process.
-  data/world.json             the simulated internet from W2 Ch8 (documentation ranges, ASNs)
+  data/world.json             a purpose-built 8-pool world (documentation ranges, ASNs; `vpn` typed datacenter on purpose)
   data/agent_sessions.jsonl   3,000 sessions: 2,000 real people in six cohorts, 4 bot campaigns of 250
   defenses/reservation/       your Round 1 stack: robots.txt · headers.json · terms.json · logging.json
   defenses/reservation_naive/ the day-one stack · reservation_reference/ the reference

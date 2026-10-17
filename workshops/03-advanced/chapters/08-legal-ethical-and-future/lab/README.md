@@ -11,7 +11,7 @@ Nothing in this lab touches a network. The decision log is generated from the do
 ```
 lab/
   requirements.txt       Python 3.12+ standard library only. No Docker, no demo-site process.
-  data/world.json        the simulated internet from W2 Ch8 (documentation ranges, ASNs)
+  data/world.json        a purpose-built 8-pool world (documentation ranges, ASNs; `vpn` typed datacenter on purpose)
   data/decisions.jsonl   3,500 scored requests: 2,000 real people in eight cohorts, 5 bot campaigns of 300
   policies/              policy_blunt (day one) · policy_naive (the first fix) · policy (yours) · policy_reference
   exercises/             round1_cases + answer key · round3 RoE template + loophole cards · ethics checklist · disclosure template
