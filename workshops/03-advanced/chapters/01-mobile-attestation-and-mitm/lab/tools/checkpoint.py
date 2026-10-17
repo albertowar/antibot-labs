@@ -8,7 +8,7 @@ checkpoint_core.
     python tools/checkpoint.py --restore              # put your own files back
     python tools/checkpoint.py --all --markdown       # every round (the README's expected-results table)
 
-This lab is WIRE-IT: Rounds 1-4 each ship one stub with a TODO (Round 1 is client code, Rounds 2-4 are checks
+This lab is WIRE-IT: Rounds 1-5 each ship one stub with a TODO (Round 1 is client code, Rounds 2-5 are checks
 already wired into defenses/ladder.py), and solutions/round<N>/ holds the finished file. The provider mock
 (defenses/mobile_core.py) is infrastructure, not a TODO.
 
@@ -18,11 +18,14 @@ already wired into defenses/ladder.py), and solutions/round<N>/ holds the finish
       2    2      require a provider verdict                 no verdict / a forged one      yes, until the check exists
       3    3      bind it: hash, fresh, single-use nonce     a lifted genuine verdict       yes, until the check exists
       4    4      integrity + device/address velocity        an emulator farm               yes, until the check exists
+      5    5      bind the session to a device key           a stolen bearer                yes, until the check exists
 
 A round passes when the attacker gets what the round expects AND no shopper is refused outright. Round 4
 refuses the three GrapheneOS customers at checkout (the challenge band is enforced as a refusal because the
 store has no step-up flow): the checkpoint lists them as the cost instead of failing, and fails if anyone else
-is touched. Defender cost is the median gate time of the shoppers' buys (Server-Timing: gate).
+is touched. Round 5 adds one more: the shopper who restored their phone from a backup (autofill) keeps their
+token but loses their key, so the bound session challenges them. Defender cost is the median gate time of the shoppers' buys
+(Server-Timing: gate).
 """
 
 import os
@@ -87,6 +90,8 @@ ROUNDS = {
                   [friction([])], solutions=("defenses/request_signing.py",)),
     4: make_round(4, "score the device: integrity and velocity stop the farm", "attacks/round4_farm.py", "farm", "blocked",
                   [friction([FRICTION_PERSONA])], solutions=("defenses/device_verdict.py",)),
+    5: make_round(5, "bind the session to a device key: a stolen bearer is just a string", "attacks/round5_hijack.py", "hijack", "blocked",
+                  [friction([FRICTION_PERSONA, "autofill"])], solutions=("defenses/session_binding.py",)),
 }
 
 if __name__ == "__main__":

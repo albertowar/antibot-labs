@@ -2,7 +2,7 @@
 Chapter 7: generate the account-activity audit log the investigation runs over.
 
 Ninety days of a store's account audit log (2026-10-01 to 2026-12-29): roughly
-ten thousand accounts, a few hundred thousand events, eight account-takeover
+ten thousand accounts, a few hundred thousand events, nine account-takeover
 campaigns buried in it and a long list of legitimate behaviour that looks like
 one. Production logs never carry ground truth; here it goes to
 solutions/answer_key.json so the scorer can report recall per campaign and
@@ -17,7 +17,7 @@ false positives per legitimate cohort.
     B     B3_oauth_hijack             8     Round 1 rules: degree ties with duplicate-account owners
     B     B4_support_ring             8     Round 1 rules: legit recoveries also come from new devices
     C     C1_low_and_slow            18     Rounds 1-2: no shared infrastructure, only weak deviations
-    -     D_prehijack (bonus)         6     a sequence invariant, unscored
+    D     D_prehijack                 6     Rounds 1-3: the account was the attacker's before it was the victim's
 
 Every address is non-routable: 198.18.0.0/15 (RFC 2544 benchmark space) for
 residential, mobile and datacenter pools, 100.64.0.0/10 (RFC 6598) for CGNAT
@@ -1146,13 +1146,12 @@ class Key:
 
     def __init__(self):
         self.victims = {}        # account_id -> dict
-        self.bonus = {}
         self.b1_devices = set()  # the phishing kit's rotating device ids, for --check
 
-    def add(self, acct, campaign, tier, first_seq, level, bonus=False):
+    def add(self, acct, campaign, tier, first_seq, level):
         acct.campaign = campaign
         rec = {"account_id": acct.account_id, "campaign": campaign, "tier": tier, "first_compromise_seq": first_seq, "level": level, "recovery_seq": None}
-        (self.bonus if bonus else self.victims)[acct.account_id] = rec
+        self.victims[acct.account_id] = rec
         return rec
 
 
@@ -1632,8 +1631,17 @@ def inject_C1(sink, w, accounts, cohorts, ids, seed, key, scale):
 
 
 def inject_D(sink, w, accounts, cohorts, ids, seed, key, scale):
-    """Bonus: pre-hijack. The attacker registers with the victim's address first; the victim
-    later 'recovers' an account that was never theirs, and no session is revoked."""
+    """Tier D: pre-hijack. The attacker registers with the victim's address first; the victim
+    later 'recovers' an account that was never theirs. The store's resets do not revoke
+    sessions (none of the legitimate reset flows in this log emit sessions_revoked_all),
+    so the attacker's remembered session survives.
+
+    The usable invariant is not "a reset must revoke sessions" (857 legitimate accounts
+    complete a reset and only 36 have any revoke at all), it is: a user-initiated reset
+    on an account that was created inside the window and whose email was never verified
+    before the reset. The first compromise event is the attacker's login right after
+    sign-up, days to weeks before the owner shows up; that is why this tier's time to
+    detect is poor by construction."""
     rng = rng_for(seed, "camp", "D")
     victims = []
     for k in range(n_scaled(6, scale)):
@@ -1647,7 +1655,6 @@ def inject_D(sink, w, accounts, cohorts, ids, seed, key, scale):
                     hour_center=19, hour_sd=2.5, rate_per_day=0.1, order_rate=0.3, order_median=45, remember_me=True, mfa="none", passkey=False, oauth=[], mobile_share=0.3)
         a.traits["carrier"] = 0
         a.traits["never_verifies"] = True
-        a.cohorts.append("prehijack_bonus")
         accounts.append(a)
         att_dev = Device(ids.new("ddev"), ids.new("dfp"), "chrome_win")
         att_block = w.datacenter[r.randrange(len(w.datacenter))]
@@ -1655,7 +1662,7 @@ def inject_D(sink, w, accounts, cohorts, ids, seed, key, scale):
         d0 = 5 + r.randrange(15)
         ms, _ = lifecycle_for_new(sink, w, a, ids, r, d0, device=att_dev, block=att_block)
         seq = sink.emit(a, ms + 5 * SECOND, "login_success", att_ctx, auth="password")
-        rec = key.add(a, "D_prehijack", "D", seq, "access_only", bonus=True)
+        rec = key.add(a, "D_prehijack", "D", seq, "access_only")
         a.traits["never_verifies"] = False
         # the real person: a reset from their own device, verification, their payment method
         d1 = d0 + 10 + r.randrange(25)
@@ -1758,15 +1765,11 @@ def write_outputs(rows, seq_to_id, key, cohorts, accounts, w, seed, out_dir, csv
                               "recovery_event_id": seq_to_id.get(rec["recovery_seq"]) if rec["recovery_seq"] else None})
     for c in camps.values():
         c["accounts"].sort(key=lambda x: x["account_id"])
-    bonus = {}
-    for rec in key.bonus.values():
-        bonus.setdefault(rec["campaign"], []).append({"account_id": rec["account_id"], "first_compromise_event_id": seq_to_id.get(rec["first_compromise_seq"]), "level": rec["level"]})
     cohort_ids = {name: sorted(a.account_id for a in members) for name, members in cohorts.items()}
     answer = {
         "seed": seed, "schema_version": SCHEMA_VERSION, "scale": scale, "accounts": len(accounts), "events": len(rows), "sha256_uncompressed": digest,
         "window": {"start": iso(START_MS), "end": iso(END_MS)},
         "campaigns": dict(sorted(camps.items())),
-        "bonus": bonus,
         "cohorts": cohort_ids,
         "cohort_info": COHORT_INFO,
     }
@@ -1804,16 +1807,17 @@ COHORT_INFO = {
     "spray_target": {"red_herring": True, "why": "one failed attempt from the spraying wave; no takeover"},
     "forced_reset": {"red_herring": True, "why": "the store's own compromised-credential policy forced a reset after the wave"},
     "fake_account_farm": {"red_herring": True, "why": "abuse, but not account takeover: no real owner existed before the farm"},
-    "prehijack_bonus": {"red_herring": False, "why": "bonus campaign D: unscored; the account was the attacker's before it was the victim's"},
 }
 
 
 def check(answer, rows, accounts, scale, key):
     """Invariants the tiering depends on. Raises on violation."""
+    from collections import defaultdict
     camps = answer["campaigns"]
     s = scale
     want = {"A1_datacenter_stuffing": n_scaled(14, s), "A2_reset_abuse": 2 * n_scaled(3, s), "A3_impossible_travel": n_scaled(5, s) + 1, "B1_phishing_kit": n_scaled(20, s),
-            "B2_session_replay": n_scaled(10, s), "B3_oauth_hijack": n_scaled(8, s), "B4_support_ring": n_scaled(8, s), "C1_low_and_slow": n_scaled(13, s) + n_scaled(5, s)}
+            "B2_session_replay": n_scaled(10, s), "B3_oauth_hijack": n_scaled(8, s), "B4_support_ring": n_scaled(8, s), "C1_low_and_slow": n_scaled(13, s) + n_scaled(5, s),
+            "D_prehijack": n_scaled(6, s)}
     problems = []
     for name, n in want.items():
         got = len(camps.get(name, {}).get("accounts", []))
@@ -1822,13 +1826,29 @@ def check(answer, rows, accounts, scale, key):
     victims = {a["account_id"] for c in camps.values() for a in c["accounts"]}
     first = {a["first_compromise_event_id"] for c in camps.values() for a in c["accounts"]}
     by_id = {r["event_id"]: r for r in rows}
+    # Tier D is the exception: its first compromise is the attacker's login right after sign-up
+    # (days 5-24), long before the owner appears; it only has to be inside the window.
+    d_accts = camps.get("D_prehijack", {}).get("accounts", [])
+    d_first = {a["first_compromise_event_id"] for a in d_accts}
+    d_ids = {a["account_id"] for a in d_accts}
     for eid in first:
         if eid is None or eid not in by_id:
             problems.append(f"first compromise event {eid} not in the window")
-        elif by_id[eid]["ts"] < iso(day_ms(25)):
+        elif eid not in d_first and by_id[eid]["ts"] < iso(day_ms(25)):
             problems.append(f"first compromise event {eid} before day 25")
+    # D's invariant: a user reset on a window-born account with no email_verified before it
+    # (the P1 rule solutions/round4_invariant.py ships).
+    by_acct = defaultdict(list)
+    for r in rows:
+        if r["account_id"] in d_ids:
+            by_acct[r["account_id"]].append(r)
+    for acc, evs in by_acct.items():
+        types = [(e["ts"], e["event_type"]) for e in evs]
+        done = [t for t, k in types if k == "password_reset_completed"]
+        ver = [t for t, k in types if k == "email_verified"]
+        if not done or (ver and min(ver) < min(done)):
+            problems.append(f"D account {acc}: no reset before email_verified")
     # B1: no single device_id touches more than 6 accounts
-    from collections import defaultdict
     dev_acc = defaultdict(set)
     for r in rows:
         if r["account_id"] in victims and r["device_id"]:
@@ -1861,8 +1881,7 @@ def generate(seed=SEED, scale=1.0):
     inject_B4(sink, w, accounts, cohorts, ids, seed, key, scale)
     inject_C1(sink, w, accounts, cohorts, ids, seed, key, scale)
     inject_D(sink, w, accounts, cohorts, ids, seed, key, scale)
-    cohorts["prehijack_bonus"] = [a for a in accounts if "prehijack_bonus" in a.cohorts]
-    victim_ids = set(key.victims) | set(key.bonus)
+    victim_ids = set(key.victims)
     rows, seq_to_id = finalize(sink, seed, victim_ids)
     return w, accounts, cohorts, key, rows, seq_to_id
 
@@ -1881,7 +1900,7 @@ def main():
     path, digest, answer = write_outputs(rows, seq_to_id, key, cohorts, accounts, w, args.seed, args.out_dir, args.csv, args.scale)
     print(f"wrote {len(rows)} events for {len(accounts)} accounts to {os.path.relpath(path)} (seed {args.seed}, scale {args.scale}, {time.time() - t0:.1f}s)")
     print(f"  sha256 (uncompressed): {digest}")
-    print("  campaigns: " + ", ".join(f"{k} {len(v['accounts'])}" for k, v in answer["campaigns"].items()) + f"; bonus D {sum(len(v) for v in answer['bonus'].values())}")
+    print("  campaigns: " + ", ".join(f"{k} {len(v['accounts'])}" for k, v in answer["campaigns"].items()) + f"; {sum(len(v['accounts']) for v in answer['campaigns'].values())} victims")
     print("  cohorts:   " + ", ".join(f"{k} {len(v)}" for k, v in sorted(answer["cohorts"].items(), key=lambda kv: -len(kv[1]))))
     if args.check:
         check(answer, rows, accounts, args.scale, key)

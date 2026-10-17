@@ -1,13 +1,14 @@
 """
 Chapter 7: round checkpoints and catch-up.
 
-    python tools/checkpoint.py --round N            # run the reference detector for round N (1-3) and score it
+    python tools/checkpoint.py --round N            # run the reference detector for round N (1-5) and score it
     python tools/checkpoint.py --round N --catch-up # also copy its suspects to lab/suspects_rN.csv so the next notebook starts from it
-    python tools/checkpoint.py --all                # rounds 1..3 in order (what the README's expected-results table comes from)
-    python tools/checkpoint.py --reveal             # score your own lab/suspects_r3.csv with names shown
+    python tools/checkpoint.py --all                # rounds 1..5 in order (what the README's expected-results table comes from)
+    python tools/checkpoint.py --reveal             # score your own lab/suspects_r5.csv with names shown
 
-Reference detectors live in solutions/round{1,2,3}_*.py and read the previous
-round's checkpoint, so run them in order (or use --all).
+Reference detectors live in solutions/round{1,2,3,4,5}_*.py and read the previous
+round's checkpoint, so run them in order (or use --all). Rounds 4 and 5 are judged
+on what they add to the previous round's file (score.py --prev).
 """
 
 import argparse
@@ -20,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.dirname(HERE)
 SOL = os.path.join(LAB, "solutions")
 CK = os.path.join(SOL, "checkpoints")
-SCRIPTS = {1: "round1_rules.py", 2: "round2_graph.py", 3: "round3_anomaly.py"}
+SCRIPTS = {1: "round1_rules.py", 2: "round2_graph.py", 3: "round3_anomaly.py", 4: "round4_invariant.py", 5: "round5_session_queue.py"}
 
 
 def run_round(n, catch_up=False):
@@ -36,16 +37,16 @@ def run_round(n, catch_up=False):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--round", type=int, choices=[1, 2, 3])
+    ap.add_argument("--round", type=int, choices=[1, 2, 3, 4, 5])
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--catch-up", action="store_true")
-    ap.add_argument("--reveal", nargs="?", const=os.path.join(LAB, "suspects_r3.csv"), help="score a suspects file with campaign names shown")
+    ap.add_argument("--reveal", nargs="?", const=os.path.join(LAB, "suspects_r5.csv"), help="score a suspects file with campaign names shown")
     args = ap.parse_args()
     if args.reveal:
         subprocess.run([sys.executable, os.path.join(HERE, "score.py"), args.reveal, "--reveal"], check=False)
         return
     if args.all:
-        for n in (1, 2, 3):
+        for n in (1, 2, 3, 4, 5):
             run_round(n, args.catch_up)
     elif args.round:
         run_round(args.round, args.catch_up)

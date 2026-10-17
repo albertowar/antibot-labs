@@ -2,7 +2,7 @@
 Chapter 7: score a list of suspected takeovers against the answer key.
 
     python tools/score.py suspects.csv                     # tiers only, campaign names hidden
-    python tools/score.py suspects.csv --prev suspects_r1.csv   # what this round added
+    python tools/score.py suspects.csv --prev suspects_r1.csv   # what this round added (Rounds 4 and 5 are judged on this delta)
     python tools/score.py suspects.csv --reveal            # names, misses and the red-herring story
     python tools/score.py suspects.csv --json out.json
 
@@ -31,7 +31,7 @@ KEY = os.path.join(LAB, "solutions", "answer_key.json")
 DATA = os.path.join(LAB, "data", "account_activity.jsonl.gz")
 REVIEW_MIN = 5
 BUDGET = 0.02
-TIER_NAMES = {"A": "rules", "B": "graph", "C": "model"}
+TIER_NAMES = {"A": "rules", "B": "graph", "C": "model", "D": "invariant"}
 
 
 def budget_for(n):
@@ -161,9 +161,6 @@ def main():
     report["levels"] = {t: {"caught": v[0], "total": v[1]} for t, v in sorted(level_tot.items())}
     report["recall"] = tp / total_v if total_v else 0
     report["precision"] = tp / len(flagged) if flagged else 0
-    bonus_ids = {v["account_id"] for lst in key.get("bonus", {}).values() for v in lst}
-    report["bonus_caught"] = len(flagged & bonus_ids)
-    report["bonus_total"] = len(bonus_ids)
 
     # --- queue metrics
     ks = [int(x) for x in args.k.split(",")]
@@ -184,10 +181,20 @@ def main():
         hit = [a for a in legit if a in flagged]
         b = budget_for(len(legit))
         rows.append({"cohort": name, "flagged": len(hit), "size": len(legit), "rate": len(hit) / len(legit), "budget": b, "ok": len(hit) <= b,
+                     "new": len([a for a in hit if a not in prev]), "was_ok": len([a for a in legit if a in prev]) <= b,
                      "red_herring": info.get(name, {}).get("red_herring", False), "why": info.get(name, {}).get("why", "")})
     rows.sort(key=lambda r: (-r["rate"], -r["flagged"]))
     report["cohorts"] = rows
     over = [r for r in rows if not r["ok"]]
+
+    # --- what this round added (only with --prev): Rounds 4 and 5 are judged on their delta
+    if args.prev:
+        added = flagged - prev
+        added_tp = added & set(victims)
+        report["added"] = {"accounts": len(added), "takeovers": len(added_tp), "precision": len(added_tp) / len(added) if added else 0,
+                           "by_campaign": {c["campaign"]: c["new"] for c in camps if c["new"]},
+                           "cohorts_over_in_delta": [r["cohort"] for r in rows if r["new"] > r["budget"]],
+                           "newly_over_budget": [r["cohort"] for r in rows if not r["ok"] and r["was_ok"]]}
 
     # --- time to detect
     ttd = None
@@ -207,16 +214,18 @@ def main():
     # --- print
     p = print
     p(f"=== {os.path.basename(args.suspects)}: {len(flagged)} accounts flagged (ranked by {report['ranked_by']}) ===")
-    p("Attacker side: confirmed takeovers found" + ("" if args.reveal else "   (names hidden; --reveal after Round 3)"))
+    p("Attacker side: confirmed takeovers found" + ("" if args.reveal else "   (names hidden; --reveal after Round 5)"))
     for c in camps:
         newtxt = f"   +{c['new']} this round" if args.prev else ""
-        p(f"  tier {c['tier']} ({TIER_NAMES[c['tier']]:5s})  {c['label']:<28s} {c['caught']:>2}/{c['total']:<2} ({c['caught'] / c['total']:4.0%}){newtxt}")
+        p(f"  tier {c['tier']} ({TIER_NAMES[c['tier']]:9s})  {c['label']:<28s} {c['caught']:>2}/{c['total']:<2} ({c['caught'] / c['total']:4.0%}){newtxt}")
         if args.reveal and c["missed"]:
             p(f"        missed: {', '.join(c['missed'])}")
     p("  tiers: " + "   ".join(f"{t} {v['caught']}/{v['total']}" for t, v in report["tiers"].items()) + f"   overall recall {tp}/{total_v} ({report['recall']:.0%})")
     p("  by compromise level: " + "   ".join(f"{t} {v['caught']}/{v['total']}" for t, v in report["levels"].items()))
-    if report["bonus_total"]:
-        p(f"  bonus campaign D (unscored): {report['bonus_caught']}/{report['bonus_total']}")
+    if args.prev:
+        ad = report["added"]
+        p(f"This round added {ad['accounts']} accounts, {ad['takeovers']} of them takeovers ({ad['precision']:.0%} delta precision)"
+          + (f"; newly over budget: {', '.join(ad['newly_over_budget'])}" if ad["newly_over_budget"] else "; no cohort newly over budget"))
     p(f"Defender cost: precision {tp}/{len(flagged)} ({report['precision']:.1%}); " + "  ".join(f"p@{k} {q['precision']:.0%} (recall {q['recall']:.0%})" for k, q in queue.items())
       + f"; {len(flagged)} reviews x {REVIEW_MIN} min = {report['analyst_hours']:.1f} analyst-hours")
     p(f"Real users hurt: {len(over)} cohort(s) over the {BUDGET:.0%} budget (budget = max(1, floor(2% of cohort)))")
@@ -226,7 +235,8 @@ def main():
             continue
         mark = "ok  " if r["ok"] else "OVER"
         why = f"   {r['why']}" if (args.reveal or not r["ok"]) and r["red_herring"] else ""
-        p(f"  {r['cohort']:<22s} {r['flagged']:>7d} {r['size']:>6d} {r['rate']:>6.1%}  {r['budget']:>4d} {mark}{why}")
+        newtxt = f"  (+{r['new']} this round)" if args.prev and r["new"] else ""
+        p(f"  {r['cohort']:<22s} {r['flagged']:>7d} {r['size']:>6d} {r['rate']:>6.1%}  {r['budget']:>4d} {mark}{newtxt}{why}")
     quiet = [r["cohort"] for r in rows if r["flagged"] == 0]
     if quiet:
         p(f"  untouched: {', '.join(quiet)}")

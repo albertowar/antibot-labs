@@ -15,6 +15,14 @@ The knobs are how each round deviates from that honest flow:
     attest=False        send no attestation              (Rounds 1-2: the faithful replay)
     replay_token=...    resend a lifted genuine verdict  (Round 3)
     device="emulator"   the honest verdict of a farmed device (Round 4)
+    proof=False         send no device proof (Round 5: a bare stolen bearer)
+    proof="v1;..."      send a lifted proof string instead of signing (Round 5)
+
+Round 5: every MobileApp holds its OWN EC key (an install owns its key), registers it at login with the
+provider's attestation of where it lives (mobile_core.attest_key), and signs a proof (nonce, time, request line,
+bound to the bearer) on each sensitive call whenever it has a bearer. At levels below 5 the proof is ignored.
+reinstall() is what a phone restore does: a new key, the same bearer token (the token survives a backup, the
+keystore key does not).
 
 Nothing here forges a verdict: mint() is the provider, and it only stamps the honest verdict of the device
 profile you pass. forge_token() is what Round 2's attacker TRIES with a key of their own; the provider's
@@ -46,6 +54,9 @@ class MobileApp:
         self.device, self.serial, self.ua = device, serial, ua
         self.client = LabClient(actor, ip=ip, ja4=ja4)
         self.bearer = None
+        self.key = mobile_core.new_device_key()      # this install's key (Round 5)
+        self.proof = True                            # True: sign honestly | False: send none | str: send this
+        self.last_proof = None                       # the X-Device-Proof header most recently sent
 
     def _headers(self, extra=()):
         headers = [("User-Agent", self.ua), ("X-App-Id", mobile_core.APP_ID), ("Accept", "application/json")]
@@ -53,15 +64,36 @@ class MobileApp:
             headers.append(("Authorization", f"Bearer {self.bearer}"))
         return headers + list(extra)
 
+    # -- Round 5: the device key ------------------------------------------
+    def _key_headers(self):
+        """Sent at login/register: the public key and the provider's claim about where its private half lives."""
+        pub = mobile_core.public_b64(self.key)
+        return [("X-Device-Key", pub), ("X-Key-Attest", mobile_core.attest_key(self.device, self.serial, pub))]
+
+    def _proof_headers(self, method, path):
+        """X-Device-Proof for one sensitive call (a fresh server nonce each time), or nothing."""
+        if not self.bearer or self.proof is False:
+            return []
+        if isinstance(self.proof, str):
+            header = self.proof
+        else:
+            header = mobile_core.sign_proof(self.key, self.bearer, self.nonce(), method, path)
+        self.last_proof = header
+        return [("X-Device-Proof", header)]
+
+    def reinstall(self):
+        """A phone restore or app reinstall: the bearer token comes back from the backup, the keystore key does not."""
+        self.key = mobile_core.new_device_key()
+
     # -- honest app steps -------------------------------------------------
     def login(self, email, password):
-        r = self.client.post("/api/mobile/login", json={"email": email, "password": password}, headers=self._headers())
+        r = self.client.post("/api/mobile/login", json={"email": email, "password": password}, headers=self._headers(self._key_headers()))
         if r.status_code == 200:
             self.bearer = r.json()["token"]
         return r
 
     def register(self, ident):
-        r = self.client.post("/api/mobile/register", json=ident, headers=self._headers())
+        r = self.client.post("/api/mobile/register", json=ident, headers=self._headers(self._key_headers()))
         if r.status_code == 201:
             self.bearer = r.json()["token"]
         return r
@@ -81,7 +113,12 @@ class MobileApp:
 
     def post_buy(self, body, token):
         extra = [("Content-Type", "application/json")] + ([("X-Attest", token)] if token else [])
+        extra += self._proof_headers("POST", "/api/mobile/buy")
         return self.client.post("/api/mobile/buy", data=body, headers=self._headers(extra))
+
+    def orders(self):
+        """GET /api/mobile/orders (Round 5's gated read), with a device proof."""
+        return self.client.get("/api/mobile/orders", headers=self._headers(self._proof_headers("GET", "/api/mobile/orders")))
 
     def buy(self, sku=DROP_SKU, attest=True, replay_token=None):
         """

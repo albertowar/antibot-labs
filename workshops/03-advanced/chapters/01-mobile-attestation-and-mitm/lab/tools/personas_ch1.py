@@ -10,10 +10,14 @@ provider honestly signs:
     home            24   pixel8, iphone15, pixel8, pixel6-old     the easy majority: strong or device integrity
     mobile_cgnat     8   iphone15 / pixel8, two shared addresses  carrier NAT: eight phones, two addresses
     private_relay    2   iphone15                                 Safari customers behind a relay
-    autofill         1   pixel6-old                               older, certified
+    autofill         1   pixel6-old                               older, certified; restores a backup mid-checkout
     old_chrome       1   old-uncertified (basic)                  a cheap Android that never passed certification
     no_js            1   rooted (basic)                           an unlocked bootloader: a power user
     consumer_vpn     3   graphene (none, UNRECOGNIZED_VERSION)    privacy-conscious customers on a de-Googled ROM
+
+Round 5 adds one life event. The autofill shopper restores their phone from a backup between login and
+checkout: the bearer token comes back with the backup, the keystore key does not (MobileApp.reinstall). At
+every level this changes nothing they can see; a device-bound session notices, and that is its cost.
 
 The last three groups return weak integrity for honest reasons. Round 4's defense has to stop the emulator
 farm without turning them away; watch them in the checkpoint: they are the false-positive bill.
@@ -59,6 +63,8 @@ def scenario_mobile(p, client, rng):
         outcome, status = ("blocked" if login.status_code in (403, 429) else "failed"), login.status_code
     else:
         time.sleep(rng.uniform(0.5, 2.0))
+        if p.persona == "autofill":
+            app.reinstall()                       # restored from a backup: same token, new key
         app.buy(DROP_SKU)
         res = app.result()
         status = res["status"]

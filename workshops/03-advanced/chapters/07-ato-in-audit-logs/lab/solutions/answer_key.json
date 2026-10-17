@@ -1,39 +1,5 @@
 {
  "accounts": 11256,
- "bonus": {
-  "D_prehijack": [
-   {
-    "account_id": "acc_011251",
-    "first_compromise_event_id": "evt_0018056",
-    "level": "monetized"
-   },
-   {
-    "account_id": "acc_011252",
-    "first_compromise_event_id": "evt_0041455",
-    "level": "monetized"
-   },
-   {
-    "account_id": "acc_011253",
-    "first_compromise_event_id": "evt_0044235",
-    "level": "monetized"
-   },
-   {
-    "account_id": "acc_011254",
-    "first_compromise_event_id": "evt_0023144",
-    "level": "monetized"
-   },
-   {
-    "account_id": "acc_011255",
-    "first_compromise_event_id": "evt_0020535",
-    "level": "monetized"
-   },
-   {
-    "account_id": "acc_011256",
-    "first_compromise_event_id": "evt_0026888",
-    "level": "monetized"
-   }
-  ]
- },
  "campaigns": {
   "A1_datacenter_stuffing": {
    "accounts": [
@@ -614,6 +580,47 @@
     }
    ],
    "tier": "C"
+  },
+  "D_prehijack": {
+   "accounts": [
+    {
+     "account_id": "acc_011251",
+     "first_compromise_event_id": "evt_0018056",
+     "level": "monetized",
+     "recovery_event_id": null
+    },
+    {
+     "account_id": "acc_011252",
+     "first_compromise_event_id": "evt_0041455",
+     "level": "monetized",
+     "recovery_event_id": null
+    },
+    {
+     "account_id": "acc_011253",
+     "first_compromise_event_id": "evt_0044235",
+     "level": "monetized",
+     "recovery_event_id": null
+    },
+    {
+     "account_id": "acc_011254",
+     "first_compromise_event_id": "evt_0023144",
+     "level": "monetized",
+     "recovery_event_id": null
+    },
+    {
+     "account_id": "acc_011255",
+     "first_compromise_event_id": "evt_0020535",
+     "level": "monetized",
+     "recovery_event_id": null
+    },
+    {
+     "account_id": "acc_011256",
+     "first_compromise_event_id": "evt_0026888",
+     "level": "monetized",
+     "recovery_event_id": null
+    }
+   ],
+   "tier": "D"
   }
  },
  "cohort_info": {
@@ -676,10 +683,6 @@
   "organic_signup": {
    "red_herring": false,
    "why": "accounts created during the window"
-  },
-  "prehijack_bonus": {
-   "red_herring": false,
-   "why": "bonus campaign D: unscored; the account was the attacker's before it was the victim's"
   },
   "privacy_browser": {
    "red_herring": true,
@@ -6036,14 +6039,6 @@
    "acc_010998",
    "acc_010999",
    "acc_011000"
-  ],
-  "prehijack_bonus": [
-   "acc_011251",
-   "acc_011252",
-   "acc_011253",
-   "acc_011254",
-   "acc_011255",
-   "acc_011256"
   ],
   "privacy_browser": [
    "acc_000057",
