@@ -256,7 +256,7 @@ Read `round5_forged_sensor.py`: it is `tools/profile_replay.py`, the very module
 
 ## Expected results (self-check)
 
-Verified on 2026-10-12 with Python 3.12, the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite), Playwright 1.63.0 (Chromium 153.0.8010.12), patchright 1.63.0 and playwright-stealth 2.0.3, on Linux. The Docker Redis and PostgreSQL path has not been run for this lab; the Selenium bonus was not re-run.
+Verified on 2026-10-12 with Python 3.12, the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite), Playwright 1.63.0 (Chromium 153.0.8010.12), patchright 1.63.0 and playwright-stealth 2.0.3, on Linux. the Docker Redis 8.10 / PostgreSQL 18.6 compose path passes every round too (2026-10-17); the Selenium bonus was not re-run.
 
 Generated from `python tools/verify.py --all --catch-up --markdown`. Each cell is `/api/products` / `/api/cart/add`; `–` means the bot never reached the cart. **Bold** marks the first block. Round N runs at level N+1 (Round 5 at level 5).
 

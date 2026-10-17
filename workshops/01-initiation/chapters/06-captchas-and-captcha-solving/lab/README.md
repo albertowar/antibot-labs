@@ -274,8 +274,7 @@ Then use the discussion questions in the content doc (§6.6).
 ## Expected results (self-check)
 
 Measured October 2026 on Python 3.12 (Linux, WSL2) with the baseline pins (Flask 3.1, redis 8.1, fakeredis 2.39
-on `memory://`, Pillow 12.3, numpy 2.5, scikit-learn 1.9) and `LAB_TIME_SCALE=5`. The `docker compose` path has
-not been run for the migrated lab. **Before the fix** is the round run against its shipped stub (rounds 1..N−1
+on `memory://`, Pillow 12.3, numpy 2.5, scikit-learn 1.9) and `LAB_TIME_SCALE=5`. The `docker compose` path (Redis 8.10 / PostgreSQL 18.6) passes every round too (2026-10-17). **Before the fix** is the round run against its shipped stub (rounds 1..N−1
 fixed): `python tools/verify.py --round N`. **After** is the reference solutions:
 `python tools/verify.py --all --catch-up --markdown`, which regenerates this table's numbers; do not edit them
 by hand. Numbers vary slightly between runs (OCR accuracy, retries, timings).

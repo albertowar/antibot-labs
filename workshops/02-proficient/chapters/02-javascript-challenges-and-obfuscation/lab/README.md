@@ -248,7 +248,7 @@ For each level, ask three questions: what did it stop, who did it hurt, and what
 
 ## Expected results (self-check)
 
-Verified on 2026-10-12 with Python 3.12 and Node 24.21 (`npm ci` from the committed lockfile), the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite), Playwright 1.63.0 (Chromium 153, Firefox 155), javascript-obfuscator 5.9.0, jsdom 30.1.2 and webcrack 2.16.0, on Linux. The Docker Redis and PostgreSQL path has not been run for this lab.
+Verified on 2026-10-12 with Python 3.12 and Node 24.21 (`npm ci` from the committed lockfile), the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite), Playwright 1.63.0 (Chromium 153, Firefox 155), javascript-obfuscator 5.9.0, jsdom 30.1.2 and webcrack 2.16.0, on Linux. the Docker Redis 8.10 / PostgreSQL 18.6 compose path passes every round too (2026-10-17).
 
 Generated from `python tools/verify.py --all --markdown`. Records scraped out of 125 (5 listing pages + 120 product records); blank = bot not introduced yet; **bold** = the first level that stops it; `(n)` = challenge solves.
 

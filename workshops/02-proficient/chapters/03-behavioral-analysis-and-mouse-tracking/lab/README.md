@@ -321,7 +321,7 @@ curl -s localhost:5000/lab/behavior/sessions | python -m json.tool | less
 
 ## Expected results (self-check)
 
-Verified on 2026-10-12 with Python 3.12, the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite) and Playwright 1.63.0 (Chromium 153.0.8010.12, headless) on Linux. The Docker Redis and PostgreSQL path has not been run for this lab.
+Verified on 2026-10-12 with Python 3.12, the W2 starter's pins (Flask 3.1.3, fakeredis 2.39.0 as the in-process Redis, SQLite) and Playwright 1.63.0 (Chromium 153.0.8010.12, headless) on Linux. The Docker Redis 8.10 / PostgreSQL 18.6 compose path passes every round too (2026-10-17).
 
 Generated from `python tools/verify.py --all --markdown` (each round runs every bot next to the 40 shoppers). R = reserved · C = challenged · B = blocked; **bold** is the round that first stops the bot.
 

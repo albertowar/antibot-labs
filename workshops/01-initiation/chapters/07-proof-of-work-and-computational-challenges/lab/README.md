@@ -305,7 +305,7 @@ python tools/scoreboard.py                   # bots stopped vs shoppers hurt
 
 **Test setup**
 
-- **Verified on:** Python 3.12.15, Flask 3.1.3, requests 2.34.2, fakeredis 2.39.0 (the store's default `memory://` Redis) with SQLite, and Playwright 1.63.0 (Chromium) for Round 5. The `docker compose` Redis/PostgreSQL path was not run: there was no Docker on the build machine.
+- **Verified on:** Python 3.12.15, Flask 3.1.3, requests 2.34.2, fakeredis 2.39.0 (the store's default `memory://` Redis) with SQLite, and Playwright 1.63.0 (Chromium) for Round 5. The `docker compose` Redis 8.10 / PostgreSQL 18.6 path passes every round too (2026-10-17).
 - **Hardware:** a shared 12-thread Xeon W-2133 under WSL2, busy with other jobs while this ran, so the CPU-seconds and the gate times below are pessimistic. An unloaded laptop is typically 2-4x faster in Python; the ratios stay the same.
 - **Source:** `python tools/verify.py --round N` for every round at its own level (defended), the same attacks one level lower (undefended), and `--catch-up` for rounds 3 and 5. Shoppers: 40 (`DESKTOP_MHS=4.0`, 5 s patience).
 
