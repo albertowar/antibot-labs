@@ -68,7 +68,7 @@ def score_request(ctx, store, level, count=True):
 
 
 def w2_shadow(sess):
-    """What the end-of-W2 stack would have said about this checkout. Never counts."""
+    """What the W2 browser stack (this lab's own copies) would have said about this checkout. Never counts."""
     points, reasons = 0, []
     for fn in (lambda: automation.score_automation(sess),
                lambda: fingerprint_coherence.score_coherence(sess["fp"], sess.get("http_ua")),

@@ -1,7 +1,7 @@
 """
 Chapter 8, Round 2: generate the agent-session log the audit runs over.
 
-The store's pipeline (W2 Ch8, W3 Ch3-4, and the agent telemetry from W4 Ch4)
+The store's pipeline (W2 Ch8, and the agent telemetry from W4 Ch4)
 writes one line per *session*: the signals it saw, the client type it inferred,
 whether the session reached checkout, the account's order velocity, and, in
 this lab only, who it actually was. Production logs never carry ground truth;

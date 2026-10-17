@@ -9,7 +9,7 @@ Train the session model (Rounds 1 and 2)
 What it does
   1. Builds one row per purchase attempt (features.build_dataset) and attaches weak labels
      (labels.py). Writes artifacts/reference_features.parquet: the training-time feature
-     distribution W3 Ch4 monitors for drift.
+     distribution a production drift monitor compares against.
   2. EVALUATES on a split by TIME: the oldest 70% train, the newest 30% are the holdout. Bots
      arrive in campaigns, and a random split puts sessions from the same campaign on both sides,
      so it grades the model on sessions it has effectively already seen. A logistic-regression
@@ -19,7 +19,7 @@ What it does
      0.5 and not from F1. "Block at most 1% of verified customers" is a business decision. Write
      it down and own it.
   4. Saves LightGBM's native text model + a JSON sidecar. No pickle: a pickled model file executes
-     code when loaded, so a model artifact becomes a supply-chain target (W3 Ch5).
+     code when loaded, so a model artifact becomes a supply-chain target.
 
 Caveat on the false-positive estimate: validation humans are loyal, signed-in customers. Users
 who never sign in (privacy browsers, VPNs) are not in it. The checkpoint measures the real

@@ -7,7 +7,7 @@ all of them (no train/serve skew between the checkout decision, the rule
 engine's card and the scoreboard).
 
     LADDER[0]   request_headers + egress_rate (W1, request phase, always on)
-                + the end-of-W2 stack (automation, fingerprint coherence,
+                + the W2 browser stack (automation, fingerprint coherence,
                   behaviour flow) as shadow=True checks: they report on every
                   checkout and never decide — Round 0's "what would W2 say"
     LADDER[2]   agent_governance at action:checkout (Round 2)
@@ -157,7 +157,7 @@ def _egress_rate(ctx):
     return [Signal("L0", "rate", points, "; ".join(reasons)[:160])] if points else None
 
 
-# --- LADDER[0], shadow: what the end-of-W2 stack would say about a checkout ----------------------
+# --- LADDER[0], shadow: what the W2 browser stack would say about a checkout ----------------------
 
 def _w2_shadow(ctx):
     sess = session_state(ctx)

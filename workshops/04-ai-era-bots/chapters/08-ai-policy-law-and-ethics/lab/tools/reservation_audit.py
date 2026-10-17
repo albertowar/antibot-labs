@@ -44,7 +44,7 @@ sys.path.insert(0, os.path.join(LAB, "attacks"))
 from round1_crawler_fleet import ALL, DECLARED, PROFILES, load_stack, refuse_urls, run_fleet  # noqa: E402
 
 MIN_RETENTION = 30     # one cease-and-desist cycle
-MAX_RETENTION = 180    # past this, write down why (data minimisation, W3 Ch8)
+MAX_RETENTION = 180    # past this, write down why (GDPR data minimisation)
 
 # Lever per ingesting crawler: (label, logging fields the lever needs, needs clickwrap?)
 LEVERS = {
@@ -105,7 +105,7 @@ def exposure_notes(stack, results, channels, general):
         notes.append("one machine-readable channel only: crawlers read different ones (robots lines, headers, RSL). "
                      "Say it twice.")
     if terms.get("acceptance") != "clickwrap":
-        notes.append("terms are browsewrap: a visitor is not bound (Meta v. Bright Data, W3 Ch8). The contract lever "
+        notes.append("terms are browsewrap: a visitor is not bound (Meta v. Bright Data). The contract lever "
                      "exists only against account holders.")
     for field, why in (("robots_fetches", "you cannot show the stealth crawler never asked"),
                        ("asn", "no attribution of undeclared crawling to a provider"),

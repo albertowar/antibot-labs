@@ -97,7 +97,7 @@ Useful by hand: `python tools/population.py --scenario crawl_mix` runs the 49-cl
 
 ## How a client is judged
 
-Four checks run in order on the catalog surface (`/`, `/products`, `/catalog`, `/product/<sku>`, `/search`). `/robots.txt`, `/sitemap.xml`, `/feed.xml`, the cart and account pages and `/api/*` are never judged: a crawler must be able to read the policy you want it to follow, and the JSON API is another chapter's problem (W3 Ch2).
+Four checks run in order on the catalog surface (`/`, `/products`, `/catalog`, `/product/<sku>`, `/search`). `/robots.txt`, `/sitemap.xml`, `/feed.xml`, the cart and account pages and `/api/*` are never judged: a crawler must be able to read the policy you want it to follow, and the JSON API is a leak Chapter 3 closes (API abuse in depth is W3 Ch2's territory).
 
 1. **Claim** (L1, `crawler_registry`): which registry token is in the User-Agent, who runs it, for what purpose, and does your `robots.txt` allow this path for that token?
 2. **Proof** (L2, `crawler_verify`): is the claim true? The operator's published address list, or forward-confirmed reverse DNS. Which network an address sits in proves nothing here: the operators and the impersonators rent from the same cloud pools.

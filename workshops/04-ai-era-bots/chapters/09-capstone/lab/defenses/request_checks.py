@@ -1,5 +1,5 @@
 """
-L0 request checks: headers and per-egress rate (W1 Ch2, Ch4; unchanged from W2 Ch9)
+L0 request checks: headers and per-egress rate (W1 Ch2, Ch4)
 
 The cheapest layer, and still the one that removes most bulk traffic. It
 runs on every request, before any session state is read.

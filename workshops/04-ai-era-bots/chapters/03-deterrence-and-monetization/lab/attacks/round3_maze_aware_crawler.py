@@ -11,7 +11,7 @@ The counter to a tarpit is hygiene, and every serious crawler has it:
 It still declares nothing, still rotates residential addresses, still ignores the policy. It never
 enters the maze, is never tagged, and gets the catalogue. That is the limit of deterrence: it taxes
 the careless, not the careful. What the careful crawler cannot avoid is the request volume and the
-breadth of its crawl, which is where W2's behavioural and ML layers, and W3 Ch6's coverage cap,
+breadth of its crawl, which is where W2's behavioural and ML layers, and a catalogue coverage cap (distinct products per session above a threshold),
 pick up.
 
     python attacks/round3_maze_aware_crawler.py

@@ -23,7 +23,7 @@ What it judges. Only the HTML catalog surface (``/``, ``/products``, ``/catalog`
 ``/product/<sku>``, ``/search``) is judged. ``/robots.txt``, ``/sitemap.xml``,
 ``/feed.xml``, the cart, the account pages and ``/api/*`` pass through every layer
 unexamined: a crawler must be able to read the policy you want it to follow, and the
-JSON API is a separate chapter's problem (W3 Ch2). Static files and images never reach
+JSON API is a leak Chapter 3 closes; API abuse in depth is W3 Ch2's territory. Static files and images never reach
 the gate at all; ``demo_site/ext/crawl.py`` records them for the Round 3 signature.
 """
 

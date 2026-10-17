@@ -2,7 +2,7 @@
 
 > A worked reference, not the only good answer. It is what the Capstone runs under, and what Round 4 audits. Score it with `python tools/checkpoint.py --round 4 --record <file>` or `python tools/audit.py --record <file>`.
 
-**Team:** capstone reference  **System:** Lab Store bot defense (W2 Ch8 scoring, W3 streaming, W4 Ch6 adversarially-hardened classifier, W4 Ch7 LLM triage, this capstone's crawl + agent governance)  **Date:** 2026-10-11
+**Team:** capstone reference  **System:** Lab Store bot defense (W2 Ch8 scoring, W4 Ch6 adversarially-hardened classifier, W4 Ch7 LLM triage, this capstone's crawl + agent governance)  **Date:** 2026-10-11
 
 ## 1. Role
 
@@ -50,7 +50,7 @@ Tarpits, labyrinths and decoys are served **only to sessions the policy would ot
 
 ## 12. Incidents and complaints
 
-A **complaint** from a person, a vendor, an accessibility auditor or a **regulator** (DPA or AI Office) goes to `abuse@lab-store.test` and is acknowledged **within 2 business days**. A **false-positive incident** (a cohort over budget in production) is declared by the on-call engineer, reviewed within 24 hours, and written up with the W3 Ch8 disclosure template.
+A **complaint** from a person, a vendor, an accessibility auditor or a **regulator** (DPA or AI Office) goes to `abuse@lab-store.test` and is acknowledged **within 2 business days**. A **false-positive incident** (a cohort over budget in production) is declared by the on-call engineer, reviewed within 24 hours, and written up as a false-positive disclosure (what fired, which cohorts were hurt, the fix).
 
 | Name | Team | Signature | Time |
 |---|---|---|---|

@@ -1,7 +1,7 @@
 """
 The ladder: the capstone's stack, one layer per DEFENSE_LEVEL.
 
-    0  W1 request checks (always on) + the end-of-W2 stack in permanent shadow
+    0  W1 request checks (always on) + the W2 browser stack in permanent shadow
     1  (ext) crawl governance on content paths: allow / 402 / charged / maze / block
     2  agent governance at the checkout: the Ch8 policy, live
     3  (ext) deception within limits + the LLM guard on /summary and /assist

@@ -297,7 +297,7 @@ def _shape(response):
     # the decision oracle: the gate's JSON refusals carry score + reasons "for teaching"
     # below L4; the student's oracle guard decides what survives at L4
     # an appeal link rides on every refusal the store publishes an appeal path for: a block a
-    # person cannot contest is an Article 22 problem (W3 Ch8), and the audit checks for it.
+    # person cannot contest is an Article 22 problem (Chapter 8), and the audit checks for it.
     if response.status_code in (402, 403, 429) and policy_engine.load_policy().get("appeal_path"):
         response.headers["Link"] = (response.headers.get("Link", "")
                                      + (", " if response.headers.get("Link") else "")

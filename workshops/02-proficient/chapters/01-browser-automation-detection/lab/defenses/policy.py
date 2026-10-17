@@ -3,7 +3,7 @@ Policy: every number the defender tunes, and how a verdict becomes an HTTP answe
 
 pipeline.py decides WHICH checks run; this file decides HOW MUCH each signal
 counts and WHERE the lines are. Chapters tune these values; W2 Ch8 replaces
-decide() with calibrated weights; W3 Ch4 loads them from a hot-reloaded file.
+decide() with calibrated weights; in production an ops team hot-reloads them from a config file.
 
 One scale for every check: 0 (clean) to 100 (certain).
 

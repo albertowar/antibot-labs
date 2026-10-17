@@ -11,7 +11,7 @@ Model artifacts: where they live, which one each defense level scores with, and 
 The version numbers continue W2 Ch7's (v1, v2 were its models): v2 is the model you inherit, and each
 round of this chapter ships the next one. Level L scores with model v(L+1), so `--level N-1` runs a
 round's attackers against the PREVIOUS round's model. LightGBM's native text format, never pickle: a
-pickled model executes code when it is loaded, so a model file is a supply-chain target (W3 Ch5).
+pickled model executes code when it is loaded, so a model file is a supply-chain target.
 Models reload when their files change, so retraining needs no restart.
 """
 

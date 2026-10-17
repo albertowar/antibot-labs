@@ -173,7 +173,7 @@ def exposure_notes(policy, per_cohort):
                      "to their terms (W4 Ch2), while the unsigned ones walk in. Incentive inverted.")
     if hard.get("no_pointer") == "block" or hard.get("assistive_agent") == "block":
         notes.append("hard block on no_pointer / assistive agents: keyboard and screen-reader users, with or without "
-                     "an agent, are refused. EAA / EN 301 549 / ADA exposure (W3 Ch8 §8.2.6).")
+                     "an agent, are refused. EAA / EN 301 549 / ADA exposure .")
     for ex in policy["exemptions"]:
         if ex["max_action"] == "allow":
             notes.append(f"exemption {ex['if_signal']} -> allow: never challenged, so any farm that shows that signal "
@@ -184,7 +184,7 @@ def exposure_notes(policy, per_cohort):
     if terms.get("agents_clause") == "silent":
         notes.append("terms say nothing about agents: the contract lever that Amazon v. Perplexity left you is unused.")
     if terms.get("acceptance") != "clickwrap":
-        notes.append("terms are browsewrap: visitors, and their agents, are not bound (Meta v. Bright Data, W3 Ch8).")
+        notes.append("terms are browsewrap: visitors, and their agents, are not bound (Meta v. Bright Data).")
     decl = policy["declaration"]
     if decl.get("required") and decl.get("undeclared_agent_action") == "allow":
         notes.append("declaration required but undeclared agents are allowed: a rule with no consequence.")
@@ -195,7 +195,7 @@ def exposure_notes(policy, per_cohort):
         notes.append("challenge_type captcha_image: no non-visual path; every challenged screen-reader session is a "
                      "block (counted as one above). Use proof-of-work or an accessible confirmation.")
     if not policy.get("appeal_path", False):
-        notes.append("appeal_path false: a blocked person, or their agent's owner, has no human to reach (GDPR Art 22, W3 Ch8).")
+        notes.append("appeal_path false: a blocked person, or their agent's owner, has no human to reach (GDPR Art 22).")
     if policy.get("retention_days", 0) > 90:
         notes.append(f"retention_days {policy['retention_days']}: session logs carry addresses and fingerprints; write down why.")
     a11y = per_cohort.get("a11y_agent", Counter())
