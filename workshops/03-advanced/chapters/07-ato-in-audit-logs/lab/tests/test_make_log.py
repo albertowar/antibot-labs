@@ -48,6 +48,7 @@ def test_golden(update=False):
 
 def test_tiers():
     ck = os.path.join(LAB, "solutions", "checkpoints")
+    os.makedirs(ck, exist_ok=True)  # detectors write suspects_rN.csv here; absent in a fresh checkout
     reports = {}
     for n, script in ((1, "round1_rules.py"), (2, "round2_graph.py"), (3, "round3_anomaly.py")):
         subprocess.run([sys.executable, os.path.join(LAB, "solutions", script), "--no-score"], check=True, stdout=subprocess.DEVNULL)

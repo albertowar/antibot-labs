@@ -26,7 +26,7 @@ for IPv6. Nothing here can ever point at a real network, and every person,
 agent and account is invented.
 
 The generator is deterministic: the same seed gives the same file on Python
-3.10 to 3.12 (string-seeded random.Random sub-streams, no set iteration, no
+3.12 and later (string-seeded random.Random sub-streams, no set iteration, no
 hash()), which is what makes the README's expected-results table reproducible.
 
 Run:

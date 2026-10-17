@@ -10,12 +10,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LAB = os.path.dirname(HERE)
 DATA = os.path.join(LAB, "data", "account_activity.jsonl.gz")
 KEY = os.path.join(LAB, "solutions", "answer_key.json")
-WANT = {"numpy": "2.2.6", "pandas": "2.3.3", "sklearn": "1.7.2", "networkx": "3.4.2", "matplotlib": "3.10.6"}
+WANT = {"numpy": "2.5.4", "pandas": "3.0.6", "sklearn": "1.9.1", "networkx": "3.4.2", "matplotlib": "3.10.6"}
 
 
 def main():
     ok = True
-    print(f"python {sys.version.split()[0]}  ({'ok' if sys.version_info >= (3, 10) else 'need 3.10+'})")
+    print(f"python {sys.version.split()[0]}  ({'ok' if sys.version_info >= (3, 12) else 'need 3.12+'})")
     for mod, want in WANT.items():
         try:
             m = __import__(mod)

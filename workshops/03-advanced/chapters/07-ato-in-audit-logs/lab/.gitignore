@@ -5,3 +5,4 @@ __pycache__/
 data/account_activity.*
 suspects*.csv
 notebooks/suspects*.csv
+solutions/checkpoints/

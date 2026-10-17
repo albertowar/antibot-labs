@@ -10,7 +10,7 @@ Nothing in this lab touches a network. Every address is non-routable (198.18.0.0
 
 ```
 lab/
-  requirements.txt       pandas, numpy, scikit-learn, networkx, matplotlib, jupyterlab. Python 3.10+. One venv per chapter.
+  requirements.txt       pandas, numpy, scikit-learn, networkx, matplotlib, jupyterlab. Python 3.12+. One venv per chapter.
   data/                  account_activity.jsonl.gz is GENERATED (python tools/make_log.py, ~1 min, ~24 MB) and gitignored.
                          world.json (the simulated internet), sample.jsonl (the first 2,000 events, for a look at the schema)
   notebooks/             00_explore · 01_rules · 02_graph · 03_ml · 04_reveal  (one per round; each starts from the previous round's suspects)
@@ -19,7 +19,7 @@ lab/
   tests/                 test_make_log.py: golden digest (determinism) and the tier-integrity assertions the README table rests on
 ```
 
-**Why a notebook and no server:** the chapter is about the *analysis* over a log the W2 Ch6 login pipeline and the W3 Ch3 stream already produced, not about producing it. A generated log lets everyone investigate the same 335,000 events, makes the scoreboard reproducible, and keeps a 3-hour chapter off server setup. `tools/make_log.py` regenerates it byte for byte from seed 2026 on any Python 3.10+.
+**Why a notebook and no server:** the chapter is about the *analysis* over a log the W2 Ch6 login pipeline and the W3 Ch3 stream already produced, not about producing it. A generated log lets everyone investigate the same 335,000 events, makes the scoreboard reproducible, and keeps a 3-hour chapter off server setup. `tools/make_log.py` regenerates it byte for byte from seed 2026 on any Python 3.12+.
 
 ---
 
@@ -109,7 +109,7 @@ Load the log, look at the event mix, the share of `session_resume` logins, a few
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔵 Defend | Weekly `window_features()` (14-day windows, leak-free, successful events only for every behavioural feature), an IsolationForest on the deviation features, each account's worst week, a top-100 queue of accounts Round 2 did not contain. | Reference (cumulative): 168 flagged, tier A 25/26, tier B 39/46, **tier C 12/18**, precision at 100 of the ranked list 72% |
+| 🔵 Defend | Weekly `window_features()` (14-day windows, leak-free, successful events only for every behavioural feature), an IsolationForest on the deviation features, each account's worst week, a top-100 queue of accounts Round 2 did not contain. | Reference (cumulative): 168 flagged, tier A 25/26, tier B 39/46, **tier C 11/18**, precision at 100 of the ranked list 72% |
 | 🔴 Attack (the queue's cost) | Read the queue's composition: travellers, relocators, the MFA-migration batch, forced resets. Each is a single feature doing honest work on the wrong person. | 6 cohorts "over budget" in a 100-account review queue; that is what review is for |
 | 🔵 Contrast | Train the supervised model on Rounds 1+2 and submit its queue instead. | More tier A and B, almost no tier C: a model trained on your detections finds your detections |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 3 --catch-up` | the reference `suspects_r3.csv` |
@@ -122,7 +122,7 @@ Load the log, look at the event mix, the share of `session_resume` logins, a few
 
 ## Expected results (self-check)
 
-Produced by `python tests/test_make_log.py --tiers` (which runs the three reference detectors and asserts the bounds below). The log is deterministic (seed 2026, same digest on Python 3.10 and 3.12), so these numbers do not drift.
+Produced by `python tests/test_make_log.py --tiers` (which runs the three reference detectors and asserts the bounds below). The log is deterministic (seed 2026, same digest on Python 3.12+), so these numbers do not drift.
 
 | Round (cumulative) | Tier A (26) | Tier B (46) | Tier C (18) | Flagged | Precision | Cohorts over 2% budget |
 |---|---|---|---|---|---|---|
