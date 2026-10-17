@@ -24,7 +24,7 @@ workshops/<NN>/starter.manifest.json:
       "why_empty": "..."                              # README text when the baseline is empty
     }
 
-The baselines are empty today, by decision (TODO.md §1.6): every workshop runs on its own, and a
+The baselines are empty today, by decision (DECISIONS.md): every workshop runs on its own, and a
 chapter that needs an earlier control at its Round 0 adds it in its own lab. The mechanism stays so
 that a workshop can grow a baseline later; if one does, its starter README says what changed against
 the onboarding store, and the workshop may open with a short "what's different" lesson.

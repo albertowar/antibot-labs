@@ -48,7 +48,7 @@ files; they add `defenses/<name>.py` checks and `demo_site/ext/<name>.py` module
 are never edited by hand: change the skeleton or the manifest, rebuild (`scripts/build_starter.py --all`),
 and `scripts/starter_check.py` reports drift.
 
-Every baseline is empty today (decision in `TODO.md` §1.6). No starter is a previous workshop's end
+Every baseline is empty today (decision in `DECISIONS.md`). No starter is a previous workshop's end
 state: each workshop runs on its own, and a chapter that needs an earlier control at its Round 0 (W1's
 header rules, say) adds it in its own lab. A baseline that ever grows is listed in its starter's README,
 with why each control is there.

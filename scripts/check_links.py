@@ -27,7 +27,7 @@ MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 REPO_PATH = re.compile(r"(?<![\w./-])((?:" + "|".join(re.escape(t) for t in TOP) + r")[\w./@+-]*)")
 PLACEHOLDER = re.compile(r"[<>*{}]|\.\.\.|…|NN|<w>")
 REL_SPAN = re.compile(r"`(\.\.?/[^`\s]+\.md)`")
-# Paths the docs name on purpose before they exist (the starter chain, TODO.md §1.6). Drop an entry
+# Paths the docs name on purpose before they exist (the starter chain; see DECISIONS.md). Drop an entry
 # once the folder is built.
 PLANNED = ("workshops/02-proficient/starter", "workshops/03-advanced/starter", "workshops/04-ai-era-bots/starter")
 
