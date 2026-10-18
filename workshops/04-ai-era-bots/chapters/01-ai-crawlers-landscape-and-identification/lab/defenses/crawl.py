@@ -151,8 +151,10 @@ def enforce(ctx, threshold=60):
 
 # --- robots.txt: the policy a crawler is supposed to follow -----------------------
 # routes/seo.py serves BASE plus whatever hooks.robots providers return. The registry
-# check must evaluate the same text, so both read it from here.
-BASE_ROBOTS = ["User-agent: *", "Allow: /", "Disallow: /cart", "Disallow: /checkout",
+# check must evaluate the same text, so both read it from here. No leading "Allow: /" (the
+# starter dropped it in contract 1.7): it is the default, and a first-match parser such as
+# urllib.robotparser would stop at it and ignore every Disallow after it.
+BASE_ROBOTS = ["User-agent: *", "Disallow: /cart", "Disallow: /checkout",
                "Disallow: /account", "Disallow: /lab/"]
 POLICY_FILE = os.path.join(DATA, "crawl_policy.robots")
 

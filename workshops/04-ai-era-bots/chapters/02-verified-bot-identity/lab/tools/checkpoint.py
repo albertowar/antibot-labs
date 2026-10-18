@@ -39,7 +39,7 @@ import requests
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-import personas_ch2  # noqa: E402  (swaps in the chapter's cohort and the `lane_mix` scenario)
+import personas_ch2  # noqa: E402  (the chapter's cohort, passed as Round.people, and the `lane_mix` scenario)
 from checkpoint_core import Round, main  # noqa: E402
 import labclient  # noqa: E402
 from personas_ch2 import CRAWL_PAGES  # noqa: E402
@@ -148,7 +148,8 @@ def share(prefix_names):
 
 
 def rnd(level, description, attacks, expect, solutions, extra, cap):
-    return Round(level=level, description=description, scenario="lane_mix",
+    return Round(level=level, description=description, scenario="lane_mix", people=personas_ch2.personas,
+                legit_hurt_max=len(THROTTLED[level]),
                  attacks={n: ATTACKS[n] for n in attacks}, expect=expect, solutions=solutions,
                  metric=share(attacks), bot_success_max=cap, extra_checks=[*extra, cohort(level), gate_cost])
 

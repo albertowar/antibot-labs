@@ -6,6 +6,8 @@ A check receives a Ctx and returns one of:
     [Signal(...), ...]        evidence, on the 0-100 scale; the engine adds it up
     Verdict(action=...)       a hard answer that stops the gate (rate_limit, block, deceive),
                               or a challenge request: Verdict("challenge", 40, challenge="pow")
+                              (a soft verdict's bare score counts: the engine carries it as
+                              one synthesized signal, so the 40 reaches the band)
 
 Docstrings in a real check say what it catches, what it misses, and who it
 hurts (its false-positive profile). That is the part students read.

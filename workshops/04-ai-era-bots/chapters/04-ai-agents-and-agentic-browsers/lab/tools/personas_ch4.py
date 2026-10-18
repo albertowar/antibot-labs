@@ -19,7 +19,7 @@ all for the no-JavaScript one) and send the same telemetry static/js/agent.js wo
 each person comes from their responses, never from a label: a 403 is a stop, a step-up is friction
 they answer by reading the lab mailbox, the order page is a sale.
 
-This module swaps population.personas() for the cohort and registers the `agent_drop` scenario;
+This module offers the cohort (checkpoint.py passes `people=personas`) and registers the `agent_drop` scenario;
 checkpoint.py imports it, so every round runs these people. Everything is synthetic: accounts are the
 seeded users, the mailbox is the lab's, the operator is a .test domain.
 
@@ -83,8 +83,6 @@ def personas(seed=population.SEED, n=None):
         people.append(q)
     return people[:n] if n else people
 
-
-population.personas = personas
 
 
 # --- what the page's script would send ------------------------------------------------------------------

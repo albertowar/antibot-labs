@@ -39,8 +39,9 @@ never gated. A shopper whose device would need longer than PATIENCE_S gives up (
 The phone ratios are assumptions, not measurements (W1 Ch7 measures them). The persona result gains a
 `pow` entry: {"bits", "solves", "tried", "wait_s", "gave_up"}.
 
-This module swaps population.personas() for the chapter's cohort and registers the `crawl_gov`
-scenario; checkpoint.py imports it, so every round runs these clients.
+This module provides the chapter's cohort (`personas`, which checkpoint.py hands to every Round as
+`people=`) and registers the `crawl_gov` scenario and the Round 5 page hook; checkpoint.py imports it,
+so every round runs these clients.
 """
 
 import json
@@ -250,7 +251,6 @@ def scenario_crawl_gov(p, client, rng):
     return fn(p, client, rng) if fn else population.scenario_browse(p, client, rng)
 
 
-population.personas = personas
 if pow_hook not in population.PAGE_HOOKS:
     population.PAGE_HOOKS.append(pow_hook)          # the shoppers' browser: solve the gate's puzzle, reload
 population.SCENARIOS["crawl_gov"] = scenario_crawl_gov

@@ -59,4 +59,13 @@
     var el = document.createElement("div"); el.className = "flash " + (kind || "info"); el.setAttribute("role", "status"); el.textContent = msg;
     main.insertBefore(el, main.firstChild);
   }
+
+  // A challenge interstitial that interrupted a form POST carries the form along
+  // (#challenge-replay). A chapter's solver calls this after a successful solve to
+  // resubmit it; without JavaScript the same form is a visible Continue button.
+  window.labReplay = function () {
+    var f = document.getElementById("challenge-replay");
+    if (f) f.submit();
+    return !!f;
+  };
 })();

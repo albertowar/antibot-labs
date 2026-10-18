@@ -183,15 +183,33 @@ def wait_for_store(timeout=30):
 
 # --- Browsers (Playwright), with the same guard --------------------------------
 
-def browser_context(playwright_browser, actor, ip=None, **kw):
-    """A Playwright context that carries the lab headers and refuses to leave this machine."""
-    ctx = playwright_browser.new_context(extra_http_headers={"X-Lab-Client-IP": ip or WORLD["student_ip"],
-                                                             "X-Lab-Actor": actor}, **kw)
+def browser_context(playwright_browser, actor, ip=None, ja4=None, user_agent=None, headers=None,
+                    headers_fn=None, **kw):
+    """A Playwright context that carries the lab headers and refuses to leave this machine.
+
+    ja4         a claimed X-Lab-JA4, like LabClient's
+    user_agent  shorthand for Playwright's user_agent context option
+    headers     extra fixed headers for every request
+    headers_fn  fn(request) -> dict of per-request headers (e.g. a Web Bot Auth signature),
+                merged into each request at the localhost guard's route
+    """
+    extra = {"X-Lab-Client-IP": ip or WORLD["student_ip"], "X-Lab-Actor": actor}
+    if ja4:
+        extra["X-Lab-JA4"] = ja4
+    if headers:
+        extra.update(headers)
+    if user_agent:
+        kw.setdefault("user_agent", user_agent)
+    ctx = playwright_browser.new_context(extra_http_headers=extra, **kw)
 
     def _route(route):
-        if is_local(route.request.url):
-            route.continue_()
-        else:
+        if not is_local(route.request.url):
             route.abort()
+        elif headers_fn:
+            hdrs = dict(route.request.headers)
+            hdrs.update(headers_fn(route.request) or {})
+            route.continue_(headers=hdrs)
+        else:
+            route.continue_()
     ctx.route("**/*", _route)
     return ctx

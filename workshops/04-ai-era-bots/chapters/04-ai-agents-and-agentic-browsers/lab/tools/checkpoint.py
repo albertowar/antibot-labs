@@ -75,19 +75,21 @@ def fleet_capped(board, results, attacks):
 
 
 ROUNDS = {
-    1: Round(level=1, description="declared agents may browse, not buy", scenario="agent_drop",
+    1: Round(level=1, description="declared agents may browse, not buy", scenario="agent_drop", people=cohort.personas,
              attacks={"undeclared": "attacks/round1_undeclared_agent.py", "honest": "attacks/round1_honest_agent.py"},
              expect={"undeclared": "full", "honest": "blocked"},
-             extra_checks=[cohort_report(0)], solutions=("defenses/agent_policy.py",)),
-    2: Round(level=2, description="robotic sessions get the step-up", scenario="agent_drop",
+             extra_checks=[cohort_report(0)], solutions=("defenses/agent_policy.py",),
+             legit_hurt_max=6),   # honest agent 0/4 + the two mandated agent users 0/2: declared, so refused (README)
+    2: Round(level=2, description="robotic sessions get the step-up", scenario="agent_drop", people=cohort.personas,
              attacks={"undeclared": "attacks/round1_undeclared_agent.py", "humanized": "attacks/round2_humanized_agent.py"},
              expect={"undeclared": "blocked", "humanized": "full"},
-             extra_checks=[cohort_report(0)], solutions=("defenses/agent_behavior.py",)),
-    3: Round(level=3, description="verified identity: signed by an operator we trust", scenario="agent_drop",
+             extra_checks=[cohort_report(0)], solutions=("defenses/agent_behavior.py",),
+             legit_hurt_max=2),   # the two mandated agent users, still declared until Round 3 (README)
+    3: Round(level=3, description="verified identity: signed by an operator we trust", scenario="agent_drop", people=cohort.personas,
              attacks={"forged": "attacks/round3_forged_agent.py", "verified": "attacks/round3_verified_agent.py"},
              expect={"forged": "blocked", "verified": "full"},
              extra_checks=[cohort_report(2)], solutions=("defenses/agent_identity.py",)),
-    4: Round(level=4, description="the checkout gate: mandates, step-up, device cap", scenario="agent_drop",
+    4: Round(level=4, description="the checkout gate: mandates, step-up, device cap", scenario="agent_drop", people=cohort.personas,
              attacks={"fleet": "attacks/round4_fleet.py"},
              extra_checks=[fleet_capped, cohort_report(2)], solutions=("defenses/checkout_gate.py",)),
 }

@@ -38,7 +38,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-import personas_ch1  # noqa: E402  (swaps in the chapter's cohort and the `crawl_mix` scenario)
+import personas_ch1  # noqa: E402  (the chapter's cohort, the `crawl_mix` scenario and the assets PAGE_HOOK)
 from checkpoint_core import Round, main  # noqa: E402
 import labclient  # noqa: E402
 
@@ -103,7 +103,7 @@ def gate_cost(board, results, attacks):
 
 def rnd(level, description, attacks, expect, solutions, welcome_check, **kw):
     return Round(level=level, description=description, scenario="crawl_mix",
-                 attacks={name: ATTACKS[name] for name in attacks}, expect=expect, solutions=solutions,
+                 people=personas_ch1.personas, attacks={name: ATTACKS[name] for name in attacks}, expect=expect, solutions=solutions,
                  extra_checks=[crawlers(**expect), welcome_check, gate_cost], **kw)
 
 
@@ -117,10 +117,12 @@ ROUNDS = {
            ("defenses/ladder.py", "defenses/crawler_verify.py"), welcome("ok")),
     3: rnd(3, "L3 behaviour signature", ["impersonator", "stealth", "polite", "polite_cookies"],
            {"impersonator": "blocked", "stealth": "blocked", "polite": "partial", "polite_cookies": "full"},
-           ("defenses/ladder.py", "defenses/crawl_signature.py"), welcome("refused"), allowed_fp=("localsearchbot",)),
+           ("defenses/ladder.py", "defenses/crawl_signature.py"), welcome("refused"), allowed_fp=("localsearchbot",),
+           legit_hurt_max=1),   # LocalSearchBot refused: the documented false positive
     4: rnd(4, "L4 identity x purpose policy", ["impersonator", "stealth", "polite", "polite_cookies"],
            {"impersonator": "blocked", "stealth": "blocked", "polite": "partial", "polite_cookies": "full"},
-           ("defenses/ladder.py", "defenses/crawl_policy.py"), welcome("limited")),
+           ("defenses/ladder.py", "defenses/crawl_policy.py"), welcome("limited"),
+           legit_hurt_max=1),   # LocalSearchBot limited: the scoreboard counts a 429 as a stop; none is refused
 }
 
 if __name__ == "__main__":

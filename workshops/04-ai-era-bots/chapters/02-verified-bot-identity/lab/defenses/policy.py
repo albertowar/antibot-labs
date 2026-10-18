@@ -62,8 +62,10 @@ IP_POINTS = {
 }
 
 
-def decide(score, signals, level):
-    """Map a total score to a band. `signals` and `level` are here for chapters that override."""
+def decide(score, signals, level, ctx=None):
+    """Map a total score to a band. `signals` and `level` are here for chapters that override;
+    an override that declares `ctx` (or **kwargs) also receives the request's Ctx, so a policy
+    can read per-request state (ctx.attrs, ctx.notes) without importing Flask (contract 1.7)."""
     if score >= BANDS["block"]:
         return "block"
     if score >= BANDS["challenge"]:

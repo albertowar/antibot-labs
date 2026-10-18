@@ -25,8 +25,9 @@ starter's shoppers are Python and do not, so a PAGE_HOOKS entry below fetches th
 files a browser would (once, then from cache) through the same client. Without it the Round 3
 signature would call every shopper "HTML only".
 
-This module swaps population.personas() for the chapter's cohort and registers the
-`crawl_mix` scenario; checkpoint.py imports it, so every round runs these clients.
+This module builds the chapter's cohort (personas(), handed to every Round as `people=`) and
+registers the `crawl_mix` scenario and the assets PAGE_HOOK; checkpoint.py imports it, so every
+round runs these clients.
 """
 
 import os
@@ -61,7 +62,7 @@ CRAWLERS = [
     ("verified_claudebot",     "claudebot",      "ClaudeBot",      ("cloud_vm", 27)),
     ("localsearchbot",         "localsearchbot", "LocalSearchBot", ("hosting_asn", 5)),
 ]
-_STARTER_PERSONAS = population.personas
+_STARTER_PERSONAS = population.personas  # the 40 shoppers; population.personas is left untouched
 
 
 def personas(seed=population.SEED, n=None):
@@ -144,7 +145,6 @@ def assets_hook(p, client, response):
     return None
 
 
-population.personas = personas
 population.SCENARIOS["crawl_mix"] = scenario_crawl_mix
 if assets_hook not in population.PAGE_HOOKS:
     population.PAGE_HOOKS.append(assets_hook)

@@ -163,13 +163,15 @@ def detector_aside(board, results, attacks):
 
 
 def rnd(level, description, scenario, attacks, expect, solutions, checks, **kw):
+    n = kw.get("population_n")
     return Round(level=level, description=description, scenario=scenario, attacks=attacks, expect=expect,
-                 solutions=solutions, extra_checks=[*checks, friction, gate_cost], **kw)
+                 solutions=solutions, extra_checks=[*checks, friction, gate_cost],
+                 people=lambda: personas_ch5.personas(n=n), **kw)
 
 
 ROUNDS = {
     0: Round(level=0, description="the store as it shipped: a honeypot SKU, nothing else", scenario="browse",
-             extra_checks=[gate_cost]),
+             extra_checks=[gate_cost], people=personas_ch5.personas),
     1: rnd(1, "L1 review_signals: account age, purchase, device and egress velocity", "review_r1",
            {"farm": "attacks/round1_review_farm.py"}, {"farm": "blocked"}, ("defenses/review_signals.py",),
            [farm_ceiling, detector_aside], population_n=20),

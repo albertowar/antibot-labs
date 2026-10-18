@@ -11,7 +11,10 @@ bp = Blueprint("seo", __name__)
 
 @bp.route("/robots.txt")
 def robots():
-    lines = ["User-agent: *", "Allow: /", "Disallow: /cart", "Disallow: /checkout",
+    # No "Allow: /": everything not disallowed is allowed by default (RFC 9309), and a leading
+    # blanket Allow made first-match parsers (Python's urllib.robotparser) ignore every later
+    # Disallow — including a chapter's bait entries (contract 1.7).
+    lines = ["User-agent: *", "Disallow: /cart", "Disallow: /checkout",
              "Disallow: /account", "Disallow: /lab/"]
     for provider in hooks.ROBOTS:          # chapter lines (hooks.robots), e.g. bait Disallow entries
         lines += [str(line) for line in provider()]

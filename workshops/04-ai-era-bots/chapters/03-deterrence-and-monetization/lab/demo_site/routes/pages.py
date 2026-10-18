@@ -249,10 +249,13 @@ def login():
         user.last_login_at = utcnow()
         db.session.commit()
         g.ctx.note(login="ok")
-        return redirect(request.form.get("next") or url_for("pages.account"))
-    g.ctx.note(login="fail", login_reason="unknown_user" if user is None else "wrong_password")
+        return after_action("login", redirect(request.form.get("next") or url_for("pages.account")),
+                            user=user, ok=True)
+    reason = "unknown_user" if user is None else "wrong_password"
+    g.ctx.note(login="fail", login_reason=reason)
     flash("Wrong email or password.", "warn")
-    return render("login.html", next=request.form.get("next", "/account"), email=email), 401
+    return after_action("login", (render("login.html", next=request.form.get("next", "/account"), email=email), 401),
+                        user=user, ok=False, reason=reason)
 
 
 @bp.route("/logout", methods=["POST", "GET"])
@@ -284,7 +287,7 @@ def register():
     db.session.commit()
     g.ctx.session.set("uid", u.id)
     flash("Welcome to Kestrel.", "ok")
-    return redirect(url_for("pages.account"))
+    return after_action("register", redirect(url_for("pages.account")), user=u)
 
 
 @bp.route("/account")

@@ -27,7 +27,7 @@ Ground-truth labels: shoppers are `human:<persona>:<n>`; the eight are `legit:<n
 scoreboard keeps out of both "people hurt" and "bots stopped"; the checkpoint reports them in their
 own table. A 429 is a budget ("limited": the cost of an unverified identity), a 403 a refusal.
 
-This module swaps population.personas() for the chapter's cohort and registers the `lane_mix`
+This module provides the chapter cohort (checkpoint.py passes it as Round(people=personas)) and registers the `lane_mix`
 scenario; checkpoint.py imports it, so every round runs these clients.
 """
 
@@ -98,5 +98,4 @@ def scenario_lane_mix(p, client, rng):
     return population.scenario_browse(p, client, rng)
 
 
-population.personas = personas
 population.SCENARIOS["lane_mix"] = scenario_lane_mix

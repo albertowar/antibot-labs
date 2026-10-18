@@ -1,6 +1,6 @@
 # W4 Ch4 lab: AI Agents & Agentic Browsers
 
-Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: an agent-aware drop on the Kestrel Outfitters store (`demo_site/ext/agents.py`: a step-up challenge, account mandates, an `/agent-policy` document, a Markdown catalogue for declared agents), four defense modules you finish, W4 Ch2's Web Bot Auth verifier, two agent operators and their key directories, a small observe-decide-act browser agent that drives a real Chromium, six agent scripts, and the people and welcome agents a defense must not hurt.
+Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: an agent-aware drop on the Kestrel Outfitters store (`demo_site/ext/agents.py`: a step-up challenge, account mandates, an `/agent-policy` document, a Markdown catalogue for declared agents), four defense modules you finish, W4 Ch2's Web Bot Auth verifier, two agent operators and their key directories, a small observe-decide-act browser agent that drives a real Chromium, six agent scripts, and the people and welcome agents a defense must not hurt.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -75,7 +75,7 @@ HEADLESS=1 python tools/checkpoint.py --round 1   # terminal 2: both sides, one 
 
 `PORT` changes the store's port; export `DEMO_URL=http://127.0.0.1:<port>` for the tools to match. Defense modules reload on change (`LAB_RELOAD=1`), so a saved edit takes effect on the next request. The extension in `demo_site/ext/` does not reload, and `DEFENSE_LEVEL` only changes live through the checkpoint (`POST /lab/level`), which sets the level for the round. No restart is needed between rounds.
 
-`python tools/verify.py --round N` runs the same checkpoint with the store in-process on a free port, which is how the expected results below were produced. With no `DISPLAY` the agents run headless on their own; `HEADLESS=1` forces it anywhere and `HEADLESS=0` shows the browser.
+`python tools/verify.py --round N` runs the same checkpoint with the store in-process on a free port, which is how the expected results below were produced. With no `DISPLAY` the agents run headless on their own; `HEADLESS=1` forces it anywhere and `HEADLESS=0` shows the browser. The expected results below are headless, so on a machine with a display (macOS, Windows, a Linux desktop, WSLg) compare with `HEADLESS=1`: headful agents buy exactly the same, but the W2 shadow column scores them 120 points lower.
 
 **Fell behind?** `python tools/checkpoint.py --round N --catch-up` installs the reference modules for rounds 1..N over yours (each of yours is kept once as `.bak`). `python tools/checkpoint.py --restore` puts yours back.
 
@@ -113,7 +113,7 @@ The gate's verdicts are fixed: `allow`, `monitor`, `challenge`, `block`, `rate_l
 
 - All four checks run in the `action:drop_buy` phase (`POST /drop/<sku>` and `POST /api/buy`) and return **signals** on the scale of `policy.py`: under 30 allow, 30-59 challenge, 60 and over block. `policy.DEFAULT_CHALLENGE` is `step_up`.
 - `step_up` is a registered **challenge type** (`demo_site/ext/agents.py`): a six-digit code goes to the account's lab mailbox, and the interstitial asks for it. One solve absorbs one challenge verdict (`uses=1`, the gate's downgrade rule), so the second press of Buy goes through. An agent with no inbox access stops there and hands the order back to its user.
-- A **refusal is a pre-write verdict**, not a post-write hold. The brief for this migration pointed at `hooks.on_action` for holding an order; that hook fires after the order is committed, the stock is decremented and the scoreboard has counted a purchase, so it cannot refuse. Mandate and device-cap failures are `block` verdicts from `checkout_gate`; `hooks.on_action("drop_buy", ...)` only **attributes** (`order.extra` gets `placed_by`, `operator` and the mandate id), spends the mandate and counts the unit against the device.
+- A **refusal is a pre-write verdict**, not a post-write hold. The brief for this migration pointed at `hooks.on_action` for holding an order; that hook fires after the order is committed, the stock is decremented and the order is `paid` (so the scoreboard counts a purchase unless a handler holds it, which this lab does not), so it cannot refuse. Mandate and device-cap failures are `block` verdicts from `checkout_gate`; `hooks.on_action("drop_buy", ...)` only **attributes** (`order.extra` gets `placed_by`, `operator` and the mandate id), spends the mandate and counts the unit against the device.
 - Who the principal is (`human`, `declared_agent`, `verified_agent`) and the identity record are computed once per request by `defenses/principal.py` and cached in `ctx.attrs`, because the shared verifier spends the signature's nonce: verifying twice would call a genuine request a replay. Identity is only consulted from level 3 up.
 - A mandate is a Redis record (`lab:mandate:<id>`), granted through `POST /api/account/mandates` from the account holder's **own** session; an agent session cannot grant one. The agent presents it in the drop form's `mandate` field or an `X-Agent-Mandate` header.
 
@@ -129,7 +129,19 @@ The gate's verdicts are fixed: `allow`, `monitor`, `challenge`, `block`, `rate_l
 
 ## Expected results (self-check)
 
-Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) and one `--round N --level N-1 --catch-up` run per round for the "before" column, on 2026-10-15 on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, Playwright 1.63.0 (its bundled headless Chromium), SQLite and the in-process Redis. Every round passed with the reference modules installed; the shoppers hurt were 0 of 45 in every round, and every `--level` run also passed. `--level` runs report numbers but do not judge. An agent "buys" when its session ends on the order-confirmed page. The agents are deterministic except for the humanized one's cursor jitter, so its wall time varies by seconds; the counts were identical in the separate per-round runs and in the `--all` run.
+The table between the `results:` markers is generated by `python tools/verify.py --write-readme --catch-up` (against your own store: `python tools/checkpoint.py --all --markdown`); the tables below it are its reading, from the same run's output and one `--round N --level N-1 --catch-up` run per round for the "before" column. Run on 2026-10-18 on contract 1.7 (the 1.7 starter files, the Round API's `people=` for the cohort) on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, Playwright 1.63.0 (its bundled Chromium, forced headless with `HEADLESS=1`), SQLite and the in-process Redis. Every round passed with the reference modules installed; the shoppers hurt were 0 of 45 in every round, and every `--level` run also ran (they report numbers but do not judge). An agent "buys" when its session ends on the order-confirmed page. Every count and every W2 shadow figure is identical to the 2026-10-15 run on contract 1.6; only the gate timings moved (they include Chromium running beside the shoppers, so they follow the machine's load). The agents are deterministic except for the humanized one's cursor jitter.
+
+<!-- results:start -->
+| Round | Attack | Before (level N-1) | After (level N) | Shoppers stopped after |
+|---|---|---|---|---|
+| 1 | `undeclared` | 4/4 | 4/4 | none |
+|  | `honest` | 4/4 | 0/4 |  |
+| 2 | `undeclared` | 4/4 | 0/4 | none |
+|  | `humanized` | 4/4 | 4/4 |  |
+| 3 | `forged` | 0/6 | 0/6 | none |
+|  | `verified` | 0/4 | 4/4 |  |
+| 4 | `fleet` | 6/6 | 2/6 | none |
+<!-- results:end -->
 
 ### Before and after
 
@@ -145,12 +157,12 @@ Generated from `python tools/verify.py --all --catch-up --markdown` (against you
 
 | Round | Welcome agents (`legit:agent_user`, signed, with a mandate) | People who met the step-up and answered it | Median / p95 gate time of a shopper's purchase | W2 stack in shadow, median points at the purchase |
 |---|---|---|---|---|
-| 1 | 0 / 2 bought (declared, so refused) | 0 / 45 | 8.5 / 18.4 ms | agents 205, welcome agents 65, people 0 |
-| 2 | 0 / 2 | 1 / 45 (the RPA macro) | 9.6 / 19.3 ms | agents 182, welcome agents 65, people 0 |
-| 3 | **2 / 2** (verified: no behavior score) | 1 / 45 (the RPA macro) | 9.4 / 17.5 ms | agents 205, welcome agents 65, people 0 |
-| 4 | **2 / 2** (verified and mandated) | 2 / 45 (the RPA macro, the first-timer's brand-new account) | 11.0 / 22.7 ms | agents 160, welcome agents 65, people 0 |
+| 1 | 0 / 2 bought (declared, so refused) | 0 / 45 | 4.7 / 20.0 ms | agents 205, welcome agents 65, people 0 |
+| 2 | 0 / 2 | 1 / 45 (the RPA macro) | 6.7 / 15.0 ms | agents 182, welcome agents 65, people 0 |
+| 3 | **2 / 2** (verified: no behavior score) | 1 / 45 (the RPA macro) | 5.2 / 20.7 ms | agents 205, welcome agents 65, people 0 |
+| 4 | **2 / 2** (verified and mandated) | 2 / 45 (the RPA macro, the first-timer's brand-new account) | 7.0 / 16.3 ms | agents 160, welcome agents 65, people 0 |
 
-The W2 line needs care. It is what the older layers would have said, never what they decided, and it is **not** a measurement of real agents: here the agents are Playwright's headless Chromium, which the W2 stack was built to flag (software GL, no window chrome, no pointer path). A real agentic browser drives the person's own headful Chrome and would not look like this. The agents were not run headful: the machine behind these numbers has no display.
+The W2 line needs care. It is what the older layers would have said, never what they decided, and it is **not** a measurement of real agents: here the agents are Playwright's headless Chromium, which the W2 stack was built to flag (software GL, no window chrome, no pointer path). A real agentic browser drives the person's own headful Chrome and would not look like this. The table is a headless run (`HEADLESS=1`; `attacks/_common.headless()` otherwise goes headful whenever `DISPLAY` is set). The same rounds run headful on this machine (WSLg provides a display) score the agents **exactly 120 points lower** (85, 62, 85 and 40) with every count unchanged: no `HeadlessChrome` in the User-Agent (60), a real window frame (30) and a hardware WebGL renderer (30). That is the measurement the W2 line hints at: much of the older stack's case against an agent is that it runs headless, and an agentic browser does not.
 
 Five things the table says out loud:
 
@@ -178,7 +190,7 @@ Five things the table says out loud:
 | human:voice_control | 7 | 7 | 1 | 0 | 0.0 | 4.75 |
 
 
-Bots stopped: **0/36** requests · shoppers hurt: **0/45** people (0/313 requests stopped, including challenges they then solved) · purchases: {'bot': 4, 'human': 45} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
+Bots stopped: **0/36** requests · shoppers hurt: **0/45** people (0/313 requests stopped, including challenges they then solved) · legit automation hurt: **6/8** · purchases: {'bot': 4, 'human': 45} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
 
 #### Round 2: robotic sessions get the step-up (`DEFENSE_LEVEL` 2)
 
@@ -199,7 +211,7 @@ Bots stopped: **0/36** requests · shoppers hurt: **0/45** people (0/313 request
 | human:voice_control | 7 | 7 | 1 | 0 | 0.0 | 4.88 |
 
 
-Bots stopped: **4/72** requests · shoppers hurt: **0/45** people (1/315 requests stopped, including challenges they then solved) · purchases: {'bot': 4, 'human': 45} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
+Bots stopped: **4/72** requests · shoppers hurt: **0/45** people (1/315 requests stopped, including challenges they then solved) · legit automation hurt: **2/4** · purchases: {'bot': 4, 'human': 45} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
 
 #### Round 3: verified identity (`DEFENSE_LEVEL` 3)
 
@@ -219,7 +231,7 @@ Bots stopped: **4/72** requests · shoppers hurt: **0/45** people (1/315 request
 | human:voice_control | 7 | 7 | 1 | 0 | 0.0 | 5.63 |
 
 
-Bots stopped: **6/54** requests · shoppers hurt: **0/45** people (1/315 requests stopped, including challenges they then solved) · purchases: {'human': 45, 'legit': 6} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 44}
+Bots stopped: **6/54** requests · shoppers hurt: **0/45** people (1/315 requests stopped, including challenges they then solved) · legit automation hurt: **0/8** · purchases: {'human': 45, 'legit': 6} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 44}
 
 #### Round 4: the checkout gate (`DEFENSE_LEVEL` 4)
 
@@ -239,9 +251,9 @@ Bots stopped: **6/54** requests · shoppers hurt: **0/45** people (1/315 request
 | human:voice_control | 7 | 7 | 1 | 0 | 0.0 | 6.26 |
 
 
-Bots stopped: **6/68** requests · shoppers hurt: **0/45** people (2/317 requests stopped, including challenges they then solved) · purchases: {'bot': 2, 'human': 45, 'legit': 2} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
+Bots stopped: **6/68** requests · shoppers hurt: **0/45** people (2/317 requests stopped, including challenges they then solved) · legit automation hurt: **0/4** · purchases: {'bot': 2, 'human': 45, 'legit': 2} · drop stock left: {'lab-hoodie-1': 5, 'lab-runner-9': 46}
 
-The rows `legit:honest_agent`, `legit:verified_agent`, `legit:agent_user` and `legit:agent_owner` (the welcome agents and the people who grant their mandates) are not in these tables: the scoreboard lists humans and bots, and the checkpoint reports the others from their responses. Shoppers are the starter's 40 (`home` 24, `mobile_cgnat` 8, `consumer_vpn` 3, `private_relay` 2, `old_chrome`, `autofill`, `no_js`) plus two screen-reader users, a voice-control user, an RPA macro and a first-timer who registers during the drop; the hoodie (50 units) is theirs, the Lab Runner 9 is the agents'.
+The rows `legit:honest_agent`, `legit:verified_agent`, `legit:agent_user` and `legit:agent_owner` (the welcome agents and the people who grant their mandates) are not in the per-attack tables. Since contract 1.7 the scoreboard lists them as the `legit` kind and reports them in the "legit automation hurt" figure above: a stopped welcome agent is a false positive, and the checkpoint fails a round that stops more than its `legit_hurt_max` (R1: 6, the honest agent's four runs and the two agent users, all declared and refused by design; R2: 2, the agent users, still declared until Round 3; R3 and R4: 0). The checkpoint also reports the cohort from their responses. Shoppers are the starter's 40 (`home` 24, `mobile_cgnat` 8, `consumer_vpn` 3, `private_relay` 2, `old_chrome`, `autofill`, `no_js`) plus two screen-reader users, a voice-control user, an RPA macro and a first-timer who registers during the drop; the hoodie (50 units) is theirs, the Lab Runner 9 is the agents'.
 
 ## Docker (optional)
 
@@ -255,6 +267,8 @@ docker compose -p w4ch4 down -v
 ```
 
 Redis is `redis:8.10.2-alpine`, PostgreSQL `postgres:18.6-alpine` (volume at `/var/lib/postgresql`), both bound to `127.0.0.1`. Mandates, the step-up codes, nonces and device counters are Redis keys under `lab:`, so a reset clears them on either backend.
+
+**What ran on this path (2026-10-18, contract 1.7):** Redis 8.10.2 and PostgreSQL 18.6 from `docker-compose.yml` (project `w4ch4`), with `HEADLESS=1`, `python tools/verify.py --smoke`, then `--round 1 --catch-up` and `--round 4 --catch-up`: both pass with the same counts as the tables above (Round 1: 0 of 2 welcome agents bought, `honest` 0/4; Round 4: 2 of 2 welcome agents bought, `fleet` 2/6, 2 of 45 people met the step-up; 0 of 45 shoppers hurt; W2 shadow medians agents 205 and 160, welcome agents 65, people 0). The gate time of a shopper's purchase rises to a median of 13.9 ms (p95 27.5) in Round 1 and 23.0 ms (p95 44.3) in Round 4 because the mandates, nonces, step-up codes and device counters are Redis round trips. Rounds 2 and 3 were not run on Docker.
 
 ## What this does not teach
 

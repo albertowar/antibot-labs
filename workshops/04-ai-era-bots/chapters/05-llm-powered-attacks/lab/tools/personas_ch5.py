@@ -135,6 +135,5 @@ def scenario_catalog(p, client, rng):
     return _done(p, client, "browsed", r)
 
 
-population.personas = personas
 population.SCENARIOS.update({"review_r1": _review("round1"), "review_r4": _review("round4"),
                              "register": scenario_register, "catalog": scenario_catalog})

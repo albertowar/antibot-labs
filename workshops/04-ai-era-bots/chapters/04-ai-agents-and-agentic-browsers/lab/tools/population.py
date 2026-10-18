@@ -85,6 +85,11 @@ def personas(seed=SEED, n=None):
 # solving an interstitial) that the scenario continues with.
 PAGE_HOOKS = []
 
+# The same, after each form POST: a challenge interstitial on a POST (a checkout step-up)
+# can only be solved here. The hook typically solves the challenge and resubmits the form
+# (the interstitial's #challenge-replay fields), returning the final response.
+POST_HOOKS = []
+
 
 def load_chapter_personas():
     """Import every tools/personas_*.py so its PAGE_HOOKS / SCENARIOS register (idempotent)."""
@@ -106,7 +111,12 @@ def _visit(p, client, path, kind, referer=None):
 
 
 def _post(p, client, path, data, referer, ip=None):
-    return client.post(path, data, browsers.headers_for(p.browser, "post", BASE_URL, referer), ip=ip, allow_redirects=False)
+    r = client.post(path, data, browsers.headers_for(p.browser, "post", BASE_URL, referer), ip=ip, allow_redirects=False)
+    for hook in POST_HOOKS:
+        out = hook(p, client, r)
+        if out is not None:
+            r = out
+    return r
 
 
 def _stop(p, client, outcome, r=None):

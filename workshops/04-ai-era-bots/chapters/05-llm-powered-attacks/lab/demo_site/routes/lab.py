@@ -51,7 +51,10 @@ def status():
                    ladder={str(k): [c.name for c in v] for k, v in sorted(ladder.items())},
                    extensions=current_app.extensions.get("lab_ext", []), challenges=hooks.challenges.names(),
                    telemetry_kinds=hooks.telemetry.kinds(), slots={k: len(v) for k, v in hooks.SLOTS.items()},
-                   products=Product.query.count(), users=User.query.count(), decisions=Decision.query.count(),
+                   ungated=[p for p, m in hooks.UNGATED if m == "skip"],
+                   products=Product.query.count(),
+                   visible_products=Product.query.filter_by(hidden=False).count(),
+                   users=User.query.count(), decisions=Decision.query.count(),
                    orders_this_lab=Order.query.filter(Order.session_id.isnot(None)).count(),
                    drops={p.sku: p.stock for p in Product.query.filter_by(is_drop=True)})
 
@@ -87,7 +90,7 @@ def scoreboard_data(since=None):
         final[d.actor or "you"] = d.outcome
         actor = d.actor or "you"
         kind = actor.split(":")[0]
-        group = actor.rsplit(":", 1)[0] if kind in ("human", "bot") and actor.count(":") >= 2 else actor
+        group = actor.rsplit(":", 1)[0] if kind in ("human", "bot", "legit") and actor.count(":") >= 2 else actor
         row = board.setdefault(group, {"actor": group, "kind": kind, "requests": 0, "served": 0, "purchased": 0,
                                        "blocked": 0, "challenged": 0, "rate_limited": 0, "deceived": 0, "other": 0,
                                        "score_sum": 0, "ms_sum": 0.0})
@@ -101,10 +104,12 @@ def scoreboard_data(since=None):
     for row in board.values():
         row["avg_score"] = round(row["score_sum"] / row["requests"], 1)
         row["avg_ms"] = round(row["ms_sum"] / row["requests"], 2)
-        row["stopped"] = row["blocked"] + row["challenged"] + row["rate_limited"] + row["deceived"]
+        # hooks.stopped_outcome() lets a chapter count its own outcomes (paywalled, mazed) here
+        row["stopped"] = sum(row.get(oc, 0) for oc in hooks.STOPPED_OUTCOMES)
     # An individual is hurt if the LAST thing that happened to them was a stop and they bought nothing.
     # A shopper who met a challenge, solved it and carried on is not hurt (that is the challenge working).
-    oq = Order.query.filter(Order.session_id.isnot(None))
+    # Only paid orders count: a held order (status="pending") is neither a purchase nor a stop yet.
+    oq = Order.query.filter(Order.session_id.isnot(None), Order.status == "paid")
     if since:
         oq = oq.filter(Order.created_at >= since)
     purchases, buyers = {}, set()
@@ -112,23 +117,31 @@ def scoreboard_data(since=None):
         actor = o.actor or "you"
         purchases[actor.split(":")[0]] = purchases.get(actor.split(":")[0], 0) + sum(i.qty for i in o.items)
         buyers.add(actor)
-    stopped = {"blocked", "challenged", "rate_limited", "deceived"}
     for actor, outcome in final.items():
         kind = actor.split(":")[0]
-        group = actor.rsplit(":", 1)[0] if kind in ("human", "bot") and actor.count(":") >= 2 else actor
+        group = actor.rsplit(":", 1)[0] if kind in ("human", "bot", "legit") and actor.count(":") >= 2 else actor
         row = board[group]
         row["individuals"] = row.get("individuals", 0) + 1
-        row["individuals_hurt"] = row.get("individuals_hurt", 0) + int(outcome in stopped and actor not in buyers)
+        row["individuals_hurt"] = row.get("individuals_hurt", 0) + int(outcome in hooks.STOPPED_OUTCOMES and actor not in buyers)
     humans = [r for r in board.values() if r["kind"] == "human"]
     bots = [r for r in board.values() if r["kind"] == "bot"]
-    return {"actors": sorted(board.values(), key=lambda r: (r["kind"], r["actor"])),
-            "summary": {"humans_hurt": sum(r.get("individuals_hurt", 0) for r in humans),
-                        "humans": sum(r.get("individuals", 0) for r in humans),
-                        "human_requests_stopped": sum(r["stopped"] for r in humans),
-                        "human_requests": sum(r["requests"] for r in humans),
-                        "bots_stopped": sum(r["stopped"] for r in bots), "bot_requests": sum(r["requests"] for r in bots),
-                        "bot_served": sum(r["served"] + r["purchased"] for r in bots), "purchases": purchases,
-                        "drops": {p.sku: p.stock for p in Product.query.filter_by(is_drop=True)}}}
+    summary = {"humans_hurt": sum(r.get("individuals_hurt", 0) for r in humans),
+               "humans": sum(r.get("individuals", 0) for r in humans),
+               "human_requests_stopped": sum(r["stopped"] for r in humans),
+               "human_requests": sum(r["requests"] for r in humans),
+               "bots_stopped": sum(r["stopped"] for r in bots), "bot_requests": sum(r["requests"] for r in bots),
+               "bot_served": sum(r["served"] + r["purchased"] for r in bots), "purchases": purchases,
+               "drops": {p.sku: p.stock for p in Product.query.filter_by(is_drop=True)}}
+    # Welcome automation (verified crawlers, uptime monitors) labels itself legit:<name>:<nn>.
+    # A stopped crawler is a false positive, not a bot stopped, so it gets its own columns —
+    # added only when such actors exist, so every two-kind scoreboard is unchanged.
+    legit = [r for r in board.values() if r["kind"] == "legit"]
+    if legit:
+        summary.update(legit=sum(r.get("individuals", 0) for r in legit),
+                       legit_hurt=sum(r.get("individuals_hurt", 0) for r in legit),
+                       legit_requests=sum(r["requests"] for r in legit),
+                       legit_requests_stopped=sum(r["stopped"] for r in legit))
+    return {"actors": sorted(board.values(), key=lambda r: (r["kind"], r["actor"])), "summary": summary}
 
 
 @bp.route("/lab/scoreboard")

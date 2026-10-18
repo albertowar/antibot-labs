@@ -125,9 +125,17 @@ class Ctx:
     redis: object
     phase: str = "request"
     level: int = 0
+    route: str = ""             # the matched Flask endpoint ("pages.product"), "" if none matched
+    view_args: dict = field(default_factory=dict)   # the route's URL arguments ({"sku": "p001"})
+    query_string: str = ""      # the raw query string exactly as sent (args is the parsed dict)
+    scheme: str = "http"
+    resumed: bool = False       # a valid clearance exists for a registered challenge type: this
+                                # request is likely the retry after a solve, so per-attempt
+                                # counters (velocity, failures) should not count it twice
     attrs: dict = field(default_factory=dict)   # enrichers write here; checks read
     notes: dict = field(default_factory=dict)   # goes to the decision log's `extra`
     _telemetry: object = None
+    _clearance: object = None
 
     def header(self, name, default=None):
         lname = name.lower()
@@ -154,6 +162,11 @@ class Ctx:
         """Take one token from a named bucket (policy.RATE_LIMITS). True if allowed."""
         from . import store
         return store.token_bucket(self.redis, name, key)
+
+    def cleared(self, ctype=None):
+        """True if the session holds a live clearance for `ctype` (any registered type when
+        None). Live, unlike `resumed`, which is a snapshot taken before the checks ran."""
+        return bool(self._clearance and self._clearance(ctype))
 
     def note(self, **extra):
         self.notes.update(extra)

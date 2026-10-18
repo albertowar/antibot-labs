@@ -45,7 +45,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-import personas_ch3  # noqa: E402  (swaps in the chapter's cohort and the `crawl_gov` scenario)
+import personas_ch3  # noqa: E402  (the chapter's cohort and the `crawl_gov` scenario)
 import scoreboard as sb  # noqa: E402
 from checkpoint_core import Round, main  # noqa: E402
 import labclient  # noqa: E402
@@ -303,7 +303,7 @@ def paying_unchanged(board, results, attacks):
 
 
 def rnd(level, description, attacks, expect, solutions, checks, legit=legit_unharmed, **kw):
-    return Round(level=level, description=description, scenario="crawl_gov",
+    return Round(level=level, description=description, scenario="crawl_gov", people=personas_ch3.personas,
                  attacks={n: ATTACKS[n] for n in attacks}, expect=expect, solutions=solutions,
                  extra_checks=[*checks, legit, gate_cost], **kw)
 
