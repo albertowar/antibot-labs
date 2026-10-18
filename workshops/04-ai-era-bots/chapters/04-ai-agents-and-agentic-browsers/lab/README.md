@@ -46,7 +46,7 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: an agent-
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** four rounds of defend 🔵 and attack 🔴. **Style: wire-it.** The four defense modules ship as stubs with `TODO (Round N)` markers and are wired into `defenses/ladder.py` already; an unfinished one is inert, so Round N's checkpoint fails until you finish it. Full versions are in `solutions/round1..4/`, and `--catch-up` installs rounds 1..N over your files (your own are kept as `.bak`; `--restore` puts them back). The chapter's content doc and deck are not written yet (`TODO.md`).
+**Format:** four rounds of defend 🔵 and attack 🔴. **Style: wire-it.** The four defense modules ship as stubs with `TODO (Round N)` markers and are wired into `defenses/ladder.py` already; an unfinished one is inert, so Round N's checkpoint fails until you finish it. Full versions are in `solutions/round1..4/`, and `--catch-up` installs rounds 1..N over your files (your own are kept as `.bak`; `--restore` puts them back). The chapter's content doc and deck are `../chapter_04_content.md` and `../slides.md`.
 
 Shoppers now arrive through AI agents as well as browsers. Some are honest and declared, some hide, some forge an identity, and one runs a fleet. The store sells one limited drop, the Lab Runner 9 (`/drop/lab-runner-9`, one unit per account), and every agent in this lab tries to buy it in a real Chromium. Each round adds the layer that sorts them, and the checkpoint measures what it stops **and** what happens to the 45 people and the two legitimate agents who run beside it.
 

@@ -36,7 +36,7 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: the crawl
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 5 checkpoints in 4 rounds of defend 🔵 and attack 🔴 (Round 4 holds checkpoints 4 and 5), plus two debriefs. **Style: wire-it.** Three defense modules ship as stubs with `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `python tools/checkpoint.py --round N --catch-up` installs rounds 1..N and `--restore` puts your files back. See `../chapter_02_content.md`, §2.5.
+**Format:** 5 rounds of defend 🔵 and attack 🔴 (one checkpoint each, `--round 1` to `--round 5`), plus two debriefs. **Style: wire-it.** Three defense modules ship as stubs with `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `python tools/checkpoint.py --round N --catch-up` installs rounds 1..N and `--restore` puts your files back. See `../chapter_02_content.md`, §2.5.
 
 You run a store that wants search engines and AI crawlers to index it, and that gives verified crawlers a *fast lane*: 600 requests a minute instead of the 30 every anonymous client gets. Scrapers want that lane. In every round you play the scraper that takes it, then the defender who closes the door, and you measure both what the impostor got and which genuine crawlers your new check wrongly throttled.
 
@@ -183,15 +183,15 @@ Google's user-triggered fetchers run partly on App Engine. Their reverse DNS is 
 
 The agent signs each request (RFC 9421, Ed25519) and points `Signature-Agent` at the origin that publishes its keys. Level 4 verifies the signature. Level 5 decides what a valid signature is worth. The three headers are plain request headers (not `X-Lab-*`), so they reach the check in `ctx.headers`; the signature base is built from `@authority` (`ctx.host`), `@path` and the **raw query string**. `ctx.args` is a parsed dict, so `demo_site/ext/identity.py` exposes `request.query_string` through an enricher as `ctx.attrs["raw_query"]`: the recon gap a verifier hits the first time a signed URL has `%20` or a repeated key in it. The genuine ChatGPT agent in the cohort signs `@query` and sends `tag=a%20b%2Bc` on purpose, so a verifier that rebuilds the query from `ctx.args` rejects it.
 
-**Checkpoint 4: verify.**
-
 | Step | Do | Expected |
 |---|---|---|
 | 🔵 Look | `python -m defenses.httpsig` | the signature base, line by line, in both `Signature-Agent` wire forms; tamper → `False` |
 | 🔵 Defend | Implement `verify()` in `defenses/web_bot_auth.py` (the docstring lists the six steps; `key_directory.fetch_directory()` and `message_context()` are given). Level 4 | – |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 4` | crawlers **8/8** · shoppers hurt 0 · 2 directory fetches · `self_signed 120/120 in the verified lane (expected: it works at this level)` |
 
-**Checkpoint 5: the attacks that beat verification, and the policy that stops them.**
+## Round 5: self-signed agent + replay ⚔️ trust policy
+
+The attacks that beat verification, and the policy that stops them. (The attack scripts keep their `round4_*` filenames: both attack the level-4 verifier.)
 
 | Step | Do | Expected |
 |---|---|---|
@@ -203,7 +203,7 @@ The agent signs each request (RFC 9421, Ed25519) and points `Signature-Agent` at
 
 **Discuss:** the attacker's signature in (a) was cryptographically perfect. Which line of the draft did your level-4 verifier violate? ("A verifier MUST NOT attribute a request to a Signature-Agent URL unless it made this association.") In (b) one replay still went through: why can no verifier distinguish the first replay from the original, and what could the *signer* cover to shrink the blast radius?
 
-**The shared verifier.** `defenses/httpsig.py`, `defenses/key_directory.py` and the finished `solutions/round5/defenses/web_bot_auth.py` are the series' Web Bot Auth verifier: W4 Ch3, Ch4 and Ch9 copy them byte for byte (`shared.json` lists them, and `python scripts/lab_diff.py <lab> --shared` confirms a copy still matches). The chapter-specific numbers are in `defenses/policy.py` (`TRUSTED_AGENTS`, `SIGNATURE_MAX_WINDOW_S`), which the verifier reads, so the module itself never changes.
+**The shared verifier.** `defenses/httpsig.py`, `defenses/key_directory.py` and the finished `solutions/round5/defenses/web_bot_auth.py` are the series' Web Bot Auth verifier: Chapters 3, 4 and 9 copy them byte for byte (`shared.json` lists them, and `python scripts/lab_diff.py <lab> --shared` confirms a copy still matches). The chapter-specific numbers are in `defenses/policy.py` (`TRUSTED_AGENTS`, `SIGNATURE_MAX_WINDOW_S`), which the verifier reads, so the module itself never changes.
 
 ## Wrap-up: the scoreboard
 

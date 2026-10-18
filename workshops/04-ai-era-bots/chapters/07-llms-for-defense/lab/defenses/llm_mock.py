@@ -7,7 +7,7 @@ JSON block if there is one, from "Key: value" lines otherwise), scores the
 session with a few signals, and writes a verdict in the required schema.
 
 What makes it useful is how it misbehaves. Real models follow instructions
-hidden in data they were asked to analyze. The July 2026 LogInject study
+hidden in data they were asked to analyze. The July 2026 LogInject study (arXiv:2607.14493)
 measured that on production models: ~85% success for a payload in one log
 field, ~76% when the payload was split across entries ("context
 stitching"), and ~8% residual after layered defenses. The mock reproduces

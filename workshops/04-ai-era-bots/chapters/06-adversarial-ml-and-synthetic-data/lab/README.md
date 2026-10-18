@@ -1,4 +1,4 @@
-# 06-adversarial-ml-and-synthetic-data: lab
+# W4 Ch6 Lab: Adversarial ML & Synthetic Data
 
 Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: see the block below.
 
@@ -62,6 +62,11 @@ python demo_site/app.py
 
 | Round | Defense (level) | Attack | Expected |
 |---|---|---|---|
+| 0 | None, log only (level 0): the bare store, labels audited (`tools/audit.py`) | `attacks/round0_baseline.py`: naive and headless scalpers | baseline 90–100% succeed; 0 wrong weak labels covering 20–85% of bots; 0 customers refused |
+| 1 | `defenses/oracle_guard.py`: per-address query budget in front of model v2 (level 1) | `attacks/round1_extract.py`: cheap extractor, then `--patient` (rotating exits) | baseline ≤10%; cheap clone finds ≤50% of the allowed region, patient clone ≥90%; ≤6 of 200 customers refused |
+| 2 | `defenses/robust_train.py`: adversarial training plus monotone constraints, model v3 (level 2) | `attacks/round2_evade.py`: evasion crafted from the cloned surrogate | baseline ≤10%, evade ≤20%; ≤10 of 200 customers refused |
+| 3 | `defenses/provenance.py`: sanitized training set, model v4 (level 3) | `attacks/round3_poison.py`: honeypot-label availability poison aimed at privacy-browser users | baseline ≤10%, evade ≤20%; privacy-browser customers refused ≤15%; ≤10 of 200 refused. **Currently fails the evade budget from a fresh environment (see Known issue below)** |
+| 4 | `defenses/augment.py`: SMOTE for the rare class, model v5 (level 4) | `attacks/round4_rareclass.py`: the slow mobile reseller | baseline ≤10%, evade ≤20%, reseller ≤25%; privacy-browser ≤15%; ≤12 of 200 refused. **Currently fails the reseller budget from a fresh environment (see Known issue below)** |
 
 ## Expected results (self-check)
 

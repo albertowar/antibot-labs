@@ -118,6 +118,8 @@ Checkpoints run everything for you on a free port: `python tools/verify.py --rou
 | 2 | 1 | `attacks/round2_stitched.py --mode both`: context stitching, plus the no-payload bait | `defenses/sanitize.py` + the hardened prompt in `defenses/triage.py` | injection success ≤ 50%; 0 human FPs; the bait gets flagged — its trap springs in Round 3 |
 | 3 | 2 | `attacks/round3_token_flood.py --n 400`, then the ops loop | `defenses/cluster.py` + `defenses/rule_gate.py` | the flood collapses to a handful of model calls; the gate REJECTS the bait's identity rule; the approved rules block the live wave and ≤ 6 of 400 shoppers |
 
+Rounds 1–2 are the mirror image of Chapter 5's Round 4: there the attacker injected instructions through customer reviews your LLM summarised, and `llm_guard.py` spotlighted the data channel; here the instructions arrive through log fields your LLM triages, and `sanitize.py` plus the hardened prompt do the same job on this side.
+
 **The Round 3 ops loop, by hand** (the checkpoint runs the same steps):
 
 ```bash

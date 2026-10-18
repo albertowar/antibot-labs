@@ -10,7 +10,7 @@ the session: the User-Agent and/or the Referer.
 
 The scraper does not evade detection. It asks the detector to misclassify it,
 and on an LLM that reads the field as part of a prompt, that often works
-(OWASP LLM01; LogInject 2026 measured ~85% for a single field). The
+(OWASP LLM01; LogInject 2026, arXiv:2607.14493, measured ~85% for a single field). The
 heuristic, which reads no sentences, is unmoved — that contrast is the whole
 point of Round 1.
 
