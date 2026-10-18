@@ -1,4 +1,4 @@
-# W3 Ch9 Lab: Build & Break a Production-Grade Defense
+# W3 Ch10 Lab: Build & Break a Production-Grade Defense
 
 Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Workshop 2 layers as levels 1 to 4 (finished modules copied byte for byte from the W2 chapters, see `shared.json`), the three Workshop 3 layers (API hardening, streaming, supply chain), the `api9`, `stream9`, `supply9` and `metrics9` extensions, `ladder.py`/`policy.py`, six attack scripts, the API clients, a signal-health tool and an incident-report template.
 
@@ -94,7 +94,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Workshop
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** pre-written (level style), five rounds (0 to 4), with one small `TODO (Round N)` exercise in each of Rounds 1 to 3. See `../chapter_09_content.md`, section 9.7.
+**Format:** pre-written (level style), five rounds (0 to 4), with one small `TODO (Round N)` exercise in each of Rounds 1 to 3. See `../chapter_10_content.md`, section 10.7.
 
 The store drops 50 pairs of the **Lab Runner 9**, one per account. You are the defender and the attacker, round by round: each round the attacker reaches for the next technique, you turn on the next layer and measure what it catches **and who it hurts**. Forty-three simulated people (the 40 shoppers of the W2 capstone, plus a mobile app, a second phone and a partner integration) use the store in the same minute as every attack, and every round prints both columns.
 

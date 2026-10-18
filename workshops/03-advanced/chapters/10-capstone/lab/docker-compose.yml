@@ -19,7 +19,7 @@
 # the store on another PORT.
 #
 #   docker compose --profile prod down -v            # stop and wipe all lab data
-name: w3-ch09-capstone
+name: w3-ch10-capstone
 
 services:
   redis:
