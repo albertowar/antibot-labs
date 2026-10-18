@@ -10,7 +10,7 @@ Source addresses are rented from ``data/world.json`` (RFC 5737 documentation ran
 in ``X-Lab-Client-IP``, which the store's edge honours only from loopback and only inside a
 pool: an attacker may rent a different address, never invent one. Operator crawlers are tenants
 of the same cloud pools as everyone else; what tells them apart is what they can prove
-(data/published_ranges/, data/rdns.json), not which pool they sit in.
+(tools/fixtures/ranges/, tools/fixtures/dns_zones.json), not which pool they sit in.
 
 The point of the lab is to train defenders against your own app, not to build a scraper.
 """

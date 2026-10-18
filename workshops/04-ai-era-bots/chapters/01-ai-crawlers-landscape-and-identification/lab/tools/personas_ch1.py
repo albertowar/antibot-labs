@@ -52,12 +52,13 @@ NON_BROWSER = [
     ("curl_dev",       "curl-dev",       ("home_fiber", 5),   UA["curl"],     ["/", "/product/p007", "/product/p008"]),
 ]
 # (persona, label, token, rented address). The operators' addresses sit in their published
-# snapshots (data/published_ranges/), except Googlebot's, which is just outside its stale one.
+# snapshots (tools/fixtures/ranges/), except Googlebot's, which is just outside its stale one
+# (198.51.100.108; its PTR is in tools/fixtures/dns_zones.json).
 CRAWLERS = [
-    ("verified_googlebot",     "googlebot",      "Googlebot",      ("cloud_gcp", 4)),
-    ("verified_oai_searchbot", "oai-searchbot",  "OAI-SearchBot",  ("cloud_vm", 41)),
-    ("verified_gptbot",        "gptbot",         "GPTBot",         ("cloud_vm", 49)),
-    ("verified_claudebot",     "claudebot",      "ClaudeBot",      ("cloud_gcp", 9)),
+    ("verified_googlebot",     "googlebot",      "Googlebot",      ("cloud_gcp", 11)),
+    ("verified_oai_searchbot", "oai-searchbot",  "OAI-SearchBot",  ("cloud_vm", 12)),
+    ("verified_gptbot",        "gptbot",         "GPTBot",         ("cloud_vm", 6)),
+    ("verified_claudebot",     "claudebot",      "ClaudeBot",      ("cloud_vm", 27)),
     ("localsearchbot",         "localsearchbot", "LocalSearchBot", ("hosting_asn", 5)),
 ]
 _STARTER_PERSONAS = population.personas

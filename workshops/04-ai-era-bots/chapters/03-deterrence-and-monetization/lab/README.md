@@ -1,12 +1,13 @@
 # W4 Ch3 lab: Deterrence & Monetization for AI Crawlers
 
-Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: a published crawl policy, enforcement on crawlers you can name, a poisoned maze and an HTTP 402 pay-per-crawl exchange with a ledger, all on the Kestrel Outfitters store (`demo_site/ext/deterrence.py`, four defense modules you finish, W4 Ch2's Web Bot Auth verifier, two crawler operators and their key directories, seven crawler scripts, and nine clients a crawler defense must not hurt).
+Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: a published crawl policy, enforcement on crawlers you can name, a poisoned maze, an HTTP 402 pay-per-crawl exchange with a ledger and a proof-of-work gate a client can earn a pass from, all on the Kestrel Outfitters store (`demo_site/ext/deterrence.py` and `demo_site/ext/pow.py`, five defense modules you finish, W4 Ch2's Web Bot Auth verifier, W1 Ch7's puzzle, two crawler operators and their key directories, nine crawler scripts, and nine clients a crawler defense must not hurt).
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
 
 - `defenses/babble.py`
 - `defenses/bot_identity.py`
+- `defenses/challenge_signed.py`
 - `defenses/crawl_policy.py`
 - `defenses/crawler_registry.py`
 - `defenses/enforce.py`
@@ -14,24 +15,31 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: a publish
 - `defenses/key_directory.py`
 - `defenses/maze.py`
 - `defenses/paywall.py`
+- `defenses/pow_challenge.py`
+- `defenses/pow_core.py`
+- `defenses/pow_gate.py`
 - `defenses/web_bot_auth.py`
 - `demo_site/ext/deterrence.py`
 - `demo_site/ext/identity.py`
+- `demo_site/ext/pow.py`
 - `demo_site/ext/templates/crawl/entry.html`
+- `demo_site/ext/templates/pow/interstitial.html`
 - `tools/make_keys.py`
 - `tools/mock_internet.py`
 - `tools/personas_ch3.py`
+- `tools/pow_client.py`
 
 **Edits** (student and tuning files):
 
 - `defenses/ladder.py`
 - `defenses/policy.py`
+- `demo_site/templates/challenge.html`
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** four rounds of defend 🔵 and attack 🔴, plus a bare-store Round 0. **Style: wire-it.** The four defense modules ship as stubs with `TODO (Round N)` markers and are wired into `defenses/ladder.py` already; an unfinished one is inert, so Round N's checkpoint fails until you finish it. Full versions are in `solutions/round1..4/`, and `--catch-up` installs rounds 1..N over your files (your own are kept as `.bak`; `--restore` puts them back). The chapter's content doc and deck are `../chapter_03_content.md` and `../slides.md`.
+**Format:** five rounds of defend 🔵 and attack 🔴, plus a bare-store Round 0. **Style: wire-it.** The five defense modules ship as stubs with `TODO (Round N)` markers and are wired into `defenses/ladder.py` already; an unfinished one is inert, so Round N's checkpoint fails until you finish it. Full versions are in `solutions/round1..5/`, and `--catch-up` installs rounds 1..N over your files (your own are kept as `.bak`; `--restore` puts them back). The chapter's content doc and deck are `../chapter_03_content.md` and `../slides.md`.
 
-Every well-run crawler asks the same question of a site: *may I, and what does it cost?* This lab climbs the answers a site can give. Publish what you allow (Round 1). Refuse the crawlers that announce themselves and break the rules, or cannot prove who they are (Round 2). Make it expensive for the ones that do not announce themselves (Round 3). Charge the honest ones who will pay (Round 4). Each checkpoint measures what a rung stops **and** what it costs the people and services you want: 40 shoppers, five prefetching shoppers, three text-mode readers and the verified search crawler.
+Every well-run crawler asks the same question of a site: *may I, and what does it cost?* This lab climbs the answers a site can give. Publish what you allow (Round 1). Refuse the crawlers that announce themselves and break the rules, or cannot prove who they are (Round 2). Make it expensive for the ones that do not announce themselves (Round 3). Charge the honest ones who will pay (Round 4). Make the ones nobody can name pay in work instead (Round 5). Each checkpoint measures what a rung stops **and** what it costs the people and services you want: 40 shoppers, five prefetching shoppers, three text-mode readers and the verified search crawler.
 
 ## Rules of engagement
 
@@ -70,8 +78,9 @@ python tools/checkpoint.py --round 1                  # terminal 2: both sides, 
 | 2 | 2 | `round1_ignoring_crawler`, then `round2_stealth_crawler` (Chrome UA, residential egress) | `defenses/enforce.py`: `evaluate()` | Why does the honest crawler get refused while the stealth one walks in? |
 | 3 | 3 | `round3_stealth_crawler`, then `round3_maze_aware_crawler` | `defenses/maze.py`: `entry_link()` and `tagged()` | How much does a poisoned maze cost a crawler, and you? Who walks around it? |
 | 4 | 4 | `round4_paying_crawler` and `round4_free_path_leak` | `defenses/paywall.py`: `evaluate()` (the 402 exchange) and `PAID_PATHS` | Who pays, and which route leaks the catalogue for free? |
+| 5 | 5 | `round3_maze_aware_crawler` (cannot solve), `round5_pow_solving_crawler`, `round5_pass_replay`, then `round4_paying_crawler` (exempt) | `defenses/pow_gate.py`: `evaluate()` (the pass rules) and `client_tag()` (what a pass is bound to) | What does earning a pass cost a crawler, what does it cost the people you cannot name, and can a pass be carried away? |
 
-A round passes when that round's crawler is held under its ceiling (or, in Round 4, is billed exactly what it took) **and** no shopper, prefetcher, reader or search-crawler request was refused, paywalled, billed or served a decoy. The checkpoint also prints the defender's cost: gate time per shopper request, and the maze's generation time, bytes and cap hits.
+A round passes when that round's crawler is held under its ceiling (or, in Round 4, is billed exactly what it took) **and** no shopper, prefetcher, reader or search-crawler request was refused, paywalled, billed or served a decoy. Round 5 is the exception, on purpose: a proof of work taxes every client it cannot name, so the checkpoint names the clients it cannot serve (the text-mode readers and the shopper with JavaScript off) and passes only if everyone else got through and solved. The checkpoint also prints the defender's cost: gate time per shopper request, and the maze's generation time, bytes and cap hits.
 
 ### What is given and what you write
 
@@ -81,6 +90,8 @@ A round passes when that round's crawler is held under its ceiling (or, in Round
 | 2 | `enforce.py`: `evaluate()` | the CHECK that builds its inputs from the identity |
 | 3 | `maze.py`: `entry_link()`, `tagged()` | `_token()`, `record_hit()`, `render()`, the CHECK; `babble.py` (the bigram generator) |
 | 4 | `paywall.py`: `evaluate()`, `PAID_PATHS` | the CHECK, `Offer` helpers, `_parse()` |
+| 5 | `pow_gate.py`: `evaluate()`, `client_tag()` | the CHECK (exempts policy documents and verified operators, counts the pass's use, revokes before re-challenging), `policy.POW_*`, `pow_challenge.py`, `demo_site/ext/pow.py`, `tools/pow_client.py` |
+| | | `pow_core.py`, `challenge_signed.py`: W1 Ch7's puzzle and signed challenge, byte for byte (`shared.json`) |
 | | | `bot_identity.py`, `crawler_registry.py`: who is this request really from |
 | | | `web_bot_auth.py`, `httpsig.py`, `key_directory.py`: W4 Ch2's verifier, byte for byte (`shared.json`) |
 
@@ -91,7 +102,7 @@ The gate's verdict set is fixed: `allow`, `monitor`, `challenge`, `block`, `rate
 - `enforce` is a real `block` verdict from the ladder (a 403 the gate serves).
 - `maze` and `paywall` are ordinary checks that record what they decided in `ctx.attrs` (`maze`, `paywall`) and return no verdict.
 - `demo_site/ext/deterrence.py` registers a `before_request` **after** the gate's. It sees only what the gate allowed, reads `ctx.attrs`, and returns its own `Response`: the decoy page, or the 402 with `crawler-price`; or lets a charged page through and stamps `crawler-charged`, writes the ledger (`lab:ledger:*`, Redis) when the answer is a 200.
-- It sets `g.outcome` to `mazed`, `paywalled` or `charged`. Since contract 1.6 the scoreboard gives each custom outcome its own column instead of folding it into `other`, so the table under the standard scoreboard reads: `requests · served · blocked · paywalled · charged · mazed`.
+- It sets `g.outcome` to `mazed`, `paywalled` or `charged`. (Round 5's proof of work needs none of this: `challenge` is already in the verdict set, and `demo_site/ext/pow.py` registers the `pow` type the gate serves.) Since contract 1.6 the scoreboard gives each custom outcome its own column instead of folding it into `other`, so the table under the standard scoreboard reads: `requests · served · blocked · paywalled · charged · mazed`.
 
 The identity the checks share (`bot_identity.identify(ctx)`) is computed once per request and cached in `ctx.attrs["identity"]`: a valid, trusted Web Bot Auth signature wins; otherwise a declared User-Agent from a published range is verified weakly; a declared User-Agent that proves nothing is *declared but unverified*.
 
@@ -107,9 +118,32 @@ The identity the checks share (`bot_identity.identify(ctx)`) is computed once pe
 
 **Round 4: charge the honest.** Finish `evaluate()` (the 402 exchange, step by step in its docstring) and extend `PAID_PATHS`. Watch the leak first: `python attacks/round4_free_path_leak.py` rebuilds the catalogue for $0.00 from the JSON API, the bulk feed and the RSS feed because only the HTML pages were priced. Then add every carrier. The paying crawler is billed to the cent; the store's ledger (`curl -s localhost:5000/lab/crawl/stats`) must equal its own tally. Try `python attacks/round4_paying_crawler.py --max 0.005`: a crawler whose budget is below your price walks away, which is what most 402s meet in the wild.
 
+**Round 5: pay with work.** Finish `evaluate()` and `client_tag()` in `defenses/pow_gate.py`. The check asks any client without a verified identity for a pass before it hands over catalogue data (`policy.POW_PROTECTED`: the pages, the JSON API, search, the sitemap and the feed). A client solves a hashcash puzzle (16 bits: about 65,000 hashes, tens of milliseconds on a laptop), POSTs the counter to `/api/challenge/verify` and gets a pass with three limits: **20 protected requests** (`POW_PASS_BUDGET`), **120 seconds** (`POW_PASS_TTL`), and **the address and User-Agent that earned it** (`client_tag()`). Verified operators are exempt: money pays at the paywall, work pays here. Check by hand with a client that cannot solve: `curl -s -H 'Accept: application/json' localhost:5000/api/products` answers `403 challenge_required` with the puzzle in `payload`. Then run `python attacks/round5_pow_solving_crawler.py`: the careful crawler of Round 3 (Chrome UA, residential address, no hidden links) with a solver and one cookie jar per address. It takes all 120 records, and its report shows what that cost: solves, hashes and CPU-milliseconds per record, and dollars per 1,000 records at a cloud vCPU's list price. Try `--mode rotate` (a pool of 24 addresses, a jar each: it pays once per address) and `--mode share` (24 addresses, one jar: the binding refuses the pass everywhere but where it was earned, so it pays on nearly every request). `python attacks/round5_pass_replay.py` probes the pass directly: carried to another address, and spent one request past its budget. With `client_tag()` unfinished the first probe walks through, and the checkpoint says so. The cost on your side is in the cohort: the prefetching browsers solve (they are Chrome); the three readers and the shopper with JavaScript off cannot, and stay out. **A proof of work is a tax on every client you cannot name**, and the readers are what it costs.
+
+**Difficulty.** 16 bits keeps the round at about a minute of wall time and the shoppers' wait under half a second even for the slowest phone persona (one sixteenth of a desktop's hash rate, an assumption; W1 Ch7 measures it). Each extra bit doubles both the crawler's bill and that phone's wait. Measured at 20 bits (16 times harder, `POW_BITS` in `defenses/policy.py`): the solving crawler's cost rises from about 5 ms to 37 ms of CPU per record (still only $0.0004 per 1,000 records), the median shopper waits 0.26 s instead of 0.02 s, and one of the eight phone shoppers on the carrier-NAT addresses gave up at the five seconds a person waits (`PATIENCE_S`), so the checkpoint failed. A difficulty a budget phone tolerates is a difficulty a datacenter does not notice; that is the trade-off, not a tuning problem.
+
 ## Expected results (self-check)
 
-Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) and one `--round N --level N-1 --catch-up` run per round for the "before" column, on 2026-10-15 on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, SQLite and the in-process Redis. Every round passed with the reference modules installed; the shoppers hurt were 0 of 40 and the clients you keep were hurt 0 times in every round. `--level` runs report numbers but do not judge (and so print no gate cost). "Products" are product *records* taken (a product page, a JSON item or a feed item) out of 120; a crawler is deterministic except for its request count, which varies by a request or two when its address order shifts.
+The table between the `results:` markers is generated by `python tools/verify.py --write-readme --catch-up` (against your own store: `python tools/checkpoint.py --all --markdown`); the per-round tables below it come from the same run's `--markdown` output. It is built from `--all --catch-up` and one `--round N --level N-1 --catch-up` run per round for the "before" column, on 2026-10-18 on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, httpx 0.28.1, cryptography 50.0.2, SQLite and the in-process Redis. Every round passed with the reference modules installed. Rounds 0 to 4 hurt nobody: 0 of 40 shoppers and 0 of the nine clients you keep. Round 5 hurts four clients by design, named below: the three text-mode readers and the shopper with JavaScript off. The Round 0 to 4 figures are unchanged by adding Round 5 (same products, requests, decoys, ledger and refusals as the 2026-10-15 run); only timings moved, within noise. `--level` runs report numbers but do not judge (and so print no gate cost). "Products" are product *records* taken (a product page, a JSON item or a feed item) out of 120; a crawler is deterministic except for its request count, which varies by a request or two when its address order shifts. Round 5's solver adds one more random quantity: the hashes it needs per puzzle are geometric, so its hashes and CPU time per record vary run to run by a factor of two (its number of solves does not).
+
+<!-- results:start -->
+| Round | Attack | Before (level N-1) | After (level N) | Shoppers stopped after |
+|---|---|---|---|---|
+| 0 | `compliant` | — | 120/120 | none |
+|  | `ignoring` | — | 120/120 |  |
+| 1 | `compliant` | 120/120 | 0/120 | none |
+|  | `ignoring` | 120/120 | 120/120 |  |
+| 2 | `ignoring` | 120/120 | 0/120 | none |
+|  | `stealth` | 120/120 | 120/120 |  |
+| 3 | `naive` | 120/120 | 23/120 | none |
+|  | `aware` | 120/120 | 120/120 |  |
+| 4 | `paying` | 0/120 | 120/120 | none |
+|  | `leak` | 0/120 | 0/120 |  |
+| 5 | `aware` | 120/120 | 0/120 | no_js 1, reader 3 |
+|  | `solver` | 120/120 | 120/120 |  |
+|  | `replay` | 2/2 | 0/2 |  |
+|  | `paying` | 120/120 | 120/120 |  |
+<!-- results:end -->
 
 ### Before and after
 
@@ -123,10 +157,14 @@ Generated from `python tools/verify.py --all --catch-up --markdown` (against you
 | 3 | maze-aware stealth crawler | 120 / 142 | 120 / 142 (the limit of deterrence) | served 142, mazed 0 |
 | 4 | paying LabTrainBot (signed) | 0 / 3 (level 3 denies `ai-train`, so it reads robots.txt and leaves) | **120 / 283**, billed $1.39 | **paywalled 139, charged 139**, served 5 (the policy documents) |
 | 4 | free-path leak (signed) | 0 / 24 (all 24 refused by `enforce`, which denies the purpose) | **0 / 24** (every carrier priced) | **paywalled 24** |
+| 5 | maze-aware stealth crawler (cannot solve) | 120 / 142 | **0 / 20** (3 unprotected pages served, 17 requests met the puzzle) | stopped 17 of 20 |
+| 5 | PoW-solving crawler (pinned address) | 120 / 142 | 120 / 149 (the limit of a work gate), **7 solves, about 5,000 hashes and 5 ms of CPU per record** | stopped 7 (the puzzles), then served |
+| 5 | pass replay probe | 2 of 2 free | **0 / 2** (another address: 403; request 21: 403) | stopped 4 |
+| 5 | paying LabTrainBot (signed) | 120 / 283, billed $1.39 | 120 / 283, billed $1.39, never asked to solve | paywalled 139, charged 139 |
 
 With `PAID_PATHS` left at `("/products", "/product/")` the leak rebuilds all 120 records for $0.00 in 24 requests (Round 4 then fails: "a carrier is not behind the paywall"). The ledger equals the paying crawler's own bill to the cent ($1.39 for 139 charged requests: 120 product pages and 19 listing pages).
 
-Defender cost, from the decision log (median gate time of a shopper request while the crawlers run, in-process Redis, limit 25 ms): Round 0 1.42 ms (p95 3.30), Round 1 1.48 (3.42), Round 2 1.46 (3.38), Round 3 1.97 (3.93), Round 4 2.01 (3.86). The maze costs 0.67 ms to generate a decoy page and about 2.8 KB to send it (285 decoys, 784 KB; the concurrency cap was never hit because the crawler is serial).
+Defender cost, from the decision log (median gate time of a shopper request while the crawlers run, in-process Redis, limit 25 ms): Round 0 1.29 ms (p95 3.18), Round 1 1.46 (3.43), Round 2 1.46 (3.26), Round 3 1.81 (3.82), Round 4 1.48 (3.48), Round 5 1.72 (3.58). The maze costs 0.59 ms to generate a decoy page and about 2.8 KB to send it (285 decoys, 784 KB; the concurrency cap was never hit because the crawler is serial).
 
 #### Round 0: bare store: nobody asks who is crawling
 
@@ -177,7 +215,7 @@ Bots stopped: **1/142** requests · shoppers hurt: **0/40** people (0/240 reques
 Bots stopped: **0/442** requests · shoppers hurt: **0/40** people (0/240 requests stopped, including challenges they then solved) · purchases: {'human': 40} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
 
 - maze: the naive crawler spent 95% of its 300 requests on decoys (285 in the scoreboard's mazed column); the maze-aware crawler got 100%
-- cost  285 decoy pages, 0.67 ms/page to generate, 784 KB served, concurrency cap hit 0x
+- cost  285 decoy pages, 0.59 ms/page to generate, 784 KB served, concurrency cap hit 0x
 
 #### Round 4: L4 pay-per-crawl over HTTP 402, every carrier behind it
 
@@ -192,6 +230,29 @@ Bots stopped: **0/307** requests · shoppers hurt: **0/40** people (0/240 reques
 
 - ledger: $1.39 for 139 charged requests against the crawler's own bill $1.39; 139 requests met a 402 first; ledger by operator {'total': 1.39, 'trainbot.example': 1.39}
 
+#### Round 5: L5 proof-of-work gate: the earnable challenge, pass scoped to address, budget and lifetime
+
+The scoreboard's custom columns have no `challenged` column (it is a stock outcome), so this table reports the requests the gate answered with the puzzle next to what was served:
+
+| actor | requests | served | challenged (puzzle) | refused for good |
+|---|---|---|---|---|
+| bot:aware (cannot solve) | 20 | 3 | 17 | 17 |
+| bot:solver | 156 | 149 | 7 | 0 |
+| bot:replay | 27 | 23 | 4 | 0 |
+| bot:paying (verified) | 283 | 5 | 0 | 0 (139 paywalled, 139 charged) |
+| 5 prefetching shoppers (solve like a browser) | 55 | 50 | 5 | 0 |
+| 3 text-mode readers (no JavaScript) | 6 | 3 | 3 | **3** |
+| LabSearchBot (verified) | 32 | 32 | 0 | 0 |
+| shoppers (all 40) | 314 | 274 | 40 | **1** (`no_js`) |
+
+Bots stopped: **28/486** requests · shoppers hurt: **1/40** people (40/314 requests stopped, including challenges they then solved) · purchases: {'human': 39} · drop stock left: {'lab-hoodie-1': 50, 'lab-runner-9': 50}
+
+- the puzzle: 16 bits, a pass is 20 requests / 120 s / one address. Shoppers who solved: 39 of 40, **median wait 0.02 s, slowest 0.40 s** (an Android persona at one sixteenth of a desktop's hash rate, an assumption); the shopper with JavaScript off is walled. Gate median **1.72 ms** (p95 3.58), against 1.48 ms at Round 4: the check itself is cheap, the cost is the wait and the people who cannot wait.
+- what it cost the clients you keep: the prefetchers solved once each (5 of 5); the readers are **refused, 3 of 3**, and that is the round's reported false positive, not a bug to tune away; LabSearchBot was never challenged (a verified operator is exempt).
+- what it cost the crawler: 7 solves for 120 records, **about 5,000 hashes and 5 ms of CPU per record** (one run: 618,473 hashes, 0.61 CPU-s; another: 356,637, 0.40 s), $0.00006 per 1,000 records at $0.04 per vCPU-hour. Pass scoping holds: a pass carried to another address answers 403, and request 21 on a 20-request pass answers 403.
+- money still pays: ledger $1.39 against the crawler's bill $1.39; the paying crawler was asked to solve 0 times.
+- what pass scoping does to a crawler that rotates (separate runs, same 120 records, `round5_pow_solving_crawler.py --mode ...`): `pinned` 7 solves; `rotate` (24 addresses, a jar each) **24 solves**, about twice the CPU per record; `share` (24 addresses, one jar) **139 solves**, 82 ms and about 74,000 hashes per record (the binding refuses the pass everywhere but where it was earned), roughly 12 times the pinned cost.
+
 ## Run it in Docker (optional)
 
 The default needs no Docker. To rehearse on the production-shaped stack (Redis 8.10 and PostgreSQL 18):
@@ -203,10 +264,14 @@ REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=postgresql+psycopg://workshop:wo
 docker compose -p w4ch3 down -v                       # when you are done
 ```
 
-**What ran on this path (2026-10-15):** Redis 8.10.2 and PostgreSQL 18.6 from `docker-compose.yml` (project `w4ch3`, ports bound to `127.0.0.1`), `python tools/verify.py --smoke`, then `--round 3 --catch-up` and `--round 4 --catch-up`: all pass with the same counts as above (naive crawler 23 of 120 products and 285 of 300 requests mazed; paying crawler 120 of 120, 139 charged, ledger $1.39 equal to its bill; 0 of 40 shoppers hurt). The gate figure rises to a median of 4.38 ms in Round 3 and 4.59 ms in Round 4 (p95 9.86 and 11.63 ms) because every request makes several Redis round trips (the nonce cache, the key-directory cache, the session); the checkpoint allows 250 ms against a real Redis instead of 25 ms. Round 1, Round 2 and the shoppers-only paths were not run on Docker.
+**What ran on this path (2026-10-15):** Redis 8.10.2 and PostgreSQL 18.6 from `docker-compose.yml` (project `w4ch3`, ports bound to `127.0.0.1`), `python tools/verify.py --smoke`, then `--round 3 --catch-up` and `--round 4 --catch-up`: all pass with the same counts as above (naive crawler 23 of 120 products and 285 of 300 requests mazed; paying crawler 120 of 120, 139 charged, ledger $1.39 equal to its bill; 0 of 40 shoppers hurt). The gate figure rises to a median of 4.38 ms in Round 3 and 4.59 ms in Round 4 (p95 9.86 and 11.63 ms) because every request makes several Redis round trips (the nonce cache, the key-directory cache, the session); the checkpoint allows 250 ms against a real Redis instead of 25 ms. Round 1, Round 2, Round 5 and the shoppers-only paths were not run on Docker.
 
 ## What this does not teach
 
+- **Real Anubis solves in the browser.** It serves a JavaScript challenge that the visitor's browser runs (in workers, with WebCrypto), and a visitor with JavaScript off meets a wall, exactly like this lab's readers. Here the cohort's browsers are Python programs that solve for real and then *sleep for what their device would have taken* (`DESKTOP_MHS` and the phone ratios in `tools/personas_ch3.py` are assumptions, not measurements; W1 Ch7 measures them). Nothing in this lab runs the puzzle in a page.
+- **SHA-256 is a cheap puzzle for the wrong people.** A GPU or an ASIC does billions of hashes a second; a budget phone does thousands. The asymmetry that makes the gate cheap for you is the asymmetry that makes it cheap for a crawl farm. Memory-hard puzzles (Argon2id, scrypt, Equi-X) shrink the gap, and W1 Ch7's adaptive difficulty prices by request rate; this round keeps one fixed difficulty so the trade-off stays visible.
+- **The pass is keyed on address and User-Agent.** A crawler that pins one address per session pays once per 20 requests (`--mode pinned`); one that rotates through a pool pays once per address (`--mode rotate`). A large pool of cheap addresses makes the binding cost little, and shared or changing addresses (carrier NAT, a phone moving between networks) make real users solve again. The lifetime (120 s) is not probed by `round5_pass_replay.py`, because waiting it out takes two minutes.
+- **A challenge hurts a screen reader less than a wall does, and a wall hurts it anyway.** The readers here stand for any client that cannot run a solver: text-mode browsers, some assistive technology, feed readers, plain API clients. A real site needs an alternative path (an account, an allowlist, a verified identity) for them, and that decision lives outside this lab.
 - **The stealth crawler is depth-first.** It follows the most recently discovered link first, like a recursive scraper, so it meets the hidden link early. A breadth-first crawler with a big enough budget takes the whole catalogue before the maze can tag its addresses (measured here: 100% coverage, 55% of its 300 requests in the maze, with the same crawler and budget). The maze is a tax on careless crawlers, not a wall.
 - **Tags are per address.** The stealth crawler rotates 24 addresses, so each earns its tag separately; a large rotating pool dilutes this, which is why the budget burn matters more than the tag and why production keys on fingerprints too (W2).
 - **CSS-hidden links are not hidden from everyone.** A text-mode browser does not apply CSS, and `aria-hidden` is for screen readers; a Lynx user *can* see "Catalogue archive". The readers here do not click it (nobody mid-purchase does), but a maze link on a real shop needs a design review, not just `display:none`.
@@ -219,6 +284,10 @@ docker compose -p w4ch3 down -v                       # when you are done
 
 | Symptom | Fix |
 |---|---|
+| Round 5 `FAIL: aware: expected blocked` | `evaluate()` in `defenses/pow_gate.py` still returns `None`: the gate is inert until you finish it |
+| Round 5 `FAIL: a pass was reused beyond its address binding or page budget` | `client_tag()` still returns `""` (a pass bound to nothing), or `evaluate()` does not check `bound_ok`/`used` |
+| Round 5 `FAIL: ... shoppers waited a median ... s` or a phone shopper gave up | `POW_BITS` in `defenses/policy.py` is too high for the slowest persona; the lab ships 16 |
+| Round 5 `FAIL: legit:prefetch:NN was never challenged` | the gate is not asking unnamed clients for a pass; same cause as the first row |
 | `Store not reachable on http://127.0.0.1:5000` | Start it: `python demo_site/app.py`, or use `python tools/verify.py --round N`, which starts its own |
 | Round 1 `FAIL: compliant: expected blocked` | `robots_lines()` still returns `[]`: finish it, or `--catch-up` |
 | A signed crawler is treated as unverified | The operators' websites must be up before the first signed request: a failed directory fetch is negative-cached for five minutes. Check `curl -s $MOCK_URL/stats` (the store prints `MOCK_URL` at start), then `curl -s -X POST localhost:5000/lab/reset` to clear the cache |

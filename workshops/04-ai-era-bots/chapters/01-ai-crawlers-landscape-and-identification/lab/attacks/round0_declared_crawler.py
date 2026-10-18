@@ -23,8 +23,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import UA, Crawler, Tally, finish, pool_ip  # noqa: E402
 
-# Inside each operator's published snapshot (data/published_ranges/): the operator's own address.
-ADDR = {"GPTBot": ("cloud_vm", 50), "ClaudeBot": ("cloud_gcp", 9), "CCBot": ("hosting_asn", 18)}
+# Inside each operator's published snapshot (tools/fixtures/ranges/): the operator's own address.
+ADDR = {"GPTBot": ("cloud_vm", 6), "ClaudeBot": ("cloud_vm", 27), "CCBot": ("cloud_vm", 44)}
 
 
 def run(token: str = "GPTBot", ignore_robots: bool = False, delay: float = 0.03) -> dict:

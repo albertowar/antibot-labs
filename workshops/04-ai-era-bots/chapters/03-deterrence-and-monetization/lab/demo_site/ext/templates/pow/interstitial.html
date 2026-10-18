@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Checking your client</h1>
+  <p id="pow-status" class="muted" role="status">This catalogue asks clients it cannot identify to solve a small puzzle ({{ payload.difficulty }} bits) first.</p>
+  <p class="muted">A lab note: no script on this page runs the puzzle. A client that can (tools/pow_client.py) posts the answer to /api/challenge/verify; one that cannot stays out.</p>
+  <script type="application/json" id="pow-payload">{{ payload|tojson }}</script>
+</section>
+{% endblock %}

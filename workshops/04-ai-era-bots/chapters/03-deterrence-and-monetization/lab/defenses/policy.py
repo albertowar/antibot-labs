@@ -46,6 +46,17 @@ TRUSTED_AGENTS = {
 }
 SIGNATURE_MAX_WINDOW_S = 300
 
+# W4 Ch3 Round 5: the proof-of-work gate on the catalogue (defenses/pow_gate.py reads these).
+# A client nobody can name (no verified identity) that asks for product records solves a puzzle
+# first. The pass it earns is deliberately stingy: bound to the address it was earned from, valid for
+# POW_PASS_TTL seconds and for POW_PASS_BUDGET protected requests, so one solve is not a free ticket.
+POW_PROTECTED = ("/products", "/catalog", "/product/", "/search", "/sitemap.xml", "/feed.xml",
+                 "/api/products", "/api/search")      # every carrier of catalogue data (Round 4's list)
+POW_BITS = 16           # leading zero bits: ~65,000 hashes on average, a few dozen ms on a laptop
+POW_PASS_BUDGET = 20    # protected requests one solve pays for
+POW_PASS_TTL = 120      # seconds a pass lasts
+POW_POINTS = 40         # the signal score a missing pass adds (the challenge band starts at 40)
+
 # IP reputation points, by feed (data/feeds/*, W1 Ch3).
 IP_POINTS = {
     "tor_exit": 40,

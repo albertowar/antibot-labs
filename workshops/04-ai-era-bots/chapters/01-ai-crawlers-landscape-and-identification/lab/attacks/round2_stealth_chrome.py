@@ -13,7 +13,7 @@ hides one tell, and the checkpoint shows what is left.
     python attacks/round2_stealth_chrome.py --assets        # also fetch css/js/images like a browser
     python attacks/round2_stealth_chrome.py --jitter        # random gaps instead of a fixed delay
     python attacks/round2_stealth_chrome.py --shuffle       # random order instead of the sitemap's
-    python attacks/round2_stealth_chrome.py --ips 12        # spread thinner (up to 20)
+    python attacks/round2_stealth_chrome.py --ips 7         # spread thinner (up to 7)
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from _common import UA, Crawler, Tally, finish, world_pool  # noqa: E402
 def run(ips: int = 4, assets: bool = False, jitter: bool = False,
         shuffle: bool = False, delay: float = 0.03, seed: int = 2) -> dict:
     rng = random.Random(seed)
-    addrs = world_pool("cloud_vm")[10:10 + min(ips, 20)]       # .11-.30: clear of every operator's slice
+    addrs = world_pool("cloud_vm")[36:36 + min(ips, 7)]        # .37-.43: clear of every published range
     bots = [Crawler("bot:stealth-chrome", ip, UA["stealth-chrome"]) for ip in addrs]
     paths = bots[0].sitemap_paths()
     if shuffle:

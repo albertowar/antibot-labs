@@ -1,0 +1,57 @@
+{
+  "_comment": "Synthetic DNS for the lab. Every address is a documentation address that already sits in a data/world.json pool: cloud_gcp (198.51.100.96/27) is where Google, Bing and Apple run, cloud_vm (203.0.113.0/26) hosts OpenAI, Anthropic, Perplexity and a slice of shared 'App Engine' egress, hosting_asn (203.0.113.64/26) is the attacker's rented allocation. Hostnames use the suffixes the operators really document. Identity is proven by DNS and ranges, never by pool membership: the edge hands every pool to every tenant.",
+  "ptr": {
+    "198.51.100.97": [
+      "crawl-198-51-100-97.googlebot.com"
+    ],
+    "198.51.100.98": [
+      "crawl-198-51-100-98.googlebot.com"
+    ],
+    "198.51.100.101": [
+      "msnbot-198-51-100-101.search.msn.com"
+    ],
+    "198.51.100.102": [
+      "msnbot-198-51-100-102.search.msn.com"
+    ],
+    "198.51.100.105": [
+      "198-51-100-105.applebot.apple.com"
+    ],
+    "198.51.100.106": [
+      "198-51-100-106.applebot.apple.com"
+    ],
+    "198.51.100.108": [
+      "crawl-198-51-100-108.googlebot.com"
+    ],
+    "203.0.113.121": [
+      "crawl-203-0-113-121.googlebot.com"
+    ]
+  },
+  "a": {
+    "crawl-198-51-100-97.googlebot.com": [
+      "198.51.100.97"
+    ],
+    "crawl-198-51-100-98.googlebot.com": [
+      "198.51.100.98"
+    ],
+    "msnbot-198-51-100-101.search.msn.com": [
+      "198.51.100.101"
+    ],
+    "msnbot-198-51-100-102.search.msn.com": [
+      "198.51.100.102"
+    ],
+    "198-51-100-105.applebot.apple.com": [
+      "198.51.100.105"
+    ],
+    "198-51-100-106.applebot.apple.com": [
+      "198.51.100.106"
+    ],
+    "crawl-198-51-100-108.googlebot.com": [
+      "198.51.100.108"
+    ]
+  },
+  "patterns": {
+    "_comment": "Whole blocks with generated names, like a hosting provider's default reverse zone. {d} is the IP with dots replaced by dashes. Addresses in no pattern and no explicit record have no PTR (most cloud VMs).",
+    "203.0.113.48/28": "{d}.gae.googleusercontent.com",
+    "203.0.113.64/26": "static-{d}.attacker-hosting.example"
+  }
+}

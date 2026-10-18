@@ -1,3 +1,14 @@
 {
-  "defenses/netinfo.py": "workshops/02-proficient/chapters/07-machine-learning-for-bot-detection/lab/defenses/netinfo.py"
+  "defenses/netinfo.py": "workshops/02-proficient/chapters/07-machine-learning-for-bot-detection/lab/defenses/netinfo.py",
+  "tools/fixtures/dns_zones.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/dns_zones.json",
+  "tools/fixtures/ranges/anthropic/bots.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/anthropic/bots.json",
+  "tools/fixtures/ranges/bing/bingbot.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/bing/bingbot.json",
+  "tools/fixtures/ranges/commoncrawl/ccbot.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/commoncrawl/ccbot.json",
+  "tools/fixtures/ranges/google/common-crawlers.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/google/common-crawlers.json",
+  "tools/fixtures/ranges/google/user-triggered-fetchers.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/google/user-triggered-fetchers.json",
+  "tools/fixtures/ranges/openai/chatgpt-user.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/openai/chatgpt-user.json",
+  "tools/fixtures/ranges/openai/gptbot.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/openai/gptbot.json",
+  "tools/fixtures/ranges/openai/searchbot.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/openai/searchbot.json",
+  "tools/fixtures/ranges/perplexity/perplexity-user.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/perplexity/perplexity-user.json",
+  "tools/fixtures/ranges/perplexity/perplexitybot.json": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/fixtures/ranges/perplexity/perplexitybot.json"
 }

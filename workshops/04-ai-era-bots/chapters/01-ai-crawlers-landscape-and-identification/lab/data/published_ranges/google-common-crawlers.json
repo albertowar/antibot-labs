@@ -1,9 +1,0 @@
-{
-  "_comment": "LAB SNAPSHOT. Shape mirrors https://developers.google.com/static/search/apis/ipranges/googlebot.json. Prefixes are slices of this lab's existing simulated cloud_gcp pool (RFC 5737 documentation space), not Google's real ones. The snapshot is deliberately a few days stale: Googlebot's live address is not in it, so only forward-confirmed reverse DNS verifies it.",
-  "creationTime": "2026-10-01T00:00:00.000000",
-  "prefixes": [
-    {
-      "ipv4Prefix": "198.51.100.96/30"
-    }
-  ]
-}

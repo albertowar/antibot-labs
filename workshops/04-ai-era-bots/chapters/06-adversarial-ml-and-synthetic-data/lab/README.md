@@ -68,6 +68,69 @@ python demo_site/app.py
 | 3 | `defenses/provenance.py`: sanitized training set, model v4 (level 3) | `attacks/round3_poison.py`: honeypot-label availability poison aimed at privacy-browser users | baseline ≤10%, evade ≤20%; privacy-browser customers refused ≤15%; ≤10 of 200 refused. **Currently fails the evade budget from a fresh environment (see Known issue below)** |
 | 4 | `defenses/augment.py`: SMOTE for the rare class, model v5 (level 4) | `attacks/round4_rareclass.py`: the slow mobile reseller | baseline ≤10%, evade ≤20%, reseller ≤25%; privacy-browser ≤15%; ≤12 of 200 refused. **Currently fails the reseller budget from a fresh environment (see Known issue below)** |
 
+## Bonus demo: membership inference (not judged)
+
+Extraction asks whether the attacker can copy your model. Membership inference asks whether a given session was
+in the data you trained it on: "did my fleet end up in your training labels?" A bot author who knows that knows
+which fingerprints to retire before the next retrain. On the defender's side the same question is a privacy one,
+because the training set is real customers' sessions. `attacks/demo_membership.py` runs a *label-only* version
+of the attack (Choquette-Choo et al., 2021) against the Round 1 model: for each candidate it bisects a line from
+"the session as it is" to "typical human behaviour", reads only the allow or refuse bit, and takes the distance
+to the flip as the membership score (members are expected to sit further from the boundary). It is **not a
+round**: `tools/checkpoint.py` does not run it, judge it or count it, and it needs nothing beyond Round 1.
+
+```bash
+python tools/checkpoint.py --round 1 --catch-up   # history, model v2 and the reference guard (skip if you have them)
+python demo_site/app.py                           # in another terminal
+python attacks/demo_membership.py                 # about 3 minutes
+python tools/checkpoint.py --restore              # puts your own oracle_guard.py back
+```
+
+The candidates are the 30 drop-day headless scalpers whose sessions got a weak label (so model v2 was fitted on
+them) and 30 from the same fleet and the same day that never did. The membership list comes from the training
+pipeline and is used only to pick the candidates and to score the result afterwards, like the checkpoint scores
+a round with the actor labels; the attack never sees it. The script runs twice over the same candidates:
+`guarded` sends every query from the extractor's own four boxes (Round 1's guard is in the way), `funded`
+spreads them over 180 datacenter exits so the budget never fires.
+
+Measured on 2026-10-18 (fresh history, model v2 trained by `--catch-up`; three runs gave identical output, and
+`first_input_s` carries 96% of the model's gain in this history too):
+
+| Run | Exits | Queries | Refused | Candidates that never flip | AUC (95% interval) | TPR / FPR | Spend |
+|---|---|---|---|---|---|---|---|
+| guarded | 4 | 210 | 93% | 75% | 0.45 (0.33–0.56) | 0.00 / 0.00 | $0.10 |
+| funded | 180 | 480 | 44% | 0% | 0.46 (0.32–0.61) | 0.40 / 0.47 | $0.23 |
+
+Mean distance to the boundary (0 = already allowed, 1.5 = never flips): funded, fitted-on 0.278 against
+never-labelled 0.282. The evaluator-only control line (the model's own score, not available to an attacker) reads
+AUC 0.34 to 0.38 (two histories), mean log-odds 8.336 against 8.339 to 8.342. The attack's own numbers were
+identical on both.
+
+**The honest read.**
+
+- **Membership is not inferable from this oracle.** An AUC of 0.5 is chance, and both intervals contain it. The
+  funded attacker pays for 480 queries and learns nothing about who was in the labels (advantage -0.07, which is
+  noise). Nothing was tuned to make the attack look better or worse.
+- **Why the guard "works" here, and why that is not the lesson.** With four boxes the budget answers about two
+  dozen probes truthfully and then goes constant, so 75% of candidates never flip and there is nothing to rank.
+  But the funded run finds nothing either, so the guard is blunting a measurement that had no signal to give.
+  Against a model that did leak, the same budget would be doing real work. It is still the control that
+  decides who gets to ask 480 questions.
+- **Why there is nothing to read.** Model v2 is, in effect, one threshold. `first_input_s` carries 96% of its
+  gain and the main split sits at 0.271 s; the scripted fleet's first input is 30–120 ms whether or not a
+  honeypot coin-flip made a session a training row. The bisection lands at t≈0.28 for both groups, which is
+  exactly where the blend crosses 0.271 s. A model that decides on one threshold that generalises has memorised
+  nothing about individual sessions.
+- **What a score API would change, measured.** The control reads the model's raw score on the recorded sessions
+  and gets AUC 0.34 to 0.38, but both groups sit at log-odds 8.34 and differ by at most 0.006. That AUC is ranking third-decimal
+  differences, which line up with the sessions that visited the honeypot (they load more assets), not with
+  memorisation, and it points the wrong way for an overfitting leak. A score API would not have helped the
+  attacker on this model. It would on a model with something to memorise.
+- **Limits.** This is one small, saturated model, trained on 278 labelled rows of near-identical scripted
+  bots, queried along one direction with 30 candidates per side. A production model on thousands of
+  heterogeneous customer sessions, with high-cardinality features and deeper trees, has far more to memorise.
+  Read the result as "this model, this oracle", never as "decision-only answers are safe".
+
 ## Expected results (self-check)
 
 Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store:

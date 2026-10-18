@@ -9,9 +9,9 @@ The check below calls verify(ip, token) for every catalog request whose User-Age
     ("unverifiable", "none")     the operator documents no method at all
 
 OPERATORS (data/operators.json) tells you, per token, which range file to load from
-data/published_ranges/ and which hostname suffixes count. The DNS stand-ins are
+tools/fixtures/ranges/<operator>/ and which hostname suffixes count. The DNS stand-ins are
 defenses/netdb.py: netdb.ptr(ip) is socket.gethostbyaddr(ip)[0], netdb.forward(name)
-is socket.gethostbyname_ex(name)[2], both answered from data/rdns.json.
+is socket.gethostbyname_ex(name)[2], both answered from tools/fixtures/dns_zones.json.
 
 Note what the lab does NOT do: it does not tell operators apart by which network an address
 is in. An operator crawler is a tenant of an ordinary cloud pool in data/world.json, exactly
@@ -39,7 +39,7 @@ from .crawler_registry import OPERATORS
 from .pipeline import Check
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RANGES_DIR = os.path.join(os.path.dirname(HERE), "data", "published_ranges")
+RANGES_DIR = os.path.join(os.path.dirname(HERE), "tools", "fixtures", "ranges")
 
 
 def load_prefixes(filename: str) -> list:

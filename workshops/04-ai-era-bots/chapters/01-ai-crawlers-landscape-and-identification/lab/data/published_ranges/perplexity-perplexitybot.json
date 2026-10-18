@@ -1,9 +1,0 @@
-{
-  "_comment": "LAB SNAPSHOT. Shape mirrors https://www.perplexity.com/perplexitybot.json. Prefixes are slices of this lab's existing simulated hosting_asn pool (RFC 5737 documentation space), not Perplexity's real ones.",
-  "creationTime": "2026-10-01T00:00:00.000000",
-  "prefixes": [
-    {
-      "ipv4Prefix": "203.0.113.100/30"
-    }
-  ]
-}

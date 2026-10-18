@@ -20,10 +20,16 @@ the PREVIOUS round's defense, plus the earlier one to prove it is still held:
       3    poisoned maze (tag, decoys, drip)     stealth, maze-aware stealth         stealth drowns in decoys; aware takes 100%
       4    402 pay-per-crawl                     paying LabTrainBot, free-path leak  paying takes 100% and is billed to the
                                                                                      cent; the leak gets nothing
+      5    proof-of-work gate (pass scoped to    maze-aware (cannot solve), PoW-     aware gets ~nothing; the solver takes
+           address, budget and lifetime)         solving crawler, pass replay,       100% and pays hashes per record; a
+                                                 paying LabTrainBot (exempt)         replayed pass buys nothing; paying
+                                                                                     is still billed, never challenged
 
 Next to the crawlers run the starter's 40 shoppers and nine clients that must never be hurt
 (tools/personas_ch3.py): 5 prefetching shoppers, 3 text-mode readers and the verified search crawler.
-"Hurt" means refused (403), paywalled (402), billed (`crawler-charged`) or served a decoy. The store's
+"Hurt" means refused (403), paywalled (402), billed (`crawler-charged`) or served a decoy. In Round 5 the
+gate challenges every client it cannot name: the prefetchers solve it like a browser, the three readers
+(text mode, no JavaScript) cannot, and that is reported as the round's cost, not tuned away. The store's
 scoreboard counts `paywalled`, `charged` and `mazed` in their own columns (contract 1.6, an ext
 setting g.outcome), so the table below the standard scoreboard reports each next to `blocked`.
 
@@ -31,6 +37,7 @@ Defender cost: the median gate time of the shoppers' requests from the decision 
 maze costs (generation time per decoy page, bytes, concurrency-cap hits).
 """
 
+import math
 import os
 import statistics
 import sys
@@ -51,10 +58,15 @@ ATTACKS = {
     "aware": "attacks/round3_maze_aware_crawler.py",
     "paying": "attacks/round4_paying_crawler.py",
     "leak": "attacks/round4_free_path_leak.py",
+    "solver": "attacks/round5_pow_solving_crawler.py",
+    "replay": "attacks/round5_pass_replay.py",
 }
 GATE_MEDIAN_MAX_MS = 25.0           # defender-cost threshold: median gate time per shopper request (in-process Redis)
 GATE_MEDIAN_MAX_MS_REDIS = 250.0    # with a real Redis: a few network round trips per request under a crawler flood
 NAIVE_COVERAGE_MAX = 0.25          # the feed link in the footer hands any crawler 20 records before the maze can tag it
+CATALOG_RECORDS = 120
+SHOPPER_WAIT_MAX_S = 3.0           # Round 5: median seconds a shopper's device sits on the puzzle (p95 of the slowest phones is ~3x)
+SOLVER_HASHES_PER_RECORD_MIN = 1000   # Round 5: the cost floor the pass budget must enforce (65,536 hashes / 20 requests = ~3,300)
 COLUMNS = ("requests", "served", "blocked", "paywalled", "charged", "mazed")
 
 
@@ -207,10 +219,93 @@ def ledger(board, results, attacks):
     return (not bad, "; ".join(bad))
 
 
-def rnd(level, description, attacks, expect, solutions, checks, **kw):
+def pow_economics(board, results, attacks):
+    """Round 5: what the work costs the crawler, what the pass scope forces, and what it costs the people."""
+    from defenses import policy
+    solver, aware, replay = attacks["solver"], attacks["aware"], attacks["replay"]
+    personas_ch3.print_pow(results)
+    shoppers = [r for r in results if r.get("actor", "").startswith("human:")]
+    waits = sorted(r["pow"]["wait_s"] for r in shoppers if r.get("pow", {}).get("solves"))
+    median_wait = statistics.median(waits) if waits else 0.0
+    walled = sorted(r["actor"] for r in shoppers if r.get("pow", {}).get("no_js"))
+    print(f"\nthe puzzle: {policy.POW_BITS} bits, a pass is {policy.POW_PASS_BUDGET} requests / {policy.POW_PASS_TTL} s / one address\n"
+          f"  shoppers who solved: {len(waits)} of {len(shoppers)}, median wait {median_wait:.2f} s, "
+          f"slowest {max(waits, default=0):.2f} s; walled (no JavaScript): {', '.join(walled) or 'none'}")
+    print(f"  solving crawler: {solver['solves']} solves, {solver['hashes']:,} hashes, {solver['cpu_s']:.2f} CPU-s -> "
+          f"{solver['hashes_per_record']:,} hashes and {solver['cpu_ms_per_record']} ms per record "
+          f"(${solver['usd_per_1k_records']:.6f} per 1,000 records)")
+    print(f"  maze-aware crawler (cannot solve): {aware['coverage']:.0%} of the catalogue; "
+          f"pass replay: {replay['succeeded']}/{replay['attempted']} probes got a record free "
+          f"(other address -> HTTP {replay.get('moved_to_B')}, request {policy.POW_PASS_BUDGET + 1} -> HTTP {replay.get('over_budget_last')})")
+    bad = []
+    if aware["coverage"] > 0.1:
+        bad.append(f"the maze-aware crawler still took {aware['coverage']:.0%} without solving anything")
+    need = math.ceil(CATALOG_RECORDS / policy.POW_PASS_BUDGET)
+    if solver["solves"] < need:
+        bad.append(f"the solving crawler paid only {solver['solves']} times for {CATALOG_RECORDS} records "
+                   f"(want >= {need}: a pass must not outlive its budget)")
+    if solver["hashes_per_record"] < SOLVER_HASHES_PER_RECORD_MIN:
+        bad.append(f"{solver['hashes_per_record']} hashes per record is below the {SOLVER_HASHES_PER_RECORD_MIN} floor")
+    if replay["succeeded"]:
+        bad.append("a pass was reused beyond its address binding or page budget "
+                   f"(other address -> {replay.get('moved_to_B')}, over budget -> {replay.get('over_budget_last')})")
+    if median_wait > SHOPPER_WAIT_MAX_S:
+        bad.append(f"shoppers waited a median {median_wait:.2f} s on the puzzle (limit {SHOPPER_WAIT_MAX_S} s)")
+    return (not bad, "; ".join(bad))
+
+
+def legit_cost(board, results, attacks):
+    """Round 5's version of legit_unharmed: the search crawler and the prefetchers must get through; the
+    readers are the cost of a gate that taxes everyone it cannot name, so they are counted and named."""
+    rows = [r for r in results if r["actor"].startswith("legit:")]
+    print("\nclients you keep                 served  refused  solved the puzzle")
+    bad, readers = [], []
+    for r in sorted(rows, key=lambda r: r["actor"]):
+        solved = r.get("pow", {}).get("solves", 0)
+        print(f"  {r['actor']:<30}{r.get('served', 0):>6}{r.get('blocked', 0):>9}{solved:>10}"
+              f"{'   <- no JavaScript: the wall stays a wall' if r['persona'] == 'reader' and r.get('blocked') else ''}")
+        if r["persona"] == "reader":
+            readers.append(r)
+        elif r.get("outcome") == "blocked" or r.get("paywalled") or r.get("charged") or r.get("mazed"):
+            bad.append(f"{r['actor']} was hurt (refused {r.get('blocked', 0)}, paywalled {r.get('paywalled', 0)}, "
+                       f"billed {r.get('charged', 0)}, mazed {r.get('mazed', 0)})")
+        elif r["persona"] == "prefetch" and not solved:
+            bad.append(f"{r['actor']} was never challenged: the gate did not ask an unnamed client for a pass")
+    search = next(r for r in rows if r["persona"] == "search")
+    if search.get("served", 0) < personas_ch3.SEARCH_PAGES:
+        bad.append(f"the verified search crawler indexed {search.get('served', 0)} pages, not {personas_ch3.SEARCH_PAGES}")
+    if search.get("pow"):
+        bad.append("the verified search crawler was challenged: a named operator is exempt")
+    refused = sum(1 for r in readers if r.get("blocked"))
+    print(f"  the gate's price on clients you keep: {refused} of {len(readers)} text-mode readers refused (they cannot run a solver)")
+    shoppers = [a for a in board["actors"] if a["kind"] == "human"]
+    unseen = sum(a.get("paywalled", 0) + a.get("charged", 0) + a.get("mazed", 0) for a in shoppers)
+    if unseen:
+        bad.append(f"{unseen} shopper requests were paywalled, billed or mazed")
+    return (not bad, "; ".join(bad))
+
+
+def paying_unchanged(board, results, attacks):
+    """Round 5: money still pays. The verified, paying crawler is billed to the cent and is never asked for work."""
+    paying = attacks["paying"]
+    stats = labclient.admin("GET", "/lab/crawl/stats")["ledger"]
+    total = round(stats.get("total", 0.0), 2)
+    asked = sum("pow_gate" in d["signals"] for d in decisions("bot:paying"))
+    row = actor_row(board, "bot:paying")
+    print(f"\nmoney still pays: ledger ${total:.2f} against the crawler's bill ${paying['spent_usd']:.2f} "
+          f"({row.get('charged', 0)} charged); requests the paying crawler was asked to solve for: {asked}")
+    bad = []
+    if abs(total - paying["spent_usd"]) >= 0.005 or total <= 0:
+        bad.append(f"ledger ${total:.2f} != the crawler's bill ${paying['spent_usd']:.2f}")
+    if asked:
+        bad.append(f"the verified paying crawler was challenged {asked} times: a named operator pays at the paywall")
+    return (not bad, "; ".join(bad))
+
+
+def rnd(level, description, attacks, expect, solutions, checks, legit=legit_unharmed, **kw):
     return Round(level=level, description=description, scenario="crawl_gov",
                  attacks={n: ATTACKS[n] for n in attacks}, expect=expect, solutions=solutions,
-                 extra_checks=[*checks, legit_unharmed, gate_cost], **kw)
+                 extra_checks=[*checks, legit, gate_cost], **kw)
 
 
 ROUNDS = {
@@ -224,6 +319,11 @@ ROUNDS = {
            {"aware": "full"}, ("defenses/maze.py",), [maze_budget]),
     4: rnd(4, "L4 pay-per-crawl over HTTP 402, every carrier behind it", ["paying", "leak"],
            {"paying": "full", "leak": "blocked"}, ("defenses/paywall.py",), [ledger]),
+    5: rnd(5, "L5 proof-of-work gate: the earnable challenge, pass scoped to address, budget and lifetime",
+           ["aware", "solver", "replay", "paying"],
+           {"aware": "blocked", "solver": "full", "replay": "blocked", "paying": "full"},
+           ("defenses/pow_gate.py",), [pow_economics, paying_unchanged], legit=legit_cost,
+           allowed_fp=("no_js", "reader"), legit_hurt_max=3),   # the walled: no JavaScript, no pass
 }
 
 if __name__ == "__main__":

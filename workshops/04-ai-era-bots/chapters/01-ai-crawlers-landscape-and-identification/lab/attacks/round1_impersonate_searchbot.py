@@ -10,7 +10,7 @@ catalog. Round 2 checks whether the badge is real.
     python attacks/round1_impersonate_searchbot.py --token Googlebot # a token verified by rDNS
     python attacks/round1_impersonate_searchbot.py --token Googlebot --fake-ptr
         # from 203.0.113.121, whose PTR says googlebot.com but whose forward lookup does
-        # not come back to it: passes a PTR-only check, fails forward confirmation
+        # not come back to it (the name has no A record): passes a PTR-only check, fails forward confirmation
     python attacks/round1_impersonate_searchbot.py --token GPTBot    # wrong badge: training is disallowed
 """
 
@@ -24,11 +24,12 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import UA, Crawler, Tally, finish, pool_ip  # noqa: E402
 
-FAKE_PTR_IP = ("hosting_asn", 56)       # 203.0.113.121, see data/rdns.json
+FAKE_PTR_IP = ("hosting_asn", 56)       # 203.0.113.121, see tools/fixtures/dns_zones.json
+IMPERSONATOR_INDEX = 35                 # 203.0.113.36 in cloud_vm: inside no operator's published range
 
 
 def run(token: str = "OAI-SearchBot", pool: str = "cloud_vm", fake_ptr: bool = False, delay: float = 0.03) -> dict:
-    ip = pool_ip(*FAKE_PTR_IP) if fake_ptr else pool_ip(pool, 7)
+    ip = pool_ip(*FAKE_PTR_IP) if fake_ptr else pool_ip(pool, IMPERSONATOR_INDEX)
     bot = Crawler("bot:impersonator", ip, UA[token])
     paths = bot.sitemap_paths()                      # never robots.txt
     tally = Tally(len(paths))

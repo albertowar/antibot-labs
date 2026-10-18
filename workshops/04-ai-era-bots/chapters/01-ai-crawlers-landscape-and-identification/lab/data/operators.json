@@ -1,65 +1,65 @@
 {
-  "_comment": "How each operator lets you VERIFY a request that claims one of its tokens. 'ranges' points at a local snapshot in data/published_ranges/ shaped like the operator's real file; 'rdns' lists hostname suffixes for forward-confirmed reverse DNS (answered from data/rdns.json). The real URLs are in 'source'. The snapshots are lab fixtures: their prefixes are slices of address pools that already exist in data/world.json (cloud_vm, cloud_gcp, hosting_asn), so an operator crawler is just another tenant of a cloud network and is told apart by what it can PROVE, never by which pool it sits in. They are NOT the operators' real addresses.",
+  "_comment": "How each operator lets you VERIFY a request that claims one of its tokens. 'ranges' points at a local snapshot in tools/fixtures/ranges/<operator>/ shaped like the operator's real file; 'rdns' lists hostname suffixes for forward-confirmed reverse DNS (answered from tools/fixtures/dns_zones.json). The real URLs are in 'source'. The snapshots are lab fixtures: these files are the same fixtures Chapter 2's mock internet serves, and their prefixes are slices of address pools that already exist in data/world.json (cloud_vm, cloud_gcp, hosting_asn), so an operator crawler is just another tenant of a cloud network and is told apart by what it can PROVE, never by which pool it sits in. They are NOT the operators' real addresses.",
   "GPTBot": {
     "operator": "OpenAI",
     "purpose": "training",
-    "ranges": "openai-gptbot.json",
+    "ranges": "openai/gptbot.json",
     "rdns": [],
     "source": "https://openai.com/gptbot.json"
   },
   "OAI-SearchBot": {
     "operator": "OpenAI",
     "purpose": "search",
-    "ranges": "openai-searchbot.json",
+    "ranges": "openai/searchbot.json",
     "rdns": [],
     "source": "https://openai.com/searchbot.json"
   },
   "ChatGPT-User": {
     "operator": "OpenAI",
     "purpose": "user-action",
-    "ranges": "openai-chatgpt-user.json",
+    "ranges": "openai/chatgpt-user.json",
     "rdns": [],
     "source": "https://openai.com/chatgpt-user.json"
   },
   "ClaudeBot": {
     "operator": "Anthropic",
     "purpose": "training",
-    "ranges": "anthropic-bots.json",
+    "ranges": "anthropic/bots.json",
     "rdns": [],
     "source": "https://claude.com/crawling/bots.json"
   },
   "Claude-SearchBot": {
     "operator": "Anthropic",
     "purpose": "search",
-    "ranges": "anthropic-bots.json",
+    "ranges": "anthropic/bots.json",
     "rdns": [],
     "source": "https://claude.com/crawling/bots.json"
   },
   "Claude-User": {
     "operator": "Anthropic",
     "purpose": "user-action",
-    "ranges": "anthropic-bots.json",
+    "ranges": "anthropic/bots.json",
     "rdns": [],
     "source": "https://claude.com/crawling/bots.json"
   },
   "PerplexityBot": {
     "operator": "Perplexity",
     "purpose": "search",
-    "ranges": "perplexity-perplexitybot.json",
+    "ranges": "perplexity/perplexitybot.json",
     "rdns": [],
     "source": "https://www.perplexity.com/perplexitybot.json"
   },
   "Perplexity-User": {
     "operator": "Perplexity",
     "purpose": "user-action",
-    "ranges": "perplexity-perplexity-user.json",
+    "ranges": "perplexity/perplexity-user.json",
     "rdns": [],
     "source": "https://www.perplexity.com/perplexity-user.json"
   },
   "Googlebot": {
     "operator": "Google",
     "purpose": "search",
-    "ranges": "google-common-crawlers.json",
+    "ranges": "google/common-crawlers.json",
     "rdns": [
       "googlebot.com",
       "google.com"
@@ -69,7 +69,7 @@
   "CCBot": {
     "operator": "Common Crawl",
     "purpose": "training",
-    "ranges": "commoncrawl-ccbot.json",
+    "ranges": "commoncrawl/ccbot.json",
     "rdns": [
       "crawl.commoncrawl.org"
     ],

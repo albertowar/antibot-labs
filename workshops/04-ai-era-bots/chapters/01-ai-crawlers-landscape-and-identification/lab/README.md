@@ -1,21 +1,12 @@
 # W4 Ch1 Lab: AI Crawlers, Landscape & Identification
 
-Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: the crawler layers and their label (`defenses/crawl.py` and four wire-it checks), the history recorders and the `robots.txt` policy hook (`demo_site/ext/crawl.py`), the reverse-DNS and published-range fixtures, four attack scripts and a 49-client cohort.
+Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: the crawler layers and their label (`defenses/crawl.py` and four wire-it checks), the history recorders and the `robots.txt` policy hook (`demo_site/ext/crawl.py`), the reverse-DNS and published-range fixtures (shared with Chapter 2), four attack scripts and a 49-client cohort.
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
 
 - `data/crawl_policy.robots`
 - `data/operators.json`
-- `data/published_ranges/anthropic-bots.json`
-- `data/published_ranges/commoncrawl-ccbot.json`
-- `data/published_ranges/google-common-crawlers.json`
-- `data/published_ranges/openai-chatgpt-user.json`
-- `data/published_ranges/openai-gptbot.json`
-- `data/published_ranges/openai-searchbot.json`
-- `data/published_ranges/perplexity-perplexity-user.json`
-- `data/published_ranges/perplexity-perplexitybot.json`
-- `data/rdns.json`
 - `data/registry_extra.json`
 - `data/robots.json`
 - `defenses/crawl.py`
@@ -24,13 +15,25 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.6). Adds: the crawl
 - `defenses/crawler_registry.py`
 - `defenses/crawler_verify.py`
 - `defenses/netdb.py`
-- `defenses/netinfo.py`
 - `demo_site/ext/crawl.py`
+- `tools/fixtures/dns_zones.json`
+- `tools/fixtures/ranges/anthropic/bots.json`
+- `tools/fixtures/ranges/bing/bingbot.json`
+- `tools/fixtures/ranges/commoncrawl/ccbot.json`
+- `tools/fixtures/ranges/google/common-crawlers.json`
+- `tools/fixtures/ranges/google/user-triggered-fetchers.json`
+- `tools/fixtures/ranges/openai/chatgpt-user.json`
+- `tools/fixtures/ranges/openai/gptbot.json`
+- `tools/fixtures/ranges/openai/searchbot.json`
+- `tools/fixtures/ranges/perplexity/perplexity-user.json`
+- `tools/fixtures/ranges/perplexity/perplexitybot.json`
 - `tools/personas_ch1.py`
 
 **Edits** (student and tuning files):
 
 - `defenses/ladder.py`
+- `defenses/policy.py`
+- `demo_site/templates/challenge.html`
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
@@ -41,7 +44,7 @@ The demo store is the Workshop 4 starter state: Kestrel Outfitters, unchanged, w
 ## Rules of engagement
 
 - **Local only, enforced in code.** Every attack script and tool imports `tools/labclient.py`, which asks `labnet.py` at the lab root for `DEMO_URL` and refuses anything that is not this machine (side-service URLs such as `REDIS_URL` too). Do not remove that check.
-- **Everything is simulated.** Source addresses are rented from `data/world.json` (RFC 5737 documentation ranges) and sent in `X-Lab-Client-IP`, which the store's edge trusts only from loopback and only inside a pool. The operators' "published ranges" in `data/published_ranges/` are lab snapshots: their prefixes are slices of pools that already exist in `world.json` (`cloud_vm`, `cloud_gcp`, `hosting_asn`), so an operator's crawler is a tenant of an ordinary cloud network, exactly like the attacker who impersonates it. Reverse and forward DNS are answered from `data/rdns.json` by `defenses/netdb.py`, never by a resolver. No crawler operator's real endpoint, range or key is contacted or used.
+- **Everything is simulated.** Source addresses are rented from `data/world.json` (RFC 5737 documentation ranges) and sent in `X-Lab-Client-IP`, which the store's edge trusts only from loopback and only inside a pool. The operators' "published ranges" in `tools/fixtures/ranges/<operator>/` are lab snapshots: their prefixes are slices of pools that already exist in `world.json` (`cloud_vm`, `cloud_gcp`, `hosting_asn`), so an operator's crawler is a tenant of an ordinary cloud network, exactly like the attacker who impersonates it. Reverse and forward DNS are answered from `tools/fixtures/dns_zones.json` by `defenses/netdb.py`, never by a resolver. These fixtures are the same files Chapter 2's mock internet serves over HTTP (byte-identical copies, listed in `shared.json`); Chapter 2 adds the network and its cost, this chapter reads them locally. No crawler operator's real endpoint, range or key is contacted or used.
 - **Outbound network:** none during the rounds. Only setup needs the internet: installing packages and container images.
 - Do not point these scripts, or anything you build from them, at a site you do not own.
 
@@ -51,7 +54,8 @@ lab/
                    ladder.py                                                           <- yours too: wire one level per round
                    crawl.py (the label, the blunt mapping, history helpers) · netdb (rDNS) · netinfo (ASN type): finished
   data/            crawl_policy.robots   <- your Round 1 file, appended to /robots.txt from level 1
-                   robots.json · registry_extra.json · operators.json · published_ranges/ · rdns.json
+                   robots.json · registry_extra.json · operators.json
+  tools/fixtures/  dns_zones.json · ranges/<operator>/<list>.json   <- the same files as Chapter 2
   demo_site/ext/   crawl.py: robots hook, the two history recorders, the placeholder challenge type
   attacks/         round0_declared_crawler · round1_impersonate_searchbot · round2_stealth_chrome
                    round3_polite_distributed · _common.py
@@ -126,15 +130,15 @@ What the checkpoint cannot show you is the other end of Round 3: a polite, distr
 
 ## Expected results (self-check)
 
-Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) and one `--round N --level N-1` run per round for the "before" column, on 2026-10-15 on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, SQLite and the in-process Redis. Every round passed with the reference solutions installed (the final `--all --catch-up` run: 0 of 40 shoppers hurt in every round). The Docker path (Redis 8.10.2 and PostgreSQL 18.6 from `docker-compose.yml`) was run for the smoke test and Rounds 1, 3 and 4: it passes with the same page counts (the gate figure rises to about 3.5 ms median in Round 1 and 8 to 10 ms in Rounds 3 and 4, p95 about 90 to 100 ms, because every request makes several Redis round trips). A "page" is one of the 120 product pages; the polite crawler's count varies by one or two between runs (it depends on which addresses reach their fourth request first), the others are deterministic.
+Generated from `python tools/verify.py --all --catch-up --markdown` (against your own store: `python tools/checkpoint.py --all --markdown`) and one `--round N --level N-1` run per round for the "before" column, on 2026-10-15 (re-verified 2026-10-18 after the fixtures moved to Chapter 2's canonical set: every page count unchanged except the polite crawler, 59 → 60, within the one-or-two-page variance) on Linux x86_64 (WSL2) with Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis 2.39.0, requests 2.34.2, SQLite and the in-process Redis. Every round passed with the reference solutions installed (the final `--all --catch-up` run: 0 of 40 shoppers hurt in every round). The Docker path (Redis 8.10.2 and PostgreSQL 18.6 from `docker-compose.yml`) was run for the smoke test and Rounds 1, 3 and 4: it passes with the same page counts (the gate figure rises to about 3.5 ms median in Round 1 and 8 to 10 ms in Rounds 3 and 4, p95 about 90 to 100 ms, because every request makes several Redis round trips). A "page" is one of the 120 product pages; the polite crawler's count varies by one or two between runs (it depends on which addresses reach their fourth request first), the others are deterministic.
 
 | Round | Level | Crawlers run | Product pages taken (before → after) | Shoppers hurt | Welcome clients | Gate per request, median / p95 |
 |---|---|---|---|---|---|---|
 | 0 | 0 | honest GPTBot | 120 | 0 of 40 | none refused | 1.5 / 3.5 ms |
 | 1 | 1 | GPTBot, GPTBot ignoring `robots.txt`, OAI-SearchBot impersonator | GPTBot 120 → **0** (it obeys the policy) · ignoring 120 → **0** (blocked by token) · impersonator 120 → **120** | 0 of 40 | none refused | 1.5 / 3.5 ms |
 | 2 | 2 | ignoring GPTBot, impersonator, fake-PTR Googlebot, stealth Chrome | ignoring 0 · impersonator 120 → **0** · fake PTR 120 → **0** · stealth 120 → **120** | 0 of 40 | none refused (Googlebot verified by reverse DNS alone) | 1.5 / 3.5 ms |
-| 3 | 3 | impersonator, stealth Chrome, polite 30-address crawler, the same with cookies | impersonator 0 · stealth 120 → **11** · polite 120 → **59** · polite with cookies 120 → **120** | 0 of 40 | **LocalSearchBot refused** (1 page served, 11 refused): the documented false positive | 1.9 / 6.3 ms |
-| 4 | 4 | the same four | impersonator 0 · stealth 11 · polite 59 · polite with cookies 120 | 0 of 40 | LocalSearchBot **limited** (10 served, 2 over its budget), none refused | 2.0 / 6.5 ms |
+| 3 | 3 | impersonator, stealth Chrome, polite 30-address crawler, the same with cookies | impersonator 0 · stealth 120 → **11** · polite 120 → **60** · polite with cookies 120 → **120** | 0 of 40 | **LocalSearchBot refused** (1 page served, 11 refused): the documented false positive | 1.9 / 6.3 ms |
+| 4 | 4 | the same four | impersonator 0 · stealth 11 · polite 60 · polite with cookies 120 | 0 of 40 | LocalSearchBot **limited** (10 served, 2 over its budget), none refused | 2.0 / 6.5 ms |
 
 Reading the table. Round 1's policy only binds clients that claim a token and read the file; the impersonator wears the allowed badge and takes everything until Round 2 checks it. Round 2 verifies the badge, so the stealth crawler stops wearing one and takes everything until Round 3 scores how it fetches. Round 3's cost is real: LocalSearchBot behaves exactly like Googlebot and cannot prove it, so the blunt mapping refuses it; Round 4 gives it a budget instead, and the crawlers' numbers barely move because the policy changes what a stop means, not who gets stopped. The residual is the last column of Round 3 and 4: a polite, distributed, cookie-holding crawler on residential addresses takes the whole catalog. GPTBot and ClaudeBot are verified from Round 2 on and still skip every product page, because their documented token is a training token and your policy says no.
 
@@ -147,7 +151,7 @@ The gate figure is the median over the shoppers' catalog and checkout requests w
 | Port 5000 taken (macOS AirPlay Receiver) | `PORT=5050 python demo_site/app.py`, then `export DEMO_URL=http://127.0.0.1:5050` in the shells that run tools |
 | Round 1 fails with `gptbot: expected blocked, got 100%` | Your stub is not finished, or not wired in `defenses/ladder.py`, or `data/crawl_policy.robots` still says nothing. Finish the `TODO`, or `python tools/checkpoint.py --round 1 --catch-up` |
 | The honest GPTBot still takes the catalog at Round 1 | `/robots.txt` is served from level 1 up only; check `curl -s localhost:5000/robots.txt` after the checkpoint set the level, and read the policy file's comment about groups and blank lines |
-| Round 2 says a verified crawler was refused | Your `verify()` returns "impersonator" for a real operator: check that Googlebot (`198.51.100.101`) passes `fcrdns()` and that GPTBot (`203.0.113.50`) is inside the range file |
+| Round 2 says a verified crawler was refused | Your `verify()` returns "impersonator" for a real operator: check that Googlebot (`198.51.100.108`) passes `fcrdns()` and that GPTBot (`203.0.113.7`) is inside the range file |
 | Round 3 hurts shoppers | A weight is enough on its own to reach `THRESHOLD`. Read `X-Lab-Signals` and the `crawl_reasons` in `/lab/decisions?actor=human:` for the person that was refused |
 | A round says `store is at level N` | The checkpoint sets the level itself; if you changed it by hand, run the checkpoint again |
 | Numbers look stale between rounds | The checkpoint resets the store (`POST /lab/reset`, which also clears the recorded history); if you ran an attack by hand, run the checkpoint to reset first |
