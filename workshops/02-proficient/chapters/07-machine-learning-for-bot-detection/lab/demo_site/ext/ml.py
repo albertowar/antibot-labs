@@ -50,9 +50,23 @@ def _redis():
 
 # --- 1. the request log -----------------------------------------------------------------------
 
+def _virtual_ts():
+    """The caller's virtual clock, when it sends one (tools/shopper.py stamps X-Virtual-Ts on every
+    request). A seeded simulation then writes the same timeline on any machine, so the training history
+    and the model are reproducible; features that divided measured wall gaps were the chapter's old P1.
+    A real browser you open yourself sends no such header and falls back to wall time."""
+    raw = request.headers.get("X-Virtual-Ts")
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    return None
+
+
 def _stamp(ctx):
-    """Request start time, shared by the log and the checkout score (one 'as of' for training and serving)."""
-    ctx.attrs["ml_ts"] = time.time()
+    """Request time, shared by the log and the checkout score (one 'as of' for training and serving)."""
+    ctx.attrs["ml_ts"] = _virtual_ts() or time.time()
 
 
 def _body_email():

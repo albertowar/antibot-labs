@@ -95,3 +95,6 @@ CLUSTER_WINDOW_S = 600
 CLUSTER_MIN_FAILURES = 5
 CLUSTER_MAX_FAILURE_RATIO = 0.5
 CLUSTER_POINTS = 60
+CAMPAIGN_MIN_FAILURES = 10         # the family-wide trip comes later than one cluster's: the family holds real users
+CAMPAIGN_FAILURE_RATIO = 0.5
+CAMPAIGN_POINTS = 30               # challenge band, never block: see login_risk.py on who shares the family

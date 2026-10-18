@@ -65,7 +65,7 @@ BOTS = {
     "round3_farm": ("attacks/round3_humanized_farm.py --sessions 3", 3),
     "round4_stuffing": ("attacks/round4_stuffing.py", 4),
     "round4_stuffing_token": ("attacks/round4_stuffing.py --with-token", 4),
-    "round4_stuffing_rotate": ("attacks/round4_stuffing.py --with-token --rotate-fp", None),   # the W3 hand-off
+    "round4_stuffing_rotate": ("attacks/round4_stuffing.py --with-token --rotate-fp", 4),   # the campaign step-up's row
 }
 # Shoppers that may meet the "proof" challenge in a round (friction, not a loss: they solve it and buy). Measured:
 # from Round 1 the privacy-extension user (Chapter 1's lie detection reads the extension's wrapped navigator),

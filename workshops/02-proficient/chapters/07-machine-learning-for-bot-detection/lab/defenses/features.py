@@ -21,9 +21,14 @@ Feature families
 LEAKY features are derived from the same events as the weak labels (defenses/labels.py). They are
 logged for analysts but must never be model inputs: see `python -m defenses.train --include-leaky`.
 
-Time. Timestamps are real seconds; every DURATION is divided by LAB_TIME_SCALE (default 0.02), so a
-shopper who "thinks" for 6 s sleeps 0.12 s and the features still read 6 s. Change it and every
-trained model is stale: retrain.
+Time. Event timestamps are seconds, and every gap and duration is already in seconds: nothing is
+divided here. A simulated session carries its VIRTUAL clock (tools/shopper.py sends X-Virtual-Ts,
+advanced by the full think time; the store records it), so a shopper who "thinks" for 6 s shows a 6 s
+gap while sleeping only 0.12 s on the wire — and, because that clock is seeded rather than measured, a
+regenerated history is identical on any machine and trains the same model. A real browser you open
+yourself sends no header; its wall-clock seconds are already real think time, so the same features
+apply unchanged. (The old code divided MEASURED wall gaps by LAB_TIME_SCALE, which multiplied
+scheduling jitter 50x and retrained a different model every run: the chapter's former P1.)
 """
 
 import os
@@ -36,6 +41,10 @@ import pandas as pd
 
 from . import cohort, netinfo
 
+# How much wall time the simulation and the live review window compress (tools/shopper.py sleeps this
+# fraction of a virtual second; enforcement.py converts its virtual review delay by it). It is NOT a
+# feature input any more — event timestamps are virtual seconds already — but it stays the one place
+# the compression factor is defined, imported by shopper, enforcement and models.time_scale().
 LAB_TIME_SCALE = float(os.environ.get("LAB_TIME_SCALE", "0.02"))
 
 HONEYPOT_PATHS = ("/archive", "/partner-feed")
@@ -162,17 +171,17 @@ def compute(req, tel, logged_in, as_of, cohort_window=None):
     assets = [r for r in req if r["is_asset"]]
     actions = [r for r in req if not r["is_asset"] and not r["path"].startswith(("/api/telemetry",) + LABEL_SOURCE_PATHS)]
     pages = [r for r in actions if r["method"] == "GET"]
-    gaps = [(b["ts"] - a["ts"]) / LAB_TIME_SCALE for a, b in zip(actions, actions[1:])]
+    gaps = [b["ts"] - a["ts"] for a, b in zip(actions, actions[1:])]
     f["n_pages"] = len(pages)
     f["asset_ratio"] = len(assets) / max(len(pages), 1)
     f["gap_median_s"] = statistics.median(gaps) if gaps else np.nan
     f["gap_cv"] = _cv(gaps)
     f["gap_min_s"] = min(gaps) if gaps else np.nan
-    f["duration_s"] = (as_of - req[0]["ts"]) / LAB_TIME_SCALE if req else 0.0
+    f["duration_s"] = (as_of - req[0]["ts"]) if req else 0.0
     f["referer_ratio"] = (sum(bool(p["referer"]) for p in pages) / len(pages)) if pages else 0.0
     f["products_viewed"] = len({p["path"] for p in pages if PRODUCT_PAGE.match(p["path"])})
     drop_page = [r["ts"] for r in pages if r["path"].startswith("/drop/")]
-    f["drop_to_buy_s"] = (as_of - max(drop_page)) / LAB_TIME_SCALE if drop_page else np.nan
+    f["drop_to_buy_s"] = (as_of - max(drop_page)) if drop_page else np.nan
     first = req[0] if req else {}
     ua = first.get("ua") or ""
     f["ua_is_library"] = int("Mozilla/" not in ua)

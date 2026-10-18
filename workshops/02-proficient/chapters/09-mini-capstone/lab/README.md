@@ -226,12 +226,14 @@ Read `defenses/drop_guard.py` first: it is the one file that explains why the ch
 | Step | Do | Expected |
 |---|---|---|
 | 🔴 Attack | `python tools/checkpoint.py --round 4 --level 4` | the stuffer takes over 10 of 60 accounts, every victim who reused a password, with or without a token: nothing at the login looks at it |
-| 🔵 Defend | Read `defenses/token_binding.py`, `login_risk.py` and `demo_site/ext/login9.py`. `python tools/checkpoint.py --round 4` | the bare stuffer: 0 takeovers (`token_binding:no_valid_token`) · the stuffer with a token: **0** takeovers: its first five attempts pass the check and fail, then its cluster is blocked before the password is read (55 of 60 attempts refused) · rotating its fingerprint: 10 again (every attempt is its own cluster) |
+| 🔵 Defend | Read `defenses/token_binding.py`, `login_risk.py` and `demo_site/ext/login9.py`. `python tools/checkpoint.py --round 4` | the bare stuffer: 0 takeovers (`token_binding:no_valid_token`) · the stuffer with a token: **0** takeovers: its first five attempts pass the check and fail, then its cluster is blocked before the password is read (55 of 60 attempts refused) · rotating its fingerprint: **5** takeovers, down from 10 — the family counter steps its later successes up to `otp` (`login_risk:campaign_stepup`); the first few slip through before the family is hot, and that residue is the W3 hand-off |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 4` | PASS |
 
 Open `http://localhost:5000/login` in your own browser at level 5 and sign in as `user031@example.test` (the password is `python -c "import demo_site.seed as s; print(s.password_for(31))"`): `login9.js` mints the token for you, in a blink. `attacks/round4_token_farm.py` is the cost line: a real Patchright browser per login takes about 0.8 s against 0.02 s (a bare login) to 0.1 s (a login with the token flow) for `curl_cffi`, and one browser build is one fingerprint, so the cluster check blocks it too.
 
 **Exercise:** set `CLUSTER_MIN_FAILURES = 1` and `CLUSTER_MAX_FAILURE_RATIO = 0.2` and rerun the shoppers at level 5: no shopper is hurt (they sign in correctly the first time), so tighten, then run `python tools/mistype.py` followed by `python tools/population.py --scenario ch9_drop`: the customer's second attempt is already refused, the right password included, and four macOS Chrome shoppers (`home:10`, `11`, `12`, `18`) who share that customer's fingerprint are blocked after them. At the shipped numbers `python tools/mistype.py --typos 2` (or `--typos 4`) signs in without trouble. `POST /lab/reset` clears the counters between tries. Put them back.
+
+**Exercise (the campaign counter):** the rotating stuffer loses 5 of its 10 takeovers to `CAMPAIGN_*` (`defenses/policy.py`), which steps up a first-seen-device success while its JA4 family is failing in a burst. Raise `CAMPAIGN_MIN_FAILURES` to 30 and rerun `python attacks/round4_stuffing.py --with-token --rotate-fp` at level 5: more pairs slip through, because the family needs longer to go hot. Lower it to 3 and rerun the shoppers: now real new-device Chrome customers meet the `otp` step-up during the campaign (they read the code and still buy — friction, not a block). That trade — oracle on one side, new-device collateral on the other — is why this is the last browser-side rung and Workshop 3 reaches for attestation. Put it back.
 
 ## Debrief
 
@@ -242,12 +244,12 @@ curl -s 'localhost:5000/lab/decisions?actor=bot:round3_farm&limit=5' | python -m
 
 - Which layer stopped the most bot *requests*, and which the most bot *pairs*?
 - Which shoppers did each round challenge, what did it cost them, and who would sign that off?
-- Fingerprint rotation beats Round 4. What would survive it, and why is it not a browser-side value?
+- Fingerprint rotation is only half-caught by the family step-up. What would catch the rest cleanly, and why is it not a browser-side value?
 
 
 ## Expected results (self-check)
 
-Measured on 2026-10-14 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis[lua] 2.39.0, requests 2.34.2, curl_cffi 0.16.3, user-agents 2.2.0, scikit-learn 1.9.1, numpy 2.5.4, Playwright 1.62.0 with its bundled Chromium, Patchright 1.63.0 and Camoufox 0.5.8 with Firefox 156), with the default **in-process Redis and SQLite**. Each cell is the number of pairs (or, for the stuffers, accounts taken over) the scalper got when it ran during that round's checkpoint, from `python tools/verify.py --all --catch-up --markdown` (the matrix is compiled from the per-round output of that command; two runs in a row gave the same table, identical except the farm cell at Round 2). A bold cell is the round whose layer must stop that scalper, and the checkpoint fails if it does not. "Stopped" means at most 10 % got through, and below its round a scalper must still get at least one through. The "before" column of Round N (`--level N`) is the previous column of the same row.
+Measured on 2026-10-14 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4, redis 8.1.0, fakeredis[lua] 2.39.0, requests 2.34.2, curl_cffi 0.16.3, user-agents 2.2.0, scikit-learn 1.9.1, numpy 2.5.4, Playwright 1.62.0 with its bundled Chromium, Patchright 1.63.0 and Camoufox 0.5.8 with Firefox 156), with the default **in-process Redis and SQLite**. Each cell is the number of pairs (or, for the stuffers, accounts taken over) the scalper got when it ran during that round's checkpoint, from `python tools/verify.py --all --catch-up --markdown` (the matrix is compiled from the per-round output of that command; two runs in a row gave the same table, identical except the farm cell at Round 2). A bold cell is the round whose layer must stop that scalper, and the checkpoint fails if it does not. "Stopped" means at most 10 % got through, and below its round a scalper must still get at least one through. The "before" column of Round N (`--level N`) is the previous column of the same row. The `--rotate-fp` row was re-measured on 2026-10-18 when the family-level step-up was added (`login_risk.py`'s campaign counter): three consecutive `--round 4` runs each gave exactly 5 takeovers (down from 10), 1 shopper hurt (`no_js`), and 3 shoppers at the `proof` challenge — the step-up itself added no new shopper challenges, because the real customers sign in before their Chrome family goes hot.
 
 | Scalper (attempts) ↓ / end of round → | 0 (level 1) | 1 (level 2) | 2 (level 3) | 3 (level 4) | 4 (level 5) |
 |---|---|---|---|---|---|
@@ -257,7 +259,7 @@ Measured on 2026-10-14 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-S
 | `round3_farm` (3) | 3 | 3 | 3 (sometimes 2) | **0** | 0 |
 | `round4_stuffing` (60 logins; takeovers) | 10 | 10 | 10 | 10 | **0** |
 | `round4_stuffing --with-token` | 10 | 10 | 10 | 10 | **0** (55 refused) |
-| `round4_stuffing --with-token --rotate-fp` | 10 | 10 | 10 | 10 | 10 |
+| `round4_stuffing --with-token --rotate-fp` | 10 | 10 | 10 | 10 | **5** (family step-up) |
 | `round4_token_farm` (7 browser logins) | - | - | - | - | 0 (five failures, then refused) |
 | **Shoppers who bought** (of 40) | 39 | 39 | 39 | 39 | 39 |
 | **Shoppers blocked** | 1 (`no_js`) | 1 | 1 | 1 | 1 |

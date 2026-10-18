@@ -13,8 +13,10 @@ decides anything.
     lab:ml:review:<n>    str    a deferred-enforcement record (Round 4)
 
 Everything lives under `lab:`, so POST /lab/reset wipes it with the rest of the lab state.
-Timestamps are real Unix seconds; every DURATION the features use is divided by LAB_TIME_SCALE
-(defenses/features.py), which is how a drop day of minutes runs in about a minute.
+Timestamps are the caller's virtual clock when it sends X-Virtual-Ts (tools/shopper.py), else wall
+seconds; the features read them as-is (no scaling). The wire is still compressed by LAB_TIME_SCALE
+(defenses/features.py) — the sleeps are short — but that compression no longer touches the recorded
+timeline, so a drop day of minutes runs in about a minute AND regenerates identically.
 """
 
 import json

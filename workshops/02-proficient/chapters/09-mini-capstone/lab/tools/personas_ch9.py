@@ -137,6 +137,28 @@ def _form(post_headers, nav_headers, referer):
     return out
 
 
+def _wants_otp(r):
+    """True when the gate answered the login with the Round 4 otp step-up."""
+    try:
+        e = r.json().get("error") or {}
+    except ValueError:
+        return False
+    return e.get("code") == "challenge_required" and e.get("challenge") == "otp"
+
+
+def _enter_otp(client, email, hdr_fetch, hdr_post):
+    """What a stepped-up customer does: read the code the store mailed them, type it in. The mailbox
+    belongs to the shopper's own account; a stuffer has no such inbox to read."""
+    m = client.get(f"/lab/mailbox/{email}", hdr_fetch)
+    msgs = m.json().get("messages", []) if m.status_code == 200 else []
+    codes = [x.get("code") for x in msgs if x.get("code")]
+    if not codes:
+        return False
+    v = client.post("/api/challenge/verify", json={"type": "otp", "answer": {"code": codes[-1]}},
+                    headers=hdr_post)
+    return v.status_code == 200
+
+
 def _solve_proof(client, r, post_headers):
     """What proof.js does on the interstitial: solve the payload, POST the answer. Returns True if verified."""
     from demo_site.ext.drop9 import solve_proof
@@ -212,7 +234,13 @@ def scenario_ch9_drop(p, client, rng):
         r = client.post("/api/login", headers=post + [("X-Login-Token", token)],
                         json={"email": username(i), "password": password_for(i)})
         stage = "login"
-    if r.status_code >= 400:
+        if r.status_code == 403 and _wants_otp(r):       # Round 4's campaign step-up: friction, not a loss
+            p.result["challenged"] = 1
+            if not _enter_otp(client, username(i), fetch, post):
+                p.result.update(stage=stage)
+                return population._stop(p, client, "stuck_on_challenge", r)
+            r = None                                     # the code opened the session the login was holding
+    if r is not None and r.status_code >= 400:
         p.result.update(stage=stage)
         return population._stop(p, client, "blocked" if r.status_code in (403, 429) else "failed", r)
 

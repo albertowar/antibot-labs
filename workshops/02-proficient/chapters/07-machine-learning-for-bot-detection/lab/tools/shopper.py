@@ -13,7 +13,11 @@ Fingerprints and behaviour summaries stand in for what the page collectors from 
 and W2 Ch4 (fingerprinting) would POST to /api/telemetry. No real browser runs in this lab.
 
 Lab time. `think()` sleeps a VIRTUAL duration times LAB_TIME_SCALE (default 0.02), so a 10 s pause is
-0.2 s. The model's features divide every measured gap by the same factor (defenses/features.py).
+0.2 s. The sleep only paces the store; the TIMESTAMP every request carries is the session's virtual
+clock (`X-Virtual-Ts`, advanced by exactly the virtual duration), so the recorded history is
+deterministic: the same seed writes the same timeline whatever the machine's load. Before this,
+features divided measured wall gaps by LAB_TIME_SCALE, which amplified scheduling jitter 50x and
+trained a different model on every fresh run (the chapter's old P1).
 
 Ground truth (who was actually a bot) is the actor label every request carries to the store's edge
 (`human:<cohort>:<n>`, `bot:<family>:<n>`). The edge strips it before any defense runs; only the
@@ -25,6 +29,7 @@ import math
 import os
 import random
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -183,9 +188,33 @@ def fixed_think(seconds, jitter=0.05):
     return _think
 
 
+SIM_EPOCH = 1_760_000_000.0   # synthetic "drop day" origin for the virtual clock (not wall time)
+ARRIVAL_WINDOW_S = 6000.0     # sessions arrive across this many virtual seconds of the drop day
+REQUEST_COST_S = 0.05         # virtual cost of one request (network + render), so back-to-back calls still tick
+
+_VCLOCK = threading.local()
+
+
+def _clock():
+    if not hasattr(_VCLOCK, "now"):
+        _VCLOCK.now = SIM_EPOCH
+    return _VCLOCK
+
+
+def start_virtual_session(arrival_s):
+    """Pin this thread's virtual clock to the session's seeded arrival time on the drop day."""
+    _VCLOCK.now = SIM_EPOCH + arrival_s
+
+
+def virtual_now():
+    return _clock().now
+
+
 def think(virtual_seconds):
-    """Sleep a virtual duration, compressed by LAB_TIME_SCALE."""
-    time.sleep(max(virtual_seconds, 0) * LAB_TIME_SCALE)
+    """Sleep a virtual duration, compressed by LAB_TIME_SCALE; the virtual clock advances the full amount."""
+    v = max(virtual_seconds, 0)
+    _clock().now += v
+    time.sleep(v * LAB_TIME_SCALE)
 
 
 @dataclass
@@ -204,6 +233,7 @@ class Persona(population.Persona):
     usd_per_gb: float = 0.0
     extra_usd: float = 0.0                   # e.g. a purchased fingerprint
     config: dict = field(default_factory=dict)   # attack knobs, for reports
+    arrival_s: float = 0.0                   # seeded offset into the drop day; the session's virtual clock starts here
 
 
 class _Headers:
@@ -211,6 +241,13 @@ class _Headers:
 
     def __init__(self, p):
         self.p, self.last = p, None
+
+    @staticmethod
+    def _ts():
+        """Tick the session's virtual clock one request forward and stamp it on the wire."""
+        c = _clock()
+        c.now += REQUEST_COST_S
+        return ("X-Virtual-Ts", f"{c.now:.3f}")
 
     def nav(self, post=False):
         p = self.p
@@ -221,6 +258,7 @@ class _Headers:
             h += [("Sec-Fetch-Site", "same-origin" if self.last else "none"), ("Sec-Fetch-Mode", "navigate")]
         if self.last:
             h.append(("Referer", self.last))
+        h.append(self._ts())
         return h
 
     def ajax(self):
@@ -230,6 +268,7 @@ class _Headers:
             h += [("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "cors")]
         if self.last:
             h.append(("Referer", self.last))
+        h.append(self._ts())
         return h
 
     def asset(self):
@@ -239,6 +278,7 @@ class _Headers:
             h += [("Sec-Fetch-Site", "same-origin"), ("Sec-Fetch-Mode", "no-cors")]
         if self.last:
             h.append(("Referer", self.last))
+        h.append(self._ts())
         return h
 
 
@@ -252,6 +292,7 @@ def _score_of(client):
 
 def shop(p, client, rng):
     """Walk the drop-day journey once. Fills and returns p.result."""
+    start_virtual_session(p.arrival_s)
     out = p.result
     out.update(actor=p.actor, persona=p.persona, is_bot=p.actor.startswith("bot:"), ip=p.ip, kb=0, usd=0.0,
                config=p.config, final=None, order=None, score=None)
@@ -351,6 +392,10 @@ def run_sessions(personas, seed=0, workers=16):
     def one(args):
         p, k = args
         rng = random.Random(seed * 100003 + k)
+        # A seeded arrival into the drop day, fixed per (seed, k), so the recorded virtual timeline
+        # and every cohort window are identical on any machine regardless of thread scheduling.
+        if not p.arrival_s:
+            p.arrival_s = random.Random(seed * 100019 + k).uniform(0, ARRIVAL_WINDOW_S)
         return shop(p, LabClient(p.actor, ip=p.ip, rng=rng), rng)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         results = list(pool.map(one, [(p, k) for k, p in enumerate(personas)]))

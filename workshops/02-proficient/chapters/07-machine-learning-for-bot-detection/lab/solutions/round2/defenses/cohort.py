@@ -31,18 +31,13 @@ import numpy as np
 
 from demo_site.ext import ml_store
 
-WINDOW_S = ml_store.WINDOW_S  # one virtual hour
+WINDOW_S = ml_store.WINDOW_S  # one hour, in the same (virtual) seconds the event timestamps use
 
 COHORT_FEATURES = [
     "fp_sessions_1h",       # sessions sharing this exact fingerprint
     "fp_ip_fanout_1h",      # distinct addresses that fingerprint arrived from
     "ip_sessions_1h",       # sessions from this address
 ]
-
-
-def _scale():
-    from .features import LAB_TIME_SCALE
-    return LAB_TIME_SCALE
 
 
 class Window:
@@ -66,7 +61,7 @@ class PopulationIndex:
         self._fp_ts = {k: [t["ts"] for t in v] for k, v in self.by_fp.items()}
 
     def window(self, as_of, ip, fp_hash):
-        start = as_of - WINDOW_S * _scale()
+        start = as_of - WINDOW_S
         rows = self.by_ip.get(ip, [])
         ts = self._ip_ts.get(ip, [])
         sessions = rows[bisect_right(ts, start):bisect_right(ts, as_of)]
@@ -79,7 +74,7 @@ class PopulationIndex:
 
 def window_from_redis(redis, as_of, ip, fp_hash):
     """Online helper: the same window, straight from the store's Redis (only the rows features() can match)."""
-    sessions, fps = ml_store.window_rows(redis, as_of - WINDOW_S * _scale(), as_of, ip, fp_hash)
+    sessions, fps = ml_store.window_rows(redis, as_of - WINDOW_S, as_of, ip, fp_hash)
     return Window(sessions, fps)
 
 
