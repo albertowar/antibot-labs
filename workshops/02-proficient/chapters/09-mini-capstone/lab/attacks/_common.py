@@ -8,7 +8,7 @@ request). No script supports proxies: the "residential" source addresses are ren
 (documentation ranges), never real; every account, email, address and credential is synthetic.
 
 What the bots claim about their TLS stack. The store sits behind no real TLS edge: it reads the JA4 a client
-CLAIMS in `X-Lab-JA4` (W2 Ch5 teaches the measured version). Each simulated client claims what its real
+CLAIMS in `X-Lab-JA4` (W2 Ch3 teaches the measured version). Each simulated client claims what its real
 stack would put on the wire (defenses/known_fingerprints.json), so a bot that reproduces a browser's
 ClientHello (curl_cffi, a real Chromium or Firefox) claims the browser's, and a Python library claims the
 library's. A bot cannot gain anything by lying here that it could not gain with the real handshake.

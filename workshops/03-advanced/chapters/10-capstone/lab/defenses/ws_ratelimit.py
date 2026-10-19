@@ -10,7 +10,7 @@ independent of the address and of how many connections the client opens.
 
 allow() is a pure function of time and state, unit-tested in __main__, so the feed (demo_site/ext/api9.py) stays a
 thin wrapper around it. It is not `ctx.bucket`: that is a Lua script on the shared Redis, which serializes under
-threads on the in-process store and would bury the gate-cost numbers (TODO.md section 1.2, the W3 Ch6 gap).
+threads on the in-process store and would bury the gate-cost numbers (TODO.md section 1.2, the W3 Ch4 gap).
 """
 
 import time

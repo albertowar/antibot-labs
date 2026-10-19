@@ -1,11 +1,11 @@
 """
 Capstone feature module: the drop, as the capstone's checks need to see it.
 
-    enricher          stamps the session with what Chapter 5's session_guard reads: `js_nonce` (the page script
+    enricher          stamps the session with what Chapter 8's session_guard reads: `js_nonce` (the page script
                       turns it into the js_ok cookie), `ua_hash` (the browser identity at session start) and
-                      `landing` (the session loaded "/"). The same plumbing Chapter 5's promo module adds.
+                      `landing` (the session loaded "/"). The same plumbing Chapter 8's promo module adds.
     hooks.slot        body_end: the one-line script that sets the js_ok cookie
-                      form:drop: Chapter 8's trap fields (the honeypot and the timing token) inside the drop form
+                      form:drop: Chapter 7's trap fields (the honeypot and the timing token) inside the drop form
     after_request     counts a purchase on the session (the one-per-customer cap reads it)
 
 No route here: the drop itself is the starter's /drop/<sku> and /api/buy. Ext modules are not
@@ -21,7 +21,7 @@ from demo_site import hooks
 
 
 def _ua_hash(ctx):
-    """A browser's identity for this session: User-Agent plus the Client Hints brand list (Chapter 5's recipe)."""
+    """A browser's identity for this session: User-Agent plus the Client Hints brand list (Chapter 8's recipe)."""
     ua = ctx.header("User-Agent", "") or ""
     ch = ctx.header("Sec-CH-UA", "") or ""
     return hashlib.sha256(f"{ua}|{ch}".encode()).hexdigest()[:16]

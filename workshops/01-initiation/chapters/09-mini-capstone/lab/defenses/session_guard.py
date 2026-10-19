@@ -1,5 +1,5 @@
 """
-W1 Ch5 — Rounds 3 & 4: read the session as evidence.
+W1 Ch8 — Rounds 3 & 4: read the session as evidence.
 
 Once the session is trustworthy (server-side, consumed once, rate-limited at birth),
 it is a record of how this visitor behaved. No single fact is proof, so each is a

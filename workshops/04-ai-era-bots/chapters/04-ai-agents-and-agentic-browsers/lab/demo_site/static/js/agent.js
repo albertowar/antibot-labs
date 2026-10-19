@@ -17,7 +17,7 @@
  * Privacy: key events record WHEN and whether the key was Tab or Enter, never
  * which character. Input events record a character COUNT, never the text.
  *
- * Everything here runs in the client and can be forged (W2 Ch2). The server
+ * Everything here runs in the client and can be forged (W2 Ch4). The server
  * treats it as evidence and checks it against what it measures itself: the
  * flow log, timing, and (Round 3) a signature it can verify.
  *

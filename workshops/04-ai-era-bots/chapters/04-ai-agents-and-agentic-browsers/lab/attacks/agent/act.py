@@ -5,7 +5,7 @@ The agent's "hands": perform one action in the browser.
                       element and click()/fill() it. No cursor path, no keystrokes.
                       This is what leaves the Round 2 tells.
     HumanizedExecutor the Round 2 evasion: move a Bezier cursor to the element and
-                      type character by character, reusing the W2 Ch3 recipe
+                      type character by character, reusing the W2 Ch5 recipe
                       (ghost-cursor-style). Plausible means, still not a real hand,
                       but enough to clear the shape checks.
 
@@ -50,7 +50,7 @@ class Executor:
 
 
 class HumanizedExecutor(Executor):
-    """Round 2: a Bezier cursor and per-character typing (W2 Ch3). Jittered think time."""
+    """Round 2: a Bezier cursor and per-character typing (W2 Ch5). Jittered think time."""
 
     def __init__(self, page, base, rng=None, think=(0.6, 2.4)):
         super().__init__(page, base, rng, think)

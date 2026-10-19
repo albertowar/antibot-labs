@@ -133,7 +133,7 @@ def run_phase(phase, ctx=None):
     d = pipeline.run(phase, ctx, ladder, cfg.defense_level, cfg.lab_shadow, cfg.lab_shadow_checks)
     # The downgrade rule: a session holding a valid clearance for the challenge type a verdict
     # asks for is served (as "monitor") instead of challenged again. A check that wants to
-    # re-challenge a cleared session must revoke_clearance() first (W1 Ch7's pass budget does).
+    # re-challenge a cleared session must revoke_clearance() first (W1 Ch6's pass budget does).
     if d.action == "challenge" and d.challenge and clearance_valid(ctx, d.challenge):
         d.action, ctx.notes["cleared"] = "monitor", d.challenge
         spend_clearance(ctx, d.challenge)

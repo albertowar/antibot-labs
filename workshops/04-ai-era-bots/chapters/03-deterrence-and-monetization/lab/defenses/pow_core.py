@@ -1,5 +1,5 @@
 """
-Chapter 7 — The puzzle itself (Sections 7.2 and 7.7)
+Chapter 6 — The puzzle itself (Sections 6.2 and 6.7)
 
 Every PoW scheme in this lab uses the same hashcash-style puzzle:
 

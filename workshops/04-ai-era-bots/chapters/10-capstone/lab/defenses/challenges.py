@@ -5,9 +5,9 @@ Three kinds of challenge the store can serve, and the one property the
 governance scoreboard cares about: whether a person who cannot see the screen
 can pass it.
 
-    pow            hash puzzle (W1 Ch7). Software solves it; nobody looks at it.
+    pow            hash puzzle (W1 Ch6). Software solves it; nobody looks at it.
                    Non-visual by construction. Costs the client CPU, not sight.
-    captcha_image  "select the tiles" (W1 Ch6). Here only a label and an answer
+    captcha_image  "select the tiles" (W1 Ch5). Here only a label and an answer
                    the lab oracle hands to sighted simulated humans. A
                    screen-reader user cannot pass it; the scoreboard counts
                    that as a block, because it is one (W4 Ch8).

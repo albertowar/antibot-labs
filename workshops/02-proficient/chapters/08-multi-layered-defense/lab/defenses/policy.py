@@ -44,23 +44,23 @@ WEIGHTS = {
     "missing_browser_headers": 30,
     "header_order_mismatch": 10,
     "outdated_browser": 10,
-    # TLS (W2 Ch5)
+    # TLS (W2 Ch3)
     "ja4_non_browser": 50,
     "ja4_ua_mismatch": 30,
     # velocity (W1 Ch2)
     "ip_burst": 30,
     "ip_elevated": 15,
-    # honeypot (W1 Ch8)
+    # honeypot (W1 Ch7)
     "honeypot_filled": 100,
-    # automation (W2 Ch1-2)
+    # automation (W2 Ch1, Ch4)
     "no_telemetry": 40,
     "webdriver_flag": 60,
     "cdp_artifacts": 40,
-    # fingerprint (W2 Ch4)
+    # fingerprint (W2 Ch2)
     "headless_gpu": 35,
     "fp_randomized": 15,
     "fp_inconsistent": 15,
-    # behaviour (W2 Ch3)
+    # behaviour (W2 Ch5)
     "no_pointer": 25,
     "mouse_too_straight": 15,
     "timing_too_regular": 15,

@@ -1,5 +1,5 @@
 """
-Chapter 7 — Round 1 Defense (L1): a PoW gate with a naive verifier
+Chapter 6 — Round 1 Defense (L1): a PoW gate with a naive verifier
 
 This is the design most first implementations end up with, and it is
 close to the code in many tutorials:

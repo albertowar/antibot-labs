@@ -2,11 +2,11 @@
 Policy: every number the defender tunes, and how a verdict becomes an HTTP answer.
 
 pipeline.py decides WHICH checks run; this file decides HOW MUCH each signal counts and WHERE the
-lines are. The capstone composes finished checks from Chapters 1, 2, 3, 5 and 6 (shared.json), and
+lines are. The capstone composes finished checks from Chapters 1, 3, 4, 5 and 6 (shared.json), and
 every one of them reads its numbers from here: the names below are exactly the ones those copies ask
 for, so a check keeps working unedited and the capstone's tuning happens in ONE file.
 
-One scale for every check: 0 (clean) to 100 (certain). Chapter 3's bands, because behavior and
+One scale for every check: 0 (clean) to 100 (certain). Chapter 5's bands, because behavior and
 account evidence is probabilistic: a challenge costs a real customer a few seconds, a block costs
 them the pair.
 
@@ -82,7 +82,7 @@ NONCE_TTL = 2 * 60                 # a page's sensor nonce must be used within t
 SENSOR_GATED = ("/drop/lab-runner-9", "/api/buy")
 NO_SENSOR_POINTS = 60              # no report at all: JavaScript off or never ran. A block, as in Chapter 1.
 
-# --- Chapter 5: TLS (ja4_denylist, tls_family) ---------------------------------------------------
+# --- Chapter 3: TLS (ja4_denylist, tls_family) ---------------------------------------------------
 # The store sees a CLAIMED JA4 (X-Lab-JA4): each simulated client sends what its real TLS stack puts
 # on the wire (defenses/known_fingerprints.json). A missing one means the request skipped the edge.
 TLS_POINTS = 50

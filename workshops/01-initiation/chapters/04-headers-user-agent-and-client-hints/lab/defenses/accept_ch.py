@@ -16,7 +16,7 @@ When the hints do arrive they are cross-checked as well: the UA string is frozen
 
 What it catches: Round 4 (consistent low-entropy hints, Chrome order, a plausible Sec-Fetch context).
 
-What it misses: a bot that drops the cookie on every request, so the store never "offered" (Chapter 5:
+What it misses: a bot that drops the cookie on every request, so the store never "offered" (Chapter 8:
 sessions), a real browser driven by automation, and Round 4's bot once it implements the negotiation
 (it is ten lines).
 

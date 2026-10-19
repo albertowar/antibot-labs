@@ -4,7 +4,7 @@ W4 Ch7 — Round 0 Attack: the bots you already know
 Two scalper families from earlier workshops, running on cheap cloud servers:
 
   naive_scalper     httpx-style script: no assets, metronome pacing. Follows the
-                    hidden honeypot link (W1 Ch8) and pokes the feed robots.txt
+                    hidden honeypot link (W1 Ch7) and pokes the feed robots.txt
                     disallows.
   headless_scalper  automated Chrome (W2 Ch1) with the HeadlessChrome token still
                     in its User-Agent: loads assets, paces at ~1 s.

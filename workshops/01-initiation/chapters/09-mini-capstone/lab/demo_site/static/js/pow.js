@@ -1,5 +1,5 @@
 /*
- * Chapter 7: the page side of the PoW gate.
+ * Chapter 6: the page side of the PoW gate.
  *
  *   interstitial   the gate's 403 page: solve its payload, POST the answer, reload the page
  *   gatedFetch()   fetch; on a JSON `challenge_required` (pow) solve, verify, retry once

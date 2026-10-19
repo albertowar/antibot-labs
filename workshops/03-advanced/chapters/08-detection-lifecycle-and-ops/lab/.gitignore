@@ -1,0 +1,15 @@
+.venv/
+instance/
+logs/
+__pycache__/
+*.pyc
+*.bak
+.env
+
+# Chapter 8 operator state and artifacts (written by tools/, read by the store)
+data/ops_config.json
+data/world_updates.json
+data/labels.jsonl
+data/snapshots/
+models/
+incident/incident_report.md

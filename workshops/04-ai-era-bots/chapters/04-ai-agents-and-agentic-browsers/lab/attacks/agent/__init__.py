@@ -7,7 +7,7 @@ W4 Ch4: a small browser agent in the shape of browser-use / Playwright MCP / Chr
     policy.py     decide the next action from the snapshot. ScriptedPolicy is a deterministic
                   stand-in for the LLM (default); OllamaPolicy asks a local open model.
     act.py        perform the action with Playwright. Executor is the stock way (click(), fill());
-                  HumanizedExecutor reuses the W2 Ch3 cursor and typing model.
+                  HumanizedExecutor reuses the W2 Ch5 cursor and typing model.
     identity.py   sign requests as an operator (Web Bot Auth) via Playwright request interception.
     loop.py       observe -> decide -> act until done.
 

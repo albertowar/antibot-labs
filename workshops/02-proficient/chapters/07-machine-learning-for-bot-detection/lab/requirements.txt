@@ -11,7 +11,7 @@ httpx==0.28.1
 # The model pipeline (defenses/features.py, train.py, anomaly.py, explain.py)
 numpy==2.5.4
 pandas==3.0.6
-# pyarrow: artifacts/reference_features.parquet, the training-time distribution W3 Ch4 monitors for drift
+# pyarrow: artifacts/reference_features.parquet, the training-time distribution W3 Ch8 monitors for drift
 pyarrow==26.0.0
 scikit-learn==1.9.1
 lightgbm==4.7.0

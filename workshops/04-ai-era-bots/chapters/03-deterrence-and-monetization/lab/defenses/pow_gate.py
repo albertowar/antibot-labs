@@ -5,7 +5,7 @@ the careful crawler nobody can name: Chrome UA, residential addresses, hygiene g
 around the maze. Chapter 1's policy could only answer such a client with a placeholder `challenge`;
 this module is the answer a client can EARN, in the style of Anubis (the open-source gate in front
 of many Git forges and docs sites): before the store hands over product records, the client solves a
-hashcash puzzle (defenses/pow_core.py, the one from W1 Ch7) and gets a pass.
+hashcash puzzle (defenses/pow_core.py, the one from W1 Ch6) and gets a pass.
 
   * Who is gated: any request for a catalogue carrier (policy.POW_PROTECTED) from a client without a
     verified identity. A verified operator (Web Bot Auth, Chapter 2) is exempt: it is handled by

@@ -1,5 +1,5 @@
 """
-Capstone feature module: the supply-chain surface (W3 Ch5). No starter file is edited, and nothing here decides
+Capstone feature module: the supply-chain surface (W3 Ch7). No starter file is edited, and nothing here decides
 anything (defenses/supply_chain.py owns the policy and the check).
 
     slot body_end         the third-party tag: static/js/runtime_monitor.js first (so it sees the other script's

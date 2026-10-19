@@ -1,5 +1,5 @@
 """
-Signal health: the console version of the Grafana board (W3 Ch4, for the capstone).
+Signal health: the console version of the Grafana board (W3 Ch8, for the capstone).
 
 Operating a stack is not just scoring traffic; it is watching whether each signal is still firing. A layer that
 goes quiet has either been bypassed or has drifted, and you want to know before the attacker tells you. This tool

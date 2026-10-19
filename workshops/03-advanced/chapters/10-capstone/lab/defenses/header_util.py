@@ -1,5 +1,5 @@
 """
-Small helpers shared by the Chapter 4 header checks (not a check itself).
+Small helpers shared by the Chapter 2 header checks (not a check itself).
 
 `lowered(ctx)` is the request's headers as a lower-cased dict; `ctx.headers` (the ordered list) stays the
 source of truth for anything about order. `demo_ctx(...)` builds a stand-in Ctx so each module's

@@ -4,12 +4,12 @@ Chapter 9 shoppers: the 40 people who want a hoodie on Drop Day.
 The starter's shoppers are Python, not browsers, so this module gives them what a browser does on this
 store's drop page, using only what the page shows:
 
-  js_hook        runs the page's one-line script: the js_ok cookie (Chapter 5). A shopper with JavaScript
-                 off (`no_js`) never sets it, and cannot solve a proof of work (Chapter 7 hook, shared
-                 with tools/personas_ch7.py)
+  js_hook        runs the page's one-line script: the js_ok cookie (Chapter 8). A shopper with JavaScript
+                 off (`no_js`) never sets it, and cannot solve a proof of work (Chapter 6 hook, shared
+                 with tools/personas_ch6.py)
   fill_form      sends what a person can touch: the hidden fields as they came (csrf, the timing token),
                  the email, the first size. A sighted person never touches the honeypot; the `autofill`
-                 persona fills every text box that has a layout box, off-screen or not (Chapter 8)
+                 persona fills every text box that has a layout box, off-screen or not (Chapter 7)
   scenario_drop_day
                  home page, think, drop page, fill, buy. If the store answers the POST with a proof of
                  work (a phone that changed network mid-checkout), solve it and submit once more
@@ -45,7 +45,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import browsers  # noqa: E402
-import personas_ch7  # noqa: E402  (registers the proof-of-work hook; imported here so the order is explicit)
+import personas_ch6  # noqa: E402  (registers the proof-of-work hook; imported here so the order is explicit)
 import population  # noqa: E402
 import trapkit  # noqa: E402
 from labclient import BASE_URL  # noqa: E402
@@ -170,4 +170,4 @@ if __name__ == "__main__":
     ap.add_argument("--n", type=int, default=None)
     args = ap.parse_args()
     out = population.run("drop_day", n=args.n)
-    personas_ch7.print_pow(out)
+    personas_ch6.print_pow(out)

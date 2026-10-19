@@ -1,5 +1,5 @@
 """
-Layer: device fingerprint (stand-in for W2 Ch4)
+Layer: device fingerprint (stand-in for W2 Ch2)
 
 Three checks on the fingerprint the collector reported:
 - a software renderer (SwiftShader, llvmpipe) is what headless Chrome on a server without a GPU

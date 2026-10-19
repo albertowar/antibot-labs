@@ -63,9 +63,9 @@ REAL_URL_CALL = re.compile(
 # Opt-in tools that may reach the real internet, each off by default and documented in
 # its lab README's "Rules of engagement".
 OUTBOUND_ALLOWLIST = {
-    "02-proficient/chapters/05-tls-and-network-fingerprinting/lab/tools/get_fingerproxy.py":
+    "02-proficient/chapters/03-tls-and-network-fingerprinting/lab/tools/get_fingerproxy.py":
         "setup-time download of the pinned fingerproxy release, SHA-256 checked",
-    "03-advanced/chapters/06-specialized-attack-scenarios/lab/defenses/breachcorpus.py":
+    "03-advanced/chapters/04-specialized-attack-scenarios/lab/defenses/breachcorpus.py":
         "k-anonymity range lookup against Pwned Passwords, only with HIBP_LIVE=1",
     "04-ai-era-bots/chapters/02-verified-bot-identity/lab/tools/verify_real.py":
         "bonus: resolve an IP from your own logs and download an operator's published range file",

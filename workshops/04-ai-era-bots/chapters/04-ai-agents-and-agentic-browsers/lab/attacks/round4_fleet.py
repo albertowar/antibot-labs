@@ -16,7 +16,7 @@ toward. Against this fleet it does two things:
              browser fingerprint. The gate counts units per fingerprint and stops at PER_DEVICE_CAP.
 
 Result at DEFENSE_LEVEL 4: the fleet wins at most the cap instead of every unit. Beating the cap means
-a different real device per unit (W2 Ch4, fingerprint stability), a cost the attacker now pays once
+a different real device per unit (W2 Ch2, fingerprint stability), a cost the attacker now pays once
 per unit. The rented residential exits change nothing: the gate does not
 look at the address.
 

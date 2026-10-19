@@ -6,7 +6,7 @@ Each fake here is indistinguishable from the real answer for that action, writes
 row, and leaves a note in the decision log. Two actions stay in their routes, which
 hold the context a plausible fake needs: checkout and drop_buy (the cart, the drop
 page). An action with no fake here falls through to the route, which then writes
-normally — a trap chapter that wants more (W1 Ch8's ghost /account page) serves it
+normally — a trap chapter that wants more (W1 Ch7's ghost /account page) serves it
 from an ext before_request or its own templates.
 
 The login fake is the deception that matters most: the password is NOT checked and

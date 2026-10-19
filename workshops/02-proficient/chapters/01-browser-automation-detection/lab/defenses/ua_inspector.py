@@ -1,5 +1,5 @@
 """
-Chapter 4, Round 1 defense (L1): User-Agent parsing.
+Chapter 2, Round 1 defense (L1): User-Agent parsing.
 
 Parses the User-Agent with the open source `user-agents` library and scores the obvious giveaways:
 library, CLI and headless markers, empty or truncated strings, and browser versions too old (or on

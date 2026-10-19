@@ -1,5 +1,5 @@
 """
-Layer: TLS fingerprint (stand-in for W2 Ch5)
+Layer: TLS fingerprint (stand-in for W2 Ch3)
 
 The edge passes the JA4 of the ClientHello (`ctx.edge.ja4`: measured by a TLS edge, or claimed by
 the lab client over plain HTTP). Two checks: is it a known HTTP library, and does the TLS stack
@@ -20,7 +20,7 @@ SIGNALS = {
     "ja4_ua_mismatch": "JA4 is one browser, User-Agent claims another",
 }
 
-# Illustrative JA4 values, one per client stack (W2 Ch5 captures and verifies real ones)
+# Illustrative JA4 values, one per client stack (W2 Ch3 captures and verifies real ones)
 JA4 = {
     "chrome":          "t13d1516h2_8daaf6152771_02713d6af862",
     "firefox":         "t13d1715h2_5b57614c22b0_3d5424432f57",

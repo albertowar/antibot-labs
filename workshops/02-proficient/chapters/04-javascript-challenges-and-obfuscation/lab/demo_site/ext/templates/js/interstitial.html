@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}Checking your browser · {{ store_name }}{% endblock %}
+{% block content %}
+{# Chapter 4: the "js" challenge interstitial. The gate renders it with js_challenge.issue()'s payload. #}
+<section class="card narrow interstitial" id="challenge" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Checking your browser&hellip;</h1>
+  {# role=status + aria-live: screen readers announce progress without the page stealing focus #}
+  <p id="challenge-status" role="status" aria-live="polite">This takes less than a second.</p>
+  <noscript><p>This store needs JavaScript to check your browser. Please enable it and reload.</p></noscript>
+  <p class="muted small">Lab: <a href="/lab/jsc/check">/lab/jsc/check</a> · scheme <code>{{ payload.scheme }}</code></p>
+</section>
+{% if payload.scheme == "cookie" %}
+<script>{{ payload.inline|safe }}</script>
+{% elif payload.error %}
+<p class="muted">{{ payload.error }}</p>
+{% else %}
+<script>
+  // The signed challenge is embedded in the page; load the script that solves it.
+  window.__ch = {{ payload|tojson }};
+  (function () {
+    var s = document.createElement("script");
+    s.src = window.__ch.script;
+    document.head.appendChild(s);
+  })();
+</script>
+{% endif %}
+{% endblock %}

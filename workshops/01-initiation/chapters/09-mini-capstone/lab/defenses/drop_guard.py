@@ -1,16 +1,16 @@
 """
 drop_guard: the capstone's own glue. Five checks that point the chapters' defenses at the drop.
 
-Chapters 2, 5 and 8 each built a defense for the page they were teaching: Chapter 2's rate limit
-meters POST /checkout, Chapter 5's session guard fires on the promo redeem, Chapter 8's traps sit on
+Chapters 2, 7 and 8 each built a defense for the page they were teaching: Chapter 2's rate limit
+meters POST /checkout, Chapter 8's session guard fires on the promo redeem, Chapter 7's traps sit on
 the signup form. The drop buys through POST /drop/<sku> (and POST /api/buy), so the capstone does not
 copy and edit those modules (copies drift). It re-points them:
 
     RATE_CHECK      Chapter 2's checkout bucket (policy.RATE_LIMITS["checkout_ip"]) on the drop POST
-    FORM_CHECK      Chapter 8's honeypot and timing token on the drop form, using form_traps'
+    FORM_CHECK      Chapter 7's honeypot and timing token on the drop form, using form_traps'
                     own helpers (honeypot_name, _sign) and responses.on_hit for the answer
-    SESSION_CHECK   Chapter 5's session_guard signals, same function, phase action:drop_buy
-    BINDING_CHECK   Chapter 5's binding signals (UA hash, ASN), same function, phase action:drop_buy
+    SESSION_CHECK   Chapter 8's session_guard signals, same function, phase action:drop_buy
+    BINDING_CHECK   Chapter 8's binding signals (UA hash, ASN), same function, phase action:drop_buy
     CAP_CHECK       one hoodie per customer: the session has bought, so the next buy is refused
 
 The checks that need no re-pointing (rate_limit, prefix_limit, the header checks, ip_reputation,
@@ -52,7 +52,7 @@ def _rate(ctx):
 
 
 def _form(ctx):
-    """Chapter 8's two form traps, read back from the drop form."""
+    """Chapter 7's two form traps, read back from the drop form."""
     if not _drop_form_post(ctx):
         return None
     sid = ctx.session.sid

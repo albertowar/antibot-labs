@@ -1,7 +1,7 @@
 """
 W4 Ch4 — L2 agent behavior: how a session acts, scored to CHALLENGE, never to block (Round 2)
 
-W2 Ch3 taught pointer kinematics against humanized bots. Agents are a
+W2 Ch5 taught pointer kinematics against humanized bots. Agents are a
 different animal: they don't fake a hand, they *don't have one*. A DOM- or
 accessibility-tree-driven agent (browser-use, Playwright MCP, Chrome DevTools
 MCP, Claude in Chrome) resolves an element and acts on it. Five tells, all

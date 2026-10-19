@@ -17,7 +17,7 @@ class EdgeInfo:
     org: str = ""
     country: str = ""
     pool: str = ""          # pool name is an edge-side join key, not its type
-    ja4: str = ""           # measured by a TLS edge (W2 Ch5) or claimed over plain HTTP
+    ja4: str = ""           # measured by a TLS edge (W2 Ch3) or claimed over plain HTTP
     ja4_source: str = ""    # "measured" | "claimed" | ""
     h2: str = ""
     xff_claimed: str = ""   # X-Forwarded-For as a CDN forwards it: everything left of the last

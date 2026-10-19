@@ -7,7 +7,7 @@ iocaine and Cloudflare's AI Labyrinth do.
 The maze has four parts, and each has a cost or a false positive to name:
 
   1. **Entry link** on every real page: hidden by CSS, `rel="nofollow"`, `tabindex=-1`,
-     `aria-hidden`, and under a path that robots.txt Disallows (W1 Ch8: a hit on a Disallowed,
+     `aria-hidden`, and under a path that robots.txt Disallows (W1 Ch7: a hit on a Disallowed,
      hidden link means the client ignored the rules or never read them). Browsers never render it;
      prefetchers must be told to skip nofollow/hidden links (the lab's prefetch cohort checks
      exactly that).
@@ -20,7 +20,7 @@ The maze has four parts, and each has a cost or a false positive to name:
      more than the tag, and why production keys on W2-style fingerprints as well.
   4. **Drip delivery** inside a concurrency cap: pages stream slowly to hold the crawler's
      connection, but only MAX_INFLIGHT at a time. Past the cap the store serves the decoy at full
-     speed. A tarpit with no cap is a DoS amplifier against yourself (W1 Ch8).
+     speed. A tarpit with no cap is a DoS amplifier against yourself (W1 Ch7).
 
 How it reaches the wire: this is not a new verdict (the gate's set is closed). The CHECK below runs
 at LADDER[3] and records `ctx.attrs["maze"]` for a tagged client; `demo_site/ext/deterrence.py`

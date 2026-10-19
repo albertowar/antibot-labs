@@ -11,7 +11,7 @@ Harness deck (`onboarding/lab-harness/slides.md`) shows how the labs measure att
 |---|---|---|
 | Python | **3.12** (3.13 fine) | every lab; `python3.12 --version` |
 | Git | any | clone the repo |
-| Node.js | 24 LTS | only to view the slide decks locally, and for W2 Ch2's JS toolchain |
+| Node.js | 24 LTS | only to view the slide decks locally, and for W2 Ch4's JS toolchain |
 | Docker + Compose | optional | the production-shaped stack (Redis + PostgreSQL); every lab also runs without it |
 
 Windows: use WSL 2 (Ubuntu) and do everything inside it. macOS: `brew install python@3.12`. Linux:

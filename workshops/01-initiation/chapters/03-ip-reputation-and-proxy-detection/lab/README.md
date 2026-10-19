@@ -110,7 +110,7 @@ curl -s 'localhost:5000/lab/decisions?actor=bot:&limit=5' | python -m json.tool
 Every response carries `X-Lab-Verdict`, `X-Lab-Score` and `X-Lab-Signals`. They tell the attacker exactly what tripped:
 never send them in production (`LAB_HEADERS=0` turns them off).
 
-**There is no challenge type yet.** CAPTCHAs arrive in Chapter 6 and proof of work in Chapter 7. Until then the `challenge`
+**There is no challenge type yet.** CAPTCHAs arrive in Chapter 5 and proof of work in Chapter 6. Until then the `challenge`
 band (score 40-74) is enforced as a block (`challenge_unavailable`), so a "challenged" shopper is a lost shopper.
 
 ## The simulated network
@@ -229,13 +229,13 @@ mutual TLS, or a shared secret header the edge adds.) This lab's edge is in-proc
 
 Every address the bot used was clean. What gave it away was one session moving between addresses and countries, until it
 dropped its cookies. **Discuss:** which information would you need that an IP can't give you? (Chapter 4: headers;
-Chapter 5: sessions.)
+Chapter 8: sessions.)
 
 ## Debrief
 
 1. Round 5's last attack wins outright. What does the next layer need to see?
 2. Which false positives would you accept to stop the bot, and which never? Who in your company decides?
-3. Where would you rather serve the bot slightly wrong data, or nothing at all (a tarpit, Chapter 8)?
+3. Where would you rather serve the bot slightly wrong data, or nothing at all (a tarpit, Chapter 7)?
 4. The rate limit and the blocklists trusted the same `X-Forwarded-For` value. What else in your stack trusts it?
 
 ---

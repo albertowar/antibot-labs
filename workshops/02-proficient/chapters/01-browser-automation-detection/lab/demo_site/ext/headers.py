@@ -1,5 +1,5 @@
 """
-Chapter 4 feature module: everything the header defenses need from the store that is not a check.
+Chapter 2 feature module: everything the header defenses need from the store that is not a check.
 
     app.after_request   Accept-CH (and optionally Critical-CH) on HTML pages, plus the `ch_offered`
                         cookie that remembers the store asked. Only while the accept_ch check is

@@ -8,7 +8,7 @@ of a refusal. What this module adds (no starter file is edited):
                           and completes whatever challenge comes back (solve the proof of work, or
                           read the emailed code from /lab/mailbox/<email> and type it).
     telemetry "risk"      the blob the layers read (ctx.telemetry("risk"), defenses/features.py)
-    challenge "pow"       hashcash, as in W1 Ch7: find n so that sha256(prefix:n) has POW_BITS
+    challenge "pow"       hashcash, as in W1 Ch6: find n so that sha256(prefix:n) has POW_BITS
                           leading zero bits. Real browsers solve it in well under a second; a bot
                           pays the same CPU, which is nothing for one login and real money for
                           millions. It stops lazy bots and only slows determined ones.

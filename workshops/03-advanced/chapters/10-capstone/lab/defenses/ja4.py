@@ -1,7 +1,7 @@
 """
 ja4: TLS client fingerprints, and the helpers every TLS check shares. (Finished: nothing to write here.)
 
-This is the series' canonical TLS-fingerprinting module. It is written in W2 Ch5 and copied, byte for
+This is the series' canonical TLS-fingerprinting module. It is written in W2 Ch3 and copied, byte for
 byte, by the W2 Ch9 capstone and by W3 Ch1 (their `shared.json`), so it knows nothing about this
 chapter's rounds: no thresholds, no point values, no protected paths. Those live in the checks
 (`ja4_denylist`, `tls_family`, `h2_fingerprint`, `browser_proof`) and in `policy.py`.

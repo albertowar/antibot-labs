@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Chapter 3: trace viewer for /lab/behavior/view/<sid> (Round 0).
+ * Chapter 5: trace viewer for /lab/behavior/view/<sid> (Round 0).
  *
  * Draws one session: the layout boxes, the pointer path (darker = faster),
  * clicks and taps, the closing-speed profile of each approach, and a keystroke

@@ -5,7 +5,7 @@ Nobody hands you a labeled dataset. You assemble one from signals that are high-
 low-coverage:
 
   bot    = the session hit a honeypot (the hidden /archive link or the robots-disallowed
-           /partner-feed endpoint, W1 Ch8)
+           /partner-feed endpoint, W1 Ch7)
   human  = the session signed in to a long-standing account
            (>= 3 past orders, account older than 90 days)
   manual = analyst decisions in data/history/manual_labels.jsonl (Round 2:

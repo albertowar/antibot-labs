@@ -289,7 +289,7 @@ override (`--no-override`) the browser never got this far: `HeadlessChrome` in t
 
 **Discuss:**
 
-- The bot throws away the `ch_offered` cookie every time. What happens? (Chapter 5)
+- The bot throws away the `ch_offered` cookie every time. What happens? (Chapter 8)
 - Which costs more, a cookie plus a response header, or blocking a real user?
 
 ---
@@ -300,10 +300,10 @@ The Playwright browser was caught by one leaked brand. Set the `userAgentMetadat
 `Emulation.setUserAgentOverride`, or run headed Chrome on a real Windows box, and **every header is genuine**. Header
 inspection ends here; the next layers are:
 
-- TLS and HTTP/2 fingerprints: W2 Ch5
+- TLS and HTTP/2 fingerprints: W2 Ch3
 - Automation artefacts: W2 Ch1
-- JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): W2 Ch4
-- Behaviour: W2 Ch3
+- JavaScript-side consistency (`userAgentData` vs. these headers, browser fingerprints): W2 Ch2
+- Behaviour: W2 Ch5
 
 Then look at the defender's side:
 

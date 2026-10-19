@@ -86,7 +86,7 @@ NONCE_TTL = 2 * 60                 # a page's sensor nonce must be used within t
 SENSOR_GATED = ("/drop/lab-runner-9", "/api/buy")
 NO_SENSOR_POINTS = 60              # no report at all: JavaScript off or never ran. A block, as in Chapter 1.
 
-# --- Chapter 5: TLS (ja4_denylist, tls_family) ---------------------------------------------------
+# --- Chapter 7: TLS (ja4_denylist, tls_family) ---------------------------------------------------
 # The store sees a CLAIMED JA4 (X-Lab-JA4): each simulated client sends what its real TLS stack puts
 # on the wire (defenses/known_fingerprints.json). A missing one means the request skipped the edge.
 TLS_POINTS = 50

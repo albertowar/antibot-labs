@@ -1,4 +1,4 @@
-// Capstone L7 — runtime fetch/sendBeacon monitor (W3 Ch5)
+// Capstone L7 — runtime fetch/sendBeacon monitor (W3 Ch7)
 //
 // Wraps the two APIs a skimmer uses to exfiltrate, and reports any call to an
 // origin that is not our own. This is DETECTION, not enforcement: a script that

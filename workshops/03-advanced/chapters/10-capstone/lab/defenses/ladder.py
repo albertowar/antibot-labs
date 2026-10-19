@@ -13,9 +13,9 @@ by contract (`tools/verify.py --smoke` runs there), so the eight layers of the c
     0      -      -      the bare store                                           -
     1      L0     0      request: headers, TLS family; buy: sensor gate and       ua_inspector, header_inspector,
                          automation artifacts; login: per-IP velocity             client_hints, header_order (Ch1) ·
-                                                                                  ja4_denylist, tls_family (Ch5) ·
+                                                                                  ja4_denylist, tls_family (Ch7) ·
                                                                                   sensor_gate, automation_artifacts (Ch1)
-                                                                                  · login_throttle (Ch6)
+                                                                                  · login_throttle (Ch4)
     2      L1     0      buy: does the fingerprint cohere?                        consistency, lie_detection (Ch1)
     3      L2     0      buy: how did the hand get to the click?                  behavior_l1, behavior_l2 (Ch3) · flow
     4      L3+L4  0      buy: is this account a farm's? · login: token, cluster   session_model · token_binding, login_risk
@@ -27,7 +27,7 @@ by contract (`tools/verify.py --smoke` runs there), so the eight layers of the c
 Rounds: 0 runs at level 4 (the whole inherited stack), 1 at 5, 2 at 6, 3 and 4 at 7. The "before" column of a
 round is the level below it (`--level N`: 4 for Round 1, and so on).
 
-The Workshop 2 checks are Chapter 1's, Chapter 3's and Chapter 6's own, re-pointed at the buy by drop_guard.at_drop().
+The Workshop 2 checks are Chapter 1's, Chapter 3's and Chapter 4's own, re-pointed at the buy by drop_guard.at_drop().
 Their docstrings count levels the way the W2 Ch9 lab does (token at 5, model at 4); here the model and the login token
 share level 4. Cheapest and most certain first inside a level: a hard verdict (the login throttle) stops the gate
 before the slower checks. Run with LAB_SHADOW=1 and the levels above the current one still run, logged in

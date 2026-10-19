@@ -231,7 +231,7 @@ The 13 profiles are synthetic but grounded: header order and native-code strings
 **Discuss:**
 
 - Scraping still works at this level. Why is that acceptable for a catalogue but not for a limited-edition drop?
-- The keyboard rule accepts `detail == 0` without checks, so a bot can Tab and press Enter. Is that a bug? (No: it is an accessibility requirement. Close the gap with Chapter 3's keystroke and focus timing, not by blocking keyboard users.)
+- The keyboard rule accepts `detail == 0` without checks, so a bot can Tab and press Enter. Is that a bug? (No: it is an accessibility requirement. Close the gap with Chapter 5's keystroke and focus timing, not by blocking keyboard users.)
 
 ---
 
@@ -247,10 +247,10 @@ Read `round5_forged_sensor.py`: it is `tools/profile_replay.py`, the very module
 
 | Gap | Picked up in |
 |---|---|
-| A sensor whose output cannot be forged without running it (challenge binding, obfuscation, signing) | Chapter 2 |
-| Movement that is merely "not a teleport" | Chapter 3 |
-| Device plausibility (canvas, audio, fonts) | Chapter 4 |
-| The HTTP client underneath the forged sensor | Chapter 5 (TLS) |
+| A sensor whose output cannot be forged without running it (challenge binding, obfuscation, signing) | Chapter 4 |
+| Movement that is merely "not a teleport" | Chapter 5 |
+| Device plausibility (canvas, audio, fonts) | Chapter 2 |
+| The HTTP client underneath the forged sensor | Chapter 3 (TLS) |
 
 ---
 
@@ -269,7 +269,7 @@ Generated from `python tools/verify.py --all --catch-up --markdown`. Each cell i
 | `round3_stealth_plugin` | 200 / 200 | 200 / 200 | 200 / 200 | **403 / –** | 403 / – | 403 / – | `lie_detection`: native code replaced, Worker realm disagrees |
 | `round4_patchright` | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | **200 / 403** | 200 / 403 | `interaction` on the cart: teleport + dead centre (+ SwiftShader 10) |
 | `round4_patchright --vanilla` | 200 / 200 | **403 / –** | 403 / – | 403 / – | 403 / – | 403 / – | `automation_artifacts`: `__playwright__binding__` global |
-| `round5_forged_sensor` | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | never stopped here: a perfect replay (Chapter 2) |
+| `round5_forged_sensor` | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | 200 / 200 | never stopped here: a perfect replay (Chapter 4) |
 | Shoppers blocked (of 40) | 0 | 1 (no-JS) | 1 (no-JS) | 1 (no-JS) | 1 (no-JS) | 1 (no-JS) | `sensor_gate:no_sensor`, an accepted cost |
 | Shoppers 🟡 suspicious (20–39) | – | – | RFP Firefox (20) | privacy ext. (30), RFP Firefox (20) | privacy ext. (30), RFP Firefox (20) | privacy ext. (30), RFP Firefox (20) | served, one rule from a block |
 | Gate ms on /api/products, median / max | 0.95 / 1.75 | 1.46 / 22.29 | 1.35 / 3.75 | 1.52 / 2.77 | 1.50 / 2.39 | 1.34 / 2.78 | `Server-Timing` |
@@ -424,5 +424,5 @@ Things to watch for:
 
 1. **Worker-side lies.** Extend `round3_stealth_plugin.py` so its patches also run inside Workers: wrap `window.Worker` and prepend the patch to the worker's script. The realm check goes quiet, but the native-code check still fires on the main thread. Why does it take both checks to catch a careful liar? Then make `workerReport()` report native-code integrity from inside the Worker too.
 2. **Selenium.** Run `python attacks/bonus_selenium.py`. ChromeDriver still injects `cdc_adoQpoasnfa76pfcZLmcfl_*` globals in 2026. Which flag or patched driver removes them, and what does Layer 2 then see?
-3. **Touch spoofing.** Make the Round 4 attack claim to be a touch device (`has_touch=True`, `page.tap()`). Which rule in `interaction.py` catches it, and what does that cost a real Windows laptop with a touchscreen? (Chapter 3, Round 5 goes further.)
+3. **Touch spoofing.** Make the Round 4 attack claim to be a touch device (`has_touch=True`, `page.tap()`). Which rule in `interaction.py` catches it, and what does that cost a real Windows laptop with a touchscreen? (Chapter 5, Round 5 goes further.)
 4. **The CDP side-effect probe.** Add the classic `Runtime.enable` detector to `sensor.js`: a `console.debug` of an Error whose `stack` getter records being read. Run every attack. Why does it never fire on Chromium 153? (See §1.4: V8 fixed it in Chrome 137.)

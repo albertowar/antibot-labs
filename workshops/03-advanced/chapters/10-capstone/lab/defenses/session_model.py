@@ -9,7 +9,7 @@ account, session and behavior features into one model:
     account_age_days, prior_orders     a fresh account with no history
     addr_accounts                      accounts that signed up with this shipping address (24 h)
     session_age_s, dwell_ms            how long the session had been alive, how long the page was open
-    n_pointer, submit_ms               how much the hand did, how long the form took (Chapter 3's features)
+    n_pointer, submit_ms               how much the hand did, how long the form took (Chapter 5's features)
     software_gpu                       the sensor report's renderer is software (Chapter 1's signal)
 
 It is the capstone's OWN code: W2 Ch7's scorer reads a per-session request log that this store does not

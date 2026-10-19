@@ -21,7 +21,7 @@ the finished versions from those chapters (see shared.json); only the numbers ar
 
 BANDS = {"monitor": 20, "challenge": 40, "block": 75}
 
-# The challenge type a "challenge" verdict serves: the W1 Ch7 proof of work (demo_site/ext/pow.py).
+# The challenge type a "challenge" verdict serves: the W1 Ch6 proof of work (demo_site/ext/pow.py).
 DEFAULT_CHALLENGE = "pow"
 
 # Rounds 1-3 have nothing to serve in the challenge band, so decide() enforces it as a block. That is
@@ -98,10 +98,10 @@ IP_POINTS = {
 # relay hit cancel datacenter, hosting_asn and known_vpn (W1 Ch3's blue step); False stops both relay shoppers.
 TRUST_PRIVACY_RELAYS = True
 
-# --- Round 3 -- W1 Ch5: the session as evidence (drop_guard.SESSION_CHECK) --------------------------------
+# --- Round 3 -- W1 Ch8: the session as evidence (drop_guard.SESSION_CHECK) --------------------------------
 # no_landing        the session never loaded "/": nobody saw the store
 # no_js_cookie      the page script never ran here. 25 is "monitor": a no-JS human is logged, not stopped
-#                   (Ch5 ships 40 and makes you lower it; the capstone starts from the lowered value)
+#                   (Ch8 ships 40 and makes you lower it; the capstone starts from the lowered value)
 # session_too_young the buy came sooner than MIN_SESSION_SECONDS after the session began
 SESSION_POINTS = {
     "no_landing": 30,
@@ -112,7 +112,7 @@ SESSION_POINTS = {
 }
 MIN_SESSION_SECONDS = 1.0   # autofill + a fast human finish a one-field form in ~1.5 s
 
-# --- Round 3 -- W1 Ch8: traps -------------------------------------------------------------------------------
+# --- Round 3 -- W1 Ch7: traps -------------------------------------------------------------------------------
 # A hit that answers with a hard verdict (a fake success) carries TRAP_HARD_POINTS; a logged-only hit
 # (the trap link, a sanctioned client's later requests) stays in the monitor band.
 TRAP_HARD_POINTS = 100
@@ -125,7 +125,7 @@ TRAP_RESPONSE_MODE = "fake"
 TRAP_SANCTION_KEY = "session"
 SANCTION_TTL = 15 * 60
 
-# --- Round 4 -- W1 Ch7: proof of work ------------------------------------------------------------------------
+# --- Round 4 -- W1 Ch6: proof of work ------------------------------------------------------------------------
 # Pages behind the gate: the drop page and the JSON buy. Everything else stays free (a wall in front of
 # the whole store prices people, not scalpers).
 POW_PROTECTED = ("/drop/", "/api/buy")

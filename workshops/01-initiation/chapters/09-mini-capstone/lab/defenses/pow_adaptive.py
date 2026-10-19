@@ -1,5 +1,5 @@
 """
-Chapter 7, Round 4 defense (L4): adaptive (risk-based) difficulty.
+Chapter 6, Round 4 defense (L4): adaptive (risk-based) difficulty.
 
 A fixed difficulty forces one compromise for everybody: too low and bots barely notice,
 too high and phones suffer. Adaptive difficulty charges by risk. Here the risk signal is

@@ -14,7 +14,7 @@ phase: the drop PAGE is where the sensor runs (a gate on the page would refuse t
 the report it asks for), and the buy is the only request whose cost to the defender is worth paying.
 
 That phase decides on ITS OWN signals: the request phase already ran for this POST (headers, TLS), but
-its points do not carry over. Chapter 3's behavior layers are already written for this phase.
+its points do not carry over. Chapter 5's behavior layers are already written for this phase.
 
 Trade-off: judging only at the buy means a scraper that never buys is not judged by the sensor at all.
 That is the right trade for a drop (nothing else is scarce) and the wrong one for a catalogue (W2 Ch1

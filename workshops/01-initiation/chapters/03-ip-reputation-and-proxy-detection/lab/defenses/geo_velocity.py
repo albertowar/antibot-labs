@@ -16,7 +16,7 @@ a challenge; churn plus hops is a block.
 What it misses: a bot that drops its cookies. A fresh cookie jar per request is a brand-new
 session from a brand-new clean address every time, and this check has nothing to compare.
 That is where the IP layer ends: the next signals are the client itself (headers in
-Chapter 4, sessions in Chapter 5).
+Chapter 4, sessions in Chapter 8).
 Who it hurts: travellers and phones, in principle. A phone hops between Wi-Fi and the carrier
 (two addresses, one country), and a traveller changes country over hours, not seconds. Keep
 the window short and the thresholds above what one person does. One shopper in this

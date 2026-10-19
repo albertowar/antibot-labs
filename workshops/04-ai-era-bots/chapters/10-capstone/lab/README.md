@@ -192,7 +192,7 @@ is ~60–90 s. Defender cost: checkout scoring median a few ms; the maze costs b
 
 ## Bonus challenges
 
-1. **Rotating pool.** Give the Round 1 stealth crawler a pool of datacenter IPs. The per-IP maze tag dilutes. What keys the deterrence now? (W2 Ch4 fingerprint clustering; streaming detection across the whole pool.)
+1. **Rotating pool.** Give the Round 1 stealth crawler a pool of datacenter IPs. The per-IP maze tag dilutes. What keys the deterrence now? (W2 Ch2 fingerprint clustering; streaming detection across the whole pool.)
 2. **A real model.** `export LLM_URL=…` and re-run Round 3. Which injection variants does a real model resist that the mock follows, and which does it fall for?
 3. **A browser agent.** `attacks/bonus_playwright_agent.py` drives a real Chromium agent against checkout (needs `pip install playwright==1.63.0 && python -m playwright install chromium`). Does the HTTP-level story hold?
 4. **Pay-per-use.** Extend the ledger so a crawl is billed only when the page is later served in an answer, not on fetch (Cloudflare's 2026 shift). Where does the accounting move?

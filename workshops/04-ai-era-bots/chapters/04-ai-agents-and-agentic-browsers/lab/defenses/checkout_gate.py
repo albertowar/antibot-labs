@@ -25,7 +25,7 @@ mandate) is demo_site/ext/agents.py's `hooks.on_action("drop_buy", ...)`.
 False positives: the first-time buyer who registers during the drop gets a step-up (friction, not
 refusal); a household buying on two identical laptops behind one fingerprint would meet the device
 cap. What the gate cannot do: tell a fleet that owns twelve inboxes and randomises twelve
-fingerprints from twelve people. That fight is W2 Ch4 (fingerprint stability) and the plain
+fingerprints from twelve people. That fight is W2 Ch2 (fingerprint stability) and the plain
 economics of owning twelve of everything, and it costs the attacker twelve of everything.
 """
 

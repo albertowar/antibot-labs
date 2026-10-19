@@ -1,5 +1,5 @@
 """
-Layer: honeypot field (stand-in for W1 Ch8)
+Layer: honeypot field (stand-in for W1 Ch7)
 
 The login form carries a `website` input that people never see: it is hidden with CSS,
 `aria-hidden` and `tabindex="-1"`, so screen readers and keyboard users skip it too (the slot

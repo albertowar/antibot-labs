@@ -1,5 +1,5 @@
 """
-Chapter 7 feature module: the proof-of-work challenge and everything the page needs to run it.
+Chapter 6 feature module: the proof-of-work challenge and everything the page needs to run it.
 
     hooks.challenges.register("pow", ...)   GET /api/challenge?type=pow, POST /api/challenge/verify,
                                             and the 403 interstitial the gate serves

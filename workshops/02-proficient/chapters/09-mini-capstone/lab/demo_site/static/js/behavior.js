@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Chapter 3: behavioral telemetry collector (Section 3.2).
+ * Chapter 5: behavioral telemetry collector (Section 3.2).
  *
  * Records HOW the visitor interacts with the drop page: pointer paths, clicks,
  * keystroke *timing* and form-fill events. Plain JavaScript, no build step,
@@ -19,7 +19,7 @@
  * Trade-offs:
  *   - Everything here runs on the attacker's machine. A bot can skip this
  *     script and POST a forged payload. Protecting the sensor (obfuscation,
- *     integrity tokens) is Chapter 2's topic; this chapter is about what the
+ *     integrity tokens) is Chapter 4's topic; this chapter is about what the
  *     data says once you have it.
  *   - Raw coalesced pointer samples are the richest signal and the biggest
  *     cost: a 1000 Hz gaming mouse produces 10x the payload of a 125 Hz one.

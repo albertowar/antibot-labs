@@ -1,5 +1,5 @@
 """
-Chapter 4, Round 2 defense (L2): header presence and consistency.
+Chapter 2, Round 2 defense (L2): header presence and consistency.
 
 User-Agent strings are trivial to fake. The rest of the header set has to tell the same story: real
 browsers always send Accept, Accept-Language and Accept-Encoding, and every modern browser (Chrome 76+,

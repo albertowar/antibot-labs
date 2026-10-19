@@ -1,5 +1,5 @@
 """
-Chapter 8 feature module: the pages and hooks the traps need.
+Chapter 7 feature module: the pages and hooks the traps need.
 
     hooks.slot("head", ...)           traps.css (.hp hides a trap with display:none, .hp-offscreen only off-screen)
     hooks.slot("form:register", ...)  the signup honeypot and the timing token (defenses/form_traps.py)

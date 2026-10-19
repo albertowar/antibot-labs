@@ -37,7 +37,7 @@ from .pipeline import Check, Signal
 
 POLICY = {
     # Paths nobody should crawl: the decoy maze (Round 3). Listing a trap here is what makes a hit
-    # on it a hard tell (W1 Ch8). The store's own robots.txt already disallows /lab/ and the cart.
+    # on it a hard tell (W1 Ch7). The store's own robots.txt already disallows /lab/ and the cart.
     "traps": ["/maze/"],
     "license_path": "/license.xml",
 }

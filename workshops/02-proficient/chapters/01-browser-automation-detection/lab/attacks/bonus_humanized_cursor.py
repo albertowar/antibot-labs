@@ -8,7 +8,7 @@ inside the button, the way open-source "humanizer" helpers do.
 This beats the two rules this chapter wrote (teleport and dead-centre).
 It does not produce human movement: constant-ish speed, no overshoot, no
 micro-corrections, perfectly regular timing. Detecting that is the subject
-of Chapter 3 (behavioural analysis).
+of Chapter 5 (behavioural analysis).
 
 Expected results (verified with patchright 1.63 / Chromium 153):
   - Round 4 (level 5) → 200 on /api/products and /api/cart/add

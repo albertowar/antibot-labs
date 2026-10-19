@@ -1,5 +1,5 @@
 """
-Capstone feature module: GET /metrics, the Prometheus text exposition (W3 Ch4's signal health, for the capstone).
+Capstone feature module: GET /metrics, the Prometheus text exposition (W3 Ch8's signal health, for the capstone).
 
 Used by the optional `prod` profile of docker-compose.yml (Prometheus scrapes this, Grafana draws the signal-health
 board) and handy on its own: `curl localhost:5000/metrics`. There is no prometheus_client dependency: the counts come

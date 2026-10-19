@@ -10,14 +10,14 @@ needs no browser at all. From level 5 a login must carry a token (header `X-Logi
     2. GET  /api/login/challenge   -> {nonce, bits, fp_hash}      (demo_site/ext/login9.py)
     3. the page finds a counter with sha256(nonce:fp_hash:counter) starting with `bits` zero bits
        (~16k hashes, a fraction of a second in a browser)
-    4. POST /api/login/token {nonce, counter} -> a token: Chapter 2's signed, expiring payload
-       {sid, fp, exp} (defenses/tokens.py, copied from W2 Ch2)
+    4. POST /api/login/token {nonce, counter} -> a token: Chapter 4's signed, expiring payload
+       {sid, fp, exp} (defenses/tokens.py, copied from W2 Ch4)
     5. the login carries it; this check verifies the signature, the expiry, the session and the
        fingerprint hash
 
     No valid token  NO_TOKEN_POINTS
 
-Trade-off, and the lesson of W2 Ch2: the token is not a secret and not a CAPTCHA. Anyone who reads the
+Trade-off, and the lesson of W2 Ch4: the token is not a secret and not a CAPTCHA. Anyone who reads the
 page's JavaScript can reproduce it in Python (attacks/round4_stuffing.py --with-token does exactly
 that), and the proof of work costs a farm almost nothing. What it buys is BINDING: every login attempt
 is now tied to one session and one fingerprint hash, so login_risk.py can count failures per

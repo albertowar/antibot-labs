@@ -65,7 +65,7 @@ APP_VERSION = "3.2.0"
 APP_UA = f"LabRunner/{APP_VERSION} (Android 14; Pixel 8) okhttp/4.12.0"
 
 # The TLS fingerprint the genuine app's stack puts on the wire. The lab has no TLS edge, so a client
-# CLAIMS it in X-Lab-JA4 (tools/labclient.py) and the gate reads it as a claimed fingerprint (W2 Ch5's
+# CLAIMS it in X-Lab-JA4 (tools/labclient.py) and the gate reads it as a claimed fingerprint (W2 Ch3's
 # measured version needs a real TLS edge). The app is modelled with Chromium/BoringSSL's JA4 from
 # defenses/known_fingerprints.json; a stock Python HTTP client has the library JA4 below.
 APP_JA4 = "t13d1516h2_8daaf6152771_806a8c22fdea"

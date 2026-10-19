@@ -6,7 +6,7 @@ What the five scalper bots share, so each script stays about its idea.
   parse_form        the drop form's inputs, with the wrappers around them (a markup-aware bot's view)
   fill              the body a form filler posts
   bought            did the store say "order confirmed"? (a trapped bot sees this too: it BELIEVES)
-  solve_interstitial  what a script does with the PoW interstitial (Chapter 7's protocol, in Python)
+  solve_interstitial  what a script does with the PoW interstitial (Chapter 6's protocol, in Python)
   Tally, finish     the per-bot count and the one JSON line tools/drop.py reads
   async_context     a Playwright context for the async API that keeps labclient.browser_context's guard
 

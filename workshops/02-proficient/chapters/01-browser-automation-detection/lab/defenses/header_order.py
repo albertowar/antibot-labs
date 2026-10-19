@@ -1,5 +1,5 @@
 """
-Chapter 4, Round 3 defense (L3b): header order fingerprinting.
+Chapter 2, Round 3 defense (L3b): header order fingerprinting.
 
 Browsers emit headers in a fixed order baked into their network stack. HTTP libraries use their own
 (python-requests starts with User-Agent, Accept-Encoding, Accept, Connection), and copy-pasting header

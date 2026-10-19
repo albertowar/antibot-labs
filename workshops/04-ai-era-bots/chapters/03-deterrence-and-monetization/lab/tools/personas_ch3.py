@@ -36,7 +36,7 @@ never gated. A shopper whose device would need longer than PATIENCE_S gives up (
     prefetch       desktop Chrome                           yes
     reader, no_js  no JavaScript                            no: the interstitial is a wall
 
-The phone ratios are assumptions, not measurements (W1 Ch7 measures them). The persona result gains a
+The phone ratios are assumptions, not measurements (W1 Ch6 measures them). The persona result gains a
 `pow` entry: {"bits", "solves", "tried", "wait_s", "gave_up"}.
 
 This module provides the chapter's cohort (`personas`, which checkpoint.py hands to every Round as

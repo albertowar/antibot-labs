@@ -8,7 +8,7 @@ produce. Three moves, none of which make the puzzle harder (that race is lost):
    device) sees a puzzle. Everyone else registers with no friction. This is where the human cost goes from
    "everyone" to "a few".
 2. **Bind a cost to it.** A risky registration carries POW_BITS_RISKY bits of hashcash on the token
-   (W1 Ch7). It does not stop a solver; it meters it. At 16 bits that is ~65k hashes, tens of milliseconds
+   (W1 Ch6). It does not stop a solver; it meters it. At 16 bits that is ~65k hashes, tens of milliseconds
    of CPU per solve in Python; tune it to the attacker's margin, not to zero.
 3. **A solve is not a pass.** After a correct answer the same velocity caps still apply, and a solve
    faster than a person can read the puzzle gets a step-up rather than an account. The pace floor is weak

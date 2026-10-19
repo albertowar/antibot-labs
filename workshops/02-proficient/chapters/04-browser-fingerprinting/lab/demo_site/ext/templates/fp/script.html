@@ -1,5 +1,0 @@
-{# Chapter 4: the fingerprint collector, on the sign-up page (slot form:register) and on /lab/fp/check.
-   It reports raw observations with this session's nonce; the server keeps every verdict to itself.
-   window.__fpResult is set when the report has been sent. #}
-<script>window.__fpNonce = {{ fp_nonce()|tojson }};</script>
-<script src="/static/js/fp.js"></script>

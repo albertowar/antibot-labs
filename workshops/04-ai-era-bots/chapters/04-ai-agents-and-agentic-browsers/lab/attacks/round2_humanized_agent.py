@@ -1,18 +1,18 @@
 """
-Round 2, 🔴 the humanized agent: beat the behaviour score the way W2 Ch3 did.
+Round 2, 🔴 the humanized agent: beat the behaviour score the way W2 Ch5 did.
 
 Round 2's defense (defenses/agent_behavior.py) challenges a session that acts like an agent: teleport
 clicks, keystroke-free fills, metronome timing, programmatic scrolls, and injected highlight overlays.
 The naive undeclared agent from Round 1 trips all of these and meets the step-up, which it cannot
 answer: the code goes to its user's inbox, not to the agent.
 
-So the attacker does what W2 Ch3 taught against behavioural detection:
+So the attacker does what W2 Ch5 taught against behavioural detection:
   - swap the stock Executor for HumanizedExecutor: a Bezier cursor path to each control, wheel ticks
     instead of scrollIntoView(), and per-character typing (the ghost-cursor recipe)
   - turn the highlight overlays OFF (observe without drawing)
   - jitter the think time between pages so the cadence is not a metronome
 
-None of this is a real hand. It is plausible means with the wrong fine structure (W2 Ch3's lesson),
+None of this is a real hand. It is plausible means with the wrong fine structure (W2 Ch5's lesson),
 but it clears the shape checks this layer can afford to run, and the agent buys at DEFENSE_LEVEL 2.
 The honest cost to notice: the same humanization is what the "rpa_macro" real user looks like from
 the other side.

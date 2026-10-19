@@ -15,7 +15,7 @@ the no-JS shopper is blocked from Round 1 on, and the checkpoint counts it as an
 
 What it does not stop: a client that skips the browser and posts a believable report itself
 (Round 5, attacks/round5_forged_sensor.py). Binding the report to a challenge it cannot fake is
-Chapter 2.
+Chapter 4.
 """
 
 from . import policy, sensor

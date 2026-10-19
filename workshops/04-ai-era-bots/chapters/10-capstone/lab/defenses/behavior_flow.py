@@ -1,5 +1,5 @@
 """
-W2 behavior and flow (W2 Ch3, Ch9) — carried into W4 Ch4 as a SHADOW instrument
+W2 behavior and flow (W2 Ch5, Ch9) — carried into W4 Ch4 as a SHADOW instrument
 
 A native stealth browser such as Camoufox can make every fingerprint
 attribute coherent. What it does by default is still *robotic*: it navigates

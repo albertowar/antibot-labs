@@ -1,5 +1,5 @@
 """
-Layer: automation artefacts (stand-in for W2 Ch1-2)
+Layer: automation artefacts (stand-in for W2 Ch1, Ch4)
 
 Did the page's JavaScript run at all (telemetry present), and does the collector see
 `navigator.webdriver` or CDP side effects?

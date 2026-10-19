@@ -19,7 +19,7 @@
  *
  * Trade-off: everything here is a CLAIM made by the client. A bot that skips
  * the browser can POST whatever it likes (Round 5). Integrity of this payload
- * (obfuscation, signing, challenge binding) is Chapter 2.
+ * (obfuscation, signing, challenge binding) is Chapter 4.
  *
  * Plain ES2020 with no build step, so it runs as-is in Chrome, Edge, Firefox
  * and Safari. Every probe is wrapped: a sensor that throws on a real browser

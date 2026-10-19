@@ -18,7 +18,7 @@ Decisions, in order:
 False positives, named honestly: the hold in (3) catches real people who review a gift, or who bought
 in-store. Measure how many held reviews a moderator later approves; if it is most of them, the hold is
 costing you reviews for nothing. And the device cookie is only as good as the attacker's cookie jar:
-clearing it resets the count (the device fingerprint of W2 Ch4 is the answer, and it has its own costs).
+clearing it resets the count (the device fingerprint of W2 Ch2 is the answer, and it has its own costs).
 """
 
 from .pipeline import Check, Signal, Verdict

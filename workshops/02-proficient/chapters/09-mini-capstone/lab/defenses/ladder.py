@@ -11,13 +11,13 @@ contract) and Round 0's layer, the one the naive fleet runs into, therefore live
     level  round  layer                                   modules (copied from)
     0      -      the bare store                          -
     1      0      request: headers, TLS consistency        ua_inspector, header_inspector, client_hints,
-                                                           header_order (Ch1) · ja4_denylist, tls_family (Ch5)
+                                                           header_order (Ch1) · ja4_denylist, tls_family (Ch3)
                   buy: did the page's JavaScript run?      sensor_gate, automation_artifacts (Ch1)
                   login: per-IP velocity, account lock     login_throttle (Ch6)
     2      1      buy: does the fingerprint cohere?        consistency, lie_detection (Ch1)
-    3      2      buy: how did the hand get to the click?  behavior_l1, behavior_l2 (Ch3) · flow (capstone)
+    3      2      buy: how did the hand get to the click?  behavior_l1, behavior_l2 (Ch5) · flow (capstone)
     4      3      buy: is this account a farm's?           session_model (capstone)
-    5      4      login: token binding, cluster failures   token_binding, login_risk (capstone; tokens from Ch2)
+    5      4      login: token binding, cluster failures   token_binding, login_risk (capstone; tokens from Ch4)
 
 The sensor checks are Chapter 1's own, re-pointed at the buy by drop_guard.at_drop(). Cheapest and most
 certain first inside a level: a hard verdict (the login throttle) stops the gate before the slower checks.

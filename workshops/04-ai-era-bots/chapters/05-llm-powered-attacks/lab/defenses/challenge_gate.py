@@ -1,6 +1,6 @@
 """Round 2, pre-wired: the challenge gate (puzzles, tiles, tokens, proof-of-work).
 
-This is the W1 Ch6 / Ch7 gate as the store had it: a text puzzle a script can't parse, a 3x3 image puzzle
+This is the W1 Ch5 / Ch6 gate as the store had it: a text puzzle a script can't parse, a 3x3 image puzzle
 an OCR solver can't read, a single-use token, and an optional hashcash proof-of-work bound to the token.
 It is not student-edited. `demo_site/ext/llm_surfaces.py` registers it as the `puzzle` challenge type;
 Round 2 shows an LLM/VLM solving all of it, and challenge_policy.py decides *who* gets it, *how
@@ -13,7 +13,7 @@ real model (``LLM_URL``) gets only the pixels. The label is a lab shortcut, not 
 CAPTCHAs, and a reminder that no secret belongs in the image you serve.
 
 An accessible alternative is non-negotiable: ``?mode=text`` always yields a text
-puzzle. Screen-reader users cannot solve the tiles (W1 Ch6).
+puzzle. Screen-reader users cannot solve the tiles (W1 Ch5).
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def verify(rds, token: str, answer: str, nonce: str):
     return True, f"solved ({rec['mode']}) in {solve_ms:.0f} ms", solve_ms
 
 
-# --- proof of work (W1 Ch7) --------------------------------------------------------
+# --- proof of work (W1 Ch6) --------------------------------------------------------
 
 def pow_ok(token: str, nonce: str, bits: int) -> bool:
     h = hashlib.sha256(f"{token}:{nonce}".encode()).digest()

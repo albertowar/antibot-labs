@@ -7,7 +7,7 @@ This lab adds it at its own Round 0 because the W3 starter ships with an empty b
     Non-app client UA                         +80   python-requests, curl, okhttp-with-no-app, an interception proxy
     Missing X-App-Id                          +30   the genuine app always sends its package name
     X-App-Id but not the app's User-Agent     +30
-    Library TLS fingerprint (claimed JA4)     +10   a soft tell: W2 Ch5's table says which stacks are libraries
+    Library TLS fingerprint (claimed JA4)     +10   a soft tell: W2 Ch3's table says which stacks are libraries
     Token bucket empty (240 burst, 4 / s)     rate_limit   per source address, policy.RATE_LIMITS["mobile_ip"]
 
 Trade-off: a reverse engineer who has watched one genuine request through a proxy copies the app's
@@ -19,7 +19,7 @@ The rate limit is loose on purpose. Carrier-grade NAT puts thousands of real pho
 real users long before it slows a farm that rotates addresses. Expect the Round 4 farm to walk past it.
 
 The JA4 is *claimed* here (X-Lab-JA4): this lab has no TLS edge, so it is as forgeable as the User-Agent.
-A measured JA4 needs the edge W2 Ch5 builds; a faithful replay with an impersonating TLS stack matches the
+A measured JA4 needs the edge W2 Ch3 builds; a faithful replay with an impersonating TLS stack matches the
 app's JA4 anyway, which is why the weight is 10 and not 40.
 """
 

@@ -1,7 +1,7 @@
 """
 Round 3 attack (beats traps and the session guard): mint sessions in a browser, spend them with scripts.
 
-The attacker read W1 Ch5 and W1 Ch8. Form fillers die on the honeypot and the timing token, so let a
+The attacker read W1 Ch8 and W1 Ch7. Form fillers die on the honeypot and the timing token, so let a
 real browser do the parts that need a browser, once, and let cheap scripts do the rest:
 
   1. MINT.  A headless Chromium (consistent headers) loads the home page, clicks through to the drop

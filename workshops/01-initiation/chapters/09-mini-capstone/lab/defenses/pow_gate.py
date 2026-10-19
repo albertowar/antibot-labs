@@ -1,5 +1,5 @@
 """
-Chapter 7, Round 1 defense (L1): a proof-of-work gate on the catalog.
+Chapter 6, Round 1 defense (L1): a proof-of-work gate on the catalog.
 
 What it does: a request for a catalog page (policy.POW_PROTECTED) from a session that
 has not solved a challenge scores POW_GATE_POINTS and asks for the `pow` challenge.

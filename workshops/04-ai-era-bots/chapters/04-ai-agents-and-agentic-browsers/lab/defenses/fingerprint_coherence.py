@@ -1,5 +1,5 @@
 """
-W2 fingerprint coherence (W2 Ch4, Ch9), run here as a SHADOW instrument
+W2 fingerprint coherence (W2 Ch2, Ch9), run here as a SHADOW instrument
 
 Stealth browsers have removed the obvious tells (webdriver, $cdc_), so we
 stop asking "is this automation?" and start asking whether the parts of the

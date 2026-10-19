@@ -4,7 +4,7 @@ Chapter 9, Round 3 attack: humanized Camoufox + an account farm (Section 9.7).
 The scalper fixes everything Round 2's layers measure:
 
   - humanize: curved Bezier paths, overshoot on long moves, a random click point inside each target, key
-    holds and gaps with human-looking noise (attacks/humanize.py, W2 Ch3's ghost-cursor recipe, copied
+    holds and gaps with human-looking noise (attacks/humanize.py, W2 Ch5's ghost-cursor recipe, copied
     byte for byte; the events are trusted because Camoufox's browser dispatches them)
   - browse like a customer: login page, home page, wander, then the drop page
   - linger on the drop page before pressing Reserve

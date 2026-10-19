@@ -14,7 +14,7 @@ Feature families
   request      server log: pacing, assets, navigation, header basics
   network      ASN type from the feeds (defenses/netinfo.py)
   client       fingerprint + behaviour summaries the page collectors POST to /api/telemetry
-               (W2 Ch3 / W2 Ch4). Absent for clients that never run JS.
+               (W2 Ch5 / W2 Ch2). Absent for clients that never run JS.
   consistency  do the client's claims agree with each other and with the network?
   cohort       population counts in a sliding window (see cohort.py)
 

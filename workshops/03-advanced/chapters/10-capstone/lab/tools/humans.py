@@ -1,8 +1,8 @@
 """
-Chapter 3: synthetic behavior for the shoppers (Section 3.8).
+Chapter 5: synthetic behavior for the shoppers (Section 5.8).
 
 The lab's 40 shoppers (tools/population.py) are Python, not browsers, so nothing
-runs the page's collector for them. tools/personas_ch3.py gives each one a
+runs the page's collector for them. tools/personas_ch5.py gives each one a
 behavior profile and calls make_session() here to synthesise the telemetry the
 collector would have recorded on the layout the server drew for that page view.
 

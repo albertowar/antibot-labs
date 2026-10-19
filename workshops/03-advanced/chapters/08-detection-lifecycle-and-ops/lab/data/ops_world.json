@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "The chapter's week-0 snapshot: the facts the store's sensors were built on before the world moved.",
+    "The simulated internet itself (pools, ASNs, feeds) is the W3 starter's data/world.json and data/feeds/*,",
+    "which the store's edge reads; this file adds only what DRIFTS in this chapter.",
+    "ja4: illustrative JA4 values, one per client stack, as captured in lab week 0 (capture real ones with the",
+    "tools from W2 Ch3). community_blocklist_stale: an old community-blocklist entry for a range that has since",
+    "changed hands (tools/refresh_corpus.py --asn retires it). built_week: when the snapshot was taken."
+  ],
+  "built_week": 0,
+  "community_blocklist_stale": [
+    "203.0.113.0/29"
+  ],
+  "ja4": {
+    "chrome": "t13d1516h2_8daaf6152771_02713d6af862",
+    "firefox": "t13d1715h2_5b57614c22b0_3d5424432f57",
+    "safari": "t13d2014h2_a09f3c656075_14788d8d241b",
+    "python-requests": "t13d4907h1_0d8feac7bc37_7395dae3b2f3",
+    "curl": "t13d3112h1_e8f1e7e78f70_2a3f32ed4b4d"
+  }
+}

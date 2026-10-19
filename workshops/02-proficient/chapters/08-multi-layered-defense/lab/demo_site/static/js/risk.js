@@ -1,5 +1,5 @@
 /* Chapter 8: the login page's collector and challenge handling.
-   A few lines of what W2 Ch2-4 built properly: a fingerprint and a short behaviour trace go to
+   A few lines of what W2 Ch2, Ch4-5 built properly: a fingerprint and a short behaviour trace go to
    POST /api/telemetry (kind "risk"), then the sign-in goes to POST /api/login and any challenge
    that comes back is completed here. Without this script the form still posts to POST /login and
    the layers score "no telemetry". */

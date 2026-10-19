@@ -47,7 +47,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: the capstone
 - `demo_site/static/js/pow.js`
 - `demo_site/static/js/traps.js`
 - `tools/drop.py`
-- `tools/personas_ch7.py`
+- `tools/personas_ch6.py`
 - `tools/personas_ch9.py`
 - `tools/pow_client.py`
 - `tools/trapkit.py`
@@ -78,15 +78,15 @@ This lab is **pre-written** (level style): every defense ships complete, because
 lab/
   defenses/ladder.py          which checks run at which level (L1 rate limits + headers, L2 IP reputation, L3 traps + session, L4 PoW + cap)
   defenses/policy.py          every number: bands, buckets, points, PoW bits. The ONLY file you edit on Drop Day
-  defenses/drop_guard.py      the capstone's glue: points Chapter 2, 5 and 8's checks at the drop, and the one-per-customer cap
+  defenses/drop_guard.py      the capstone's glue: points Chapter 2, 7 and 8's checks at the drop, and the one-per-customer cap
   defenses/rate_limit, client_ip, trusted_proxy, prefix_limit      Chapters 2/3   (copies, see shared.json)
   defenses/ip_reputation, feeds, blocklists                        Chapter 3
   defenses/ua_inspector, header_inspector, client_hints, header_order, header_util     Chapter 4
-  defenses/session_guard                                           Chapter 5
-  defenses/pow_core, pow_challenge, pow_gate, pow_budget, pow_adaptive, challenge_*    Chapter 7
-  defenses/form_traps, crawl_traps, responses                      Chapter 8
+  defenses/session_guard                                           Chapter 8
+  defenses/pow_core, pow_challenge, pow_gate, pow_budget, pow_adaptive, challenge_*    Chapter 6
+  defenses/form_traps, crawl_traps, responses                      Chapter 7
   demo_site/ext/drop.py       the session plumbing session_guard reads, and the trap fields in the drop form
-  demo_site/ext/pow.py, traps.py (+ templates, static)             Chapters 7 and 8
+  demo_site/ext/pow.py, traps.py (+ templates, static)             Chapters 6 and 7
   attacks/round0_naive_scalper ... round4_full_browser, _drop.py
   tools/drop.py               run a drop and print the scoreboard · checkpoint.py · personas_ch9.py (the shoppers)
   data/                       world.json (the pretend network) · feeds/ (Chapter 3's snapshot)
@@ -103,10 +103,10 @@ Every file marked "copy" is the **finished version** from the chapter that built
 |---|---|---|---|
 | 1 | rate limits + headers | `trusted_proxy`, `rate_limit`, `prefix_limit`, the drop's own bucket, then `ua_inspector`, `header_inspector`, `client_hints`, `header_order` | Ch2, Ch3, Ch4 |
 | 2 | IP reputation | `ip_reputation` (Private Relay trusted) | Ch3 |
-| 3 | traps + session | the drop form's honeypot and timing token, `crawl_traps`, `session_guard` | Ch8, Ch5 |
-| 4 | proof of work + cap | `pow_gate` + `pow_budget` + `pow_adaptive`, one hoodie per customer, `session_binding`, `responses` | Ch7, Ch5, Ch8 |
+| 3 | traps + session | the drop form's honeypot and timing token, `crawl_traps`, `session_guard` | Ch7, Ch8 |
+| 4 | proof of work + cap | `pow_gate` + `pow_budget` + `pow_adaptive`, one hoodie per customer, `session_binding`, `responses` | Ch6, Ch8, Ch7 |
 
-Each level includes every level below it. Until level 4 nothing can be served in the challenge band, so `policy.decide()` enforces it as a block (the cost Round 2 makes visible); from level 4 the same score earns a proof of work. The wrinkle: the chapters' checks were written for the surface they taught (Chapter 2's checkout bucket meters `POST /checkout`, Chapter 5's session guard fires on the promo redeem, Chapter 8's traps sit on the signup form). The drop buys through `POST /drop/<sku>`, so `drop_guard.py` points them at it with the `action:drop_buy` phase instead of editing the copies. Read it first.
+Each level includes every level below it. Until level 4 nothing can be served in the challenge band, so `policy.decide()` enforces it as a block (the cost Round 2 makes visible); from level 4 the same score earns a proof of work. The wrinkle: the chapters' checks were written for the surface they taught (Chapter 2's checkout bucket meters `POST /checkout`, Chapter 8's session guard fires on the promo redeem, Chapter 7's traps sit on the signup form). The drop buys through `POST /drop/<sku>`, so `drop_guard.py` points them at it with the `action:drop_buy` phase instead of editing the copies. Read it first.
 
 ## Setup
 
@@ -279,6 +279,6 @@ Things to watch for:
 ## Bonus challenges
 
 1. **Rate-limit the customer, not the address.** Add a `checkout_session` bucket keyed on the session id in `drop_guard.py`, then tighten `checkout_ip` again. Does carrier NAT still hurt?
-2. **A fallback for no-JS shoppers.** Serve a self-hosted CAPTCHA (Chapter 6) inside `<noscript>` when the proof of work cannot run. What does it cost the form filler?
+2. **A fallback for no-JS shoppers.** Serve a self-hosted CAPTCHA (Chapter 5) inside `<noscript>` when the proof of work cannot run. What does it cost the form filler?
 3. **Tor.** Add a wave that rents from the world's `tor_exit` pool. Which layer catches it, and with how many points?
 4. **Pin the workers.** Run wave 3 with its workers on the minter's own address for every request (a sticky proxy session): `python tools/reset.py --stock 20`, then `python attacks/round3_session_minting.py --pinned` against a store at level 4. It buys exactly 6 hoodies, one per minted session, with 12 refusals from the cap and no proof of work of its own (the minter's browser solved the pass the workers reuse). What stops it, and what does that tell you about the binding?

@@ -1,5 +1,5 @@
 """
-Chapter 7: the Python side of the proof-of-work gate. Shared by the attacks and the shoppers.
+Chapter 6: the Python side of the proof-of-work gate. Shared by the attacks and the shoppers.
 
   - the solver: the same puzzle as demo_site/static/js/pow-worker.js (find a counter so that
     SHA-256("<nonce>:<counter>") has `bits` leading zero bits), on one core or on all of them

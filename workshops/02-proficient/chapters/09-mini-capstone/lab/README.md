@@ -1,6 +1,6 @@
 # W2 Ch9 Lab: Stealth Browsers vs. the Stack
 
-Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the capstone's own layers (`drop_guard`, `flow`, `session_model`, `token_binding`, `login_risk`), the `drop9` and `login9` extensions, `ladder.py`/`policy.py`, five scalper scripts, the Chapter 9 shoppers, and the finished modules of Chapters 1, 2, 3, 5 and 6 copied byte for byte (see `shared.json`).
+Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the capstone's own layers (`drop_guard`, `flow`, `session_model`, `token_binding`, `login_risk`), the `drop9` and `login9` extensions, `ladder.py`/`policy.py`, five scalper scripts, the Chapter 9 shoppers, and the finished modules of Chapters 1, 3, 4, 5 and 6 copied byte for byte (see `shared.json`).
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -95,18 +95,18 @@ This lab is **pre-written** (level style): every defense ships complete, because
 | Layer (round) | Source | What it does here |
 |---|---|---|
 | Header rules (0) | **copy** Ch1: `ua_inspector`, `header_inspector`, `client_hints`, `header_order`, `header_util` | the request phase, every request |
-| TLS consistency (0) | **copy** Ch5: `ja4.py`, `known_fingerprints.json`, `ja4_denylist`, `tls_family` | a library's JA4 is a block; the User-Agent's engine must be consistent with the JA4 family |
+| TLS consistency (0) | **copy** Ch3: `ja4.py`, `known_fingerprints.json`, `ja4_denylist`, `tls_family` | a library's JA4 is a block; the User-Agent's engine must be consistent with the JA4 family |
 | Sensor gate, automation artifacts (0) | **copy** Ch1: `sensor`, `sensor_gate`, `automation_artifacts`, `ext/sensor.py`, `sensor.js` | no JavaScript, no report, no pair; `webdriver` and driver globals |
 | Fingerprint coherence (1) | **copy** Ch1: `consistency`, `lie_detection` (and `interaction.py`, which is not on the ladder: Ch1's `ext/sensor.py` imports it for `/lab/sensor/check`) | software GPU, headless window, JS vs HTTP identity, Worker and iframe realms |
-| Behavior (2) | **copy** Ch3: `behavior`, `behavior_features`, `behavior_l1`, `behavior_l2`, `ext/behavior.py`, `drop.html`, `behavior.js`, `tools/humans.py` | the drop page's collector and the first two layers (not motor-control realism) |
+| Behavior (2) | **copy** Ch5: `behavior`, `behavior_features`, `behavior_l1`, `behavior_l2`, `ext/behavior.py`, `drop.html`, `behavior.js`, `tools/humans.py` | the drop page's collector and the first two layers (not motor-control realism) |
 | Flow (2) | **own**: `flow.py` | the SERVER's clock: dwell before the buy, a buy with no view of the page |
 | Session and account model (3) | **own**: `session_model.py` | Chapter 7's idea on this store's features; Chapter 7's scorer needs a request log this store does not keep |
 | Login throttle (0) | **copy** Ch6: `login_throttle`, `ratelimit`, `ext/ato.py` | per-IP velocity and per-account lock; `ato.py` also gives the `action:login_result` phase. It brings Ch6's `otp`/`reauth` challenge types and the `recover`/`email` routes along: unused here, and the recover oracle is Ch6's lesson, left open |
-| Login token (4) | **own**: `token_binding.py` + `ext/login9.py` | a signed token bound to the session and the sensor's fingerprint hash, built on Ch2's `tokens.py` (**copy**) |
+| Login token (4) | **own**: `token_binding.py` + `ext/login9.py` | a signed token bound to the session and the sensor's fingerprint hash, built on Ch4's `tokens.py` (**copy**) |
 | Failures per fingerprint cluster (4) | **own**: `login_risk.py` | Ch6's idea keyed on JA4 a+b + fingerprint hash instead of the /24 |
 | Glue | **own**: `drop_guard.py`, `ext/drop9.py`, `ladder.py`, `policy.py` | re-points Ch1's sensor checks at the buy; the `proof` challenge; the numbers |
 
-Not copied, on purpose: Chapter 4's fingerprint checks fire on sign-up and Chapter 1's sensor already reads the fingerprint at the buy (copying both would count one root cause twice); Chapter 7's scorer; Chapter 8's sensors, which are deliberately small stand-ins for the layers above.
+Not copied, on purpose: Chapter 2's fingerprint checks fire on sign-up and Chapter 1's sensor already reads the fingerprint at the buy (copying both would count one root cause twice); Chapter 7's scorer; Chapter 8's sensors, which are deliberately small stand-ins for the layers above.
 
 ```
 lab/
@@ -114,30 +114,30 @@ lab/
   defenses/policy.py            every number: bands, points, windows, the model's FP budget
   defenses/drop_guard.py        the glue: Chapter 1's sensor checks, re-pointed at the buy
   defenses/flow.py, session_model.py, token_binding.py, login_risk.py        the capstone's own layers
-  defenses/<the Chapter 1, 2, 3, 5, 6 modules>   copies, see shared.json
+  defenses/<the Chapter 1, 3, 4, 5, 6 modules>   copies, see shared.json
   demo_site/ext/drop9.py        the "proof" challenge, the flow stamp, the address field
   demo_site/ext/login9.py       the login token endpoints and the login page's script
-  demo_site/ext/sensor.py, behavior.py, ato.py (+ templates, static)           Chapters 1, 3, 6 (copies)
-  attacks/round0_naive … round4_stuffing, round4_token_farm, _common.py, humanize.py (copy of Ch3's)
+  demo_site/ext/sensor.py, behavior.py, ato.py (+ templates, static)           Chapters 1, 5, 6 (copies)
+  attacks/round0_naive … round4_stuffing, round4_token_farm, _common.py, humanize.py (copy of Ch5's)
   tools/personas_ch9.py         the 40 shoppers · checkpoint.py · mistype.py (a real customer who mistypes) · profile_replay.py, humans.py, profiles/ (copies)
   solutions/roundN/defenses/    the ladder and policy after Round N (installed by --catch-up)
   data/                         world.json (the pretend network)
 ```
 
-**Why Python:** every layer is server-side HTTP logic (Flask), the attackers are `curl_cffi`, Playwright, Patchright and Camoufox, and the only browser-side code is the copies of Chapter 1's sensor and Chapter 3's collector plus two short scripts of the capstone's own (`proof.js`, `login9.js`). A second language would add setup without teaching anything Workshop 2 needs.
+**Why Python:** every layer is server-side HTTP logic (Flask), the attackers are `curl_cffi`, Playwright, Patchright and Camoufox, and the only browser-side code is the copies of Chapter 1's sensor and Chapter 5's collector plus two short scripts of the capstone's own (`proof.js`, `login9.js`). A second language would add setup without teaching anything Workshop 2 needs.
 
 ### The claimed JA4
 
-The store sits behind no TLS edge. Each client states in `X-Lab-JA4` what its real TLS stack would put on the wire (Python's OpenSSL, Chromium's BoringSSL, Firefox's NSS; the values come from Chapter 5's `known_fingerprints.json`), and Chapter 5's `ja4.py` reads it as a *claimed* fingerprint. That keeps the lesson (a perfect Chrome JA4 does not stop a browser or `curl_cffi`) without a fingerproxy process the harness cannot start. The measured version, with the handshake read off the wire, is Chapter 5.
+The store sits behind no TLS edge. Each client states in `X-Lab-JA4` what its real TLS stack would put on the wire (Python's OpenSSL, Chromium's BoringSSL, Firefox's NSS; the values come from Chapter 3's `known_fingerprints.json`), and Chapter 3's `ja4.py` reads it as a *claimed* fingerprint. That keeps the lesson (a perfect Chrome JA4 does not stop a browser or `curl_cffi`) without a fingerproxy process the harness cannot start. The measured version, with the handshake read off the wire, is Chapter 3.
 
 ### The levels, and one offset
 
 | Level | Round | Adds | Beats |
 |---|---|---|---|
 | 0 | - | the bare store | - |
-| 1 | 0 | request: headers (Ch1), TLS family (Ch5) · buy: sensor gate, automation artifacts (Ch1) · login: throttle (Ch6) | `requests`, `curl_cffi`, stock Chromium |
+| 1 | 0 | request: headers (Ch1), TLS family (Ch3) · buy: sensor gate, automation artifacts (Ch1) · login: throttle (Ch6) | `requests`, `curl_cffi`, stock Chromium |
 | 2 | 1 | buy: fingerprint coherence (Ch1 `consistency`, `lie_detection`) | headless Patchright |
-| 3 | 2 | buy: behavior (Ch3 `l1`, `l2`) and flow | scripted Camoufox |
+| 3 | 2 | buy: behavior (Ch5 `l1`, `l2`) and flow | scripted Camoufox |
 | 4 | 3 | buy: the session and account model | the humanized account farm |
 | 5 | 4 | login: token binding, failures per fingerprint cluster | credential stuffing |
 
@@ -186,7 +186,7 @@ Every round runs every scalper, so you see both what the current layers stop and
 | Step | Do | Expected |
 |---|---|---|
 | 🔴 Attack | `python tools/checkpoint.py --round 0 --level 0` (the "before") | every Round 0 bot buys its pair: nothing is wired at level 0 |
-| 🔵 Defend | Read level 1 in `defenses/ladder.py`: `ua_inspector`, `header_inspector`, `client_hints`, `header_order` (Ch1), `ja4_denylist`, `tls_family` (Ch5), `login_throttle` (Ch6), and Ch1's `sensor_gate` and `automation_artifacts` re-pointed at the buy by `drop_guard.at_drop()`. Then `python tools/checkpoint.py --round 0` | `requests` blocked at its first request (`ua:red_flag`, `ja4_denylist:library_ja4`, missing headers), `curl_cffi` blocked at the buy (`sensor_gate:no_sensor`), stock Chromium blocked at its first page (`client_hints:headless_brand`, `ua:red_flag`) · 39 of 40 shoppers buy · only `no_js` stopped |
+| 🔵 Defend | Read level 1 in `defenses/ladder.py`: `ua_inspector`, `header_inspector`, `client_hints`, `header_order` (Ch1), `ja4_denylist`, `tls_family` (Ch3), `login_throttle` (Ch6), and Ch1's `sensor_gate` and `automation_artifacts` re-pointed at the buy by `drop_guard.at_drop()`. Then `python tools/checkpoint.py --round 0` | `requests` blocked at its first request (`ua:red_flag`, `ja4_denylist:library_ja4`, missing headers), `curl_cffi` blocked at the buy (`sensor_gate:no_sensor`), stock Chromium blocked at its first page (`client_hints:headless_brand`, `ua:red_flag`) · 39 of 40 shoppers buy · only `no_js` stopped |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 0` | PASS |
 
 Read `defenses/drop_guard.py` first: it is the one file that explains why the chapters' checks run where they do. Open `/whoami`, `/lab/status` and `/lab/sensor/check` in your browser. `curl_cffi` is the instructive bot: its JA4 and headers are exactly Chrome's, and what stops it is that it never ran the page.
@@ -206,7 +206,7 @@ Read `defenses/drop_guard.py` first: it is the one file that explains why the ch
 | Step | Do | Expected |
 |---|---|---|
 | 🔴 Attack | `python tools/checkpoint.py --round 2 --level 2` | Camoufox buys 2 of 2: Round 1 has nothing to find in a native, coherent device |
-| 🔵 Defend | Read level 3: Ch3's `behavior_l1`, `behavior_l2` and `flow.py`. Open the drop page in your browser, reserve a pair, and look at `/lab/behavior/view/latest`. `python tools/checkpoint.py --round 2` | Camoufox stopped (`behavior_l1:teleport`, `centre`, `text_without_keys`, `flow:short_dwell`) · keyboard, screen-reader, touch, tremor and trackpad shoppers all buy · challenged, then buy: the voice-control user (55 points) and the 1.5 s password-manager buyer |
+| 🔵 Defend | Read level 3: Ch5's `behavior_l1`, `behavior_l2` and `flow.py`. Open the drop page in your browser, reserve a pair, and look at `/lab/behavior/view/latest`. `python tools/checkpoint.py --round 2` | Camoufox stopped (`behavior_l1:teleport`, `centre`, `text_without_keys`, `flow:short_dwell`) · keyboard, screen-reader, touch, tremor and trackpad shoppers all buy · challenged, then buy: the voice-control user (55 points) and the 1.5 s password-manager buyer |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 2` | PASS (budget: 3 challenged shoppers) |
 
 **Exercise:** raise `MIN_DWELL_MS` in `defenses/policy.py` from 4000 to 7000 and rerun the shoppers at level 3: 31 to 32 of the 40 shoppers (everyone whose form took under 7 s) now meet the challenge instead of 3, and the voice-control user, who scores 55 for the click and 30 more for the dwell, is blocked. A timing line has to sit below your fastest customer. Put it back.
@@ -215,7 +215,7 @@ Read `defenses/drop_guard.py` first: it is the one file that explains why the ch
 
 | Step | Do | Expected |
 |---|---|---|
-| 🔴 Attack | `python tools/checkpoint.py --round 3 --level 3` | the farm buys 3 of 3: curved paths, a random click point and human keystrokes (Ch3's recipe, `attacks/humanize.py`) beat layers 1 and 2 |
+| 🔴 Attack | `python tools/checkpoint.py --round 3 --level 3` | the farm buys 3 of 3: curved paths, a random click point and human keystrokes (Ch5's recipe, `attacks/humanize.py`) beat layers 1 and 2 |
 | 🔵 Defend | Read `defenses/session_model.py` (the features, `MIN_SAMPLES_LEAF`, `pick_threshold`) and run `python -m defenses.session_model`. `python tools/checkpoint.py --round 3` | the farm blocked (`session_model:p_bot`: fresh accounts, three of them on one address) · the first-timer, whose account is as fresh, buys · gate median about 20 ms (the model) |
 | ✅ Checkpoint | `python tools/checkpoint.py --round 3` | PASS |
 
@@ -268,12 +268,12 @@ Measured on 2026-10-14 on one laptop (WSL2, Python 3.12.15, Flask 3.1.3, Flask-S
 
 Things to watch for:
 
-- **Every cell is the same across runs except one.** The humanized farm sometimes loses a pair at level 3 (2 of 3), because Chapter 3's Bezier recipe is random and an unlucky run lands in the challenge band. Everything else, shoppers included, is deterministic: the personas are fixed, the breach list has a fixed order, and the model is trained from a fixed seed.
-- **The challenged shoppers are the same three, by design.** From Round 1 the privacy-extension user (`lie_detection`, 30). From Round 2 also the voice-control user (`behavior_l1:centre`, `teleport`, `text_without_keys`, 55: Chapter 3's own cost) and the password-manager customer who buys in 1.2 to 1.6 s (`behavior_l1:bulk_fill` and `flow:short_dwell`, 35). They solve the proof and buy; the round fails above its budget (0, 1, 3, 3, 3). The no-JavaScript visitor is blocked from Round 0 (`sensor_gate:no_sensor`, 60) and again at the login in Round 4: the accepted cost of a JavaScript gate.
+- **Every cell is the same across runs except one.** The humanized farm sometimes loses a pair at level 3 (2 of 3), because Chapter 5's Bezier recipe is random and an unlucky run lands in the challenge band. Everything else, shoppers included, is deterministic: the personas are fixed, the breach list has a fixed order, and the model is trained from a fixed seed.
+- **The challenged shoppers are the same three, by design.** From Round 1 the privacy-extension user (`lie_detection`, 30). From Round 2 also the voice-control user (`behavior_l1:centre`, `teleport`, `text_without_keys`, 55: Chapter 5's own cost) and the password-manager customer who buys in 1.2 to 1.6 s (`behavior_l1:bulk_fill` and `flow:short_dwell`, 35). They solve the proof and buy; the round fails above its budget (0, 1, 3, 3, 3). The no-JavaScript visitor is blocked from Round 0 (`sensor_gate:no_sensor`, 60) and again at the login in Round 4: the accepted cost of a JavaScript gate.
 - **A challenge is a speed bump for a person and for a browser bot alike.** A script that does not run the interstitial's JavaScript stops there (the scalpers here are "challenged" or "blocked", not bought); a bot that drives a real browser solves it in a second. The stops that matter against a stealth browser are the ones that score it past 60: Patchright scores 100 at level 2, scripted Camoufox 85 at level 3.
 - **The gate cost is pessimistic.** fakeredis emulates Redis's Lua inside the store's own process, so the median gate time is single-digit milliseconds until the model (about 18 ms at Rounds 3 and 4, mostly Python and scikit-learn inference). Present the numbers as relative, not absolute.
 - **Camoufox is the slow part.** A fresh device per launch is 10 to 30 s: the farm's three sessions take about 90 s, and a full round (every scalper) three to four minutes.
-- **Version drift.** The headers and sensor reports come from Chapter 1's profiles (Chrome 153); `MIN_CHROME_MAJOR` in `defenses/policy.py` is 140. Chapter 5's `known_fingerprints.json` is dated October 2026.
+- **Version drift.** The headers and sensor reports come from Chapter 1's profiles (Chrome 153); `MIN_CHROME_MAJOR` in `defenses/policy.py` is 140. Chapter 3's `known_fingerprints.json` is dated October 2026.
 
 **Docker path** (Redis 8.10 and PostgreSQL 18.6 from `docker-compose.yml`): `docker compose up -d --wait`, then with `REDIS_URL=redis://127.0.0.1:6379/0` and `DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop` set, `python tools/doctor.py` reports READY, `python tools/verify.py --smoke` passes, and `python tools/verify.py --round 4` passes end to end with the same numbers as above (the gate median is 27 ms: every Redis call is now a round trip to a container). Then `docker compose down -v`.
 
@@ -297,4 +297,4 @@ Things to watch for:
 1. **Capture yourself.** Save your browser at `/lab/capture`, run `python tools/checkpoint.py --round 4`, and confirm you buy at every round. Now hand your captured signals to the Round 4 stuffer in place of its own (`replay_signals()` in `attacks/round4_stuffing.py`). Why does a fingerprint shared with real customers make the cluster check hurt them?
 2. **Shadow before you ship.** Start the store with `LAB_SHADOW=1 DEFENSE_LEVEL=1` and run the shoppers (`python tools/population.py --scenario ch9_drop`). Read the `shadow` field of `curl -s 'localhost:5000/lab/decisions?limit=50'`: which layers above level 1 would have touched the privacy-extension customer?
 3. **Move the goalposts.** Lower `CLUSTER_MAX_FAILURE_RATIO` and `CLUSTER_MIN_FAILURES` in `defenses/policy.py` until a customer who mistypes twice from a shared laptop fingerprint is caught. Where is the line?
-4. **Turn Chapter 3's third layer on.** Add `behavior_l3.CHECK` (copy it from Chapter 3, with `lab_diff`'s `shared.json` entry) to level 3. Does the humanized farm lose at Round 2 instead of Round 3, and who pays for it?
+4. **Turn Chapter 5's third layer on.** Add `behavior_l3.CHECK` (copy it from Chapter 5, with `lab_diff`'s `shared.json` entry) to level 3. Does the humanized farm lose at Round 2 instead of Round 3, and who pays for it?

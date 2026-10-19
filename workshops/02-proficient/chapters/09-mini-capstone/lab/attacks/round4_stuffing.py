@@ -15,7 +15,7 @@ see nothing.
 Modes (each shows a different layer):
     (default)       a bare POST /api/login: no page, no telemetry, no token
     --with-token    the browser-equivalent flow: send a captured fingerprint, mint the login token the way
-                    login9.js does (W2 Ch2's lesson: client code is never a secret), then log in
+                    login9.js does (W2 Ch4's lesson: client code is never a secret), then log in
     --rotate-fp     with --with-token, present a NEW fingerprint on every attempt
 
 "succeeded" is a takeover: the store opened a session as the victim.

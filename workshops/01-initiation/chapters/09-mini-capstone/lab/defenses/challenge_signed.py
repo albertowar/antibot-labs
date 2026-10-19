@@ -1,5 +1,5 @@
 """
-Chapter 7 — Round 2 Defense (L2): a signed, expiring, bound challenge
+Chapter 6 — Round 2 Defense (L2): a signed, expiring, bound challenge
 
 The server still keeps no state, but it can now trust what comes back,
 because it signs every field it cares about:

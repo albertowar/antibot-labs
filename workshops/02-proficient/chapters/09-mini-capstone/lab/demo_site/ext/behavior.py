@@ -1,5 +1,5 @@
 """
-Chapter 3 extension: behavioral telemetry on the drop page.
+Chapter 5 extension: behavioral telemetry on the drop page.
 
 What it adds to the store (no starter file is edited):
 

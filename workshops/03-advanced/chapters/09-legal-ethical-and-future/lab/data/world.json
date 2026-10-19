@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "A purpose-built simulated internet for this lab's policy rounds, kept to 8 pools so each",
+    "cohort's exposure under a policy stays legible (the starter's 25-pool world would blur it).",
+    "`vpn` is typed `datacenter` on purpose: that is what makes a blunt 'block datacenter ASNs'",
+    "policy visibly catch work-VPN users as collateral, which is Round 2's lesson. Every address",
+    "is from a documentation range (RFC 5737 / RFC 3849) and every ASN from the documentation ASN",
+    "range (RFC 5398), so none of it can ever point at a real network. The lab's generators read",
+    "this file to pick source addresses and ASN/geo; there is no demo_site in this lab.",
+    "Rules of engagement: scripts may only use addresses from these pools."
+  ],
+  "pools": {
+    "isp-a":  {"cidr": "2001:db8:a::/48",    "asn": 64496, "org": "Example Broadband",    "type": "residential", "country": "US", "tz": "America/New_York"},
+    "isp-b":  {"cidr": "192.0.2.0/25",       "asn": 64497, "org": "Example Cable",        "type": "residential", "country": "US", "tz": "America/Chicago"},
+    "fiber":  {"cidr": "198.51.100.0/25",    "asn": 64498, "org": "Example Fiber",        "type": "residential", "country": "US", "tz": "America/Los_Angeles"},
+    "dsl":    {"cidr": "198.51.100.128/25",  "asn": 64499, "org": "Example DSL",          "type": "residential", "country": "US", "tz": "America/Denver"},
+    "mobile": {"cidr": "192.0.2.128/31",     "asn": 64500, "org": "Example Mobile (CGNAT)", "type": "mobile",    "country": "US", "tz": "America/New_York"},
+    "cloud":  {"cidr": "203.0.113.0/25",     "asn": 64501, "org": "Example Cloud",        "type": "datacenter",  "country": "US", "tz": "America/New_York"},
+    "vpn":    {"cidr": "203.0.113.128/26",   "asn": 64502, "org": "Example VPN",          "type": "datacenter",  "country": "NL", "tz": "Europe/Amsterdam"},
+    "tor":    {"cidr": "203.0.113.192/27",   "asn": 64503, "org": "Tor exits (simulated)", "type": "tor",        "country": "DE", "tz": "Europe/Berlin"}
+  },
+  "community_blocklist": ["203.0.113.0/29"],
+  "ja4": {
+    "_comment": "Illustrative JA4 values, one per client stack. Capture real ones with the tools from W2 Ch3.",
+    "chrome":          "t13d1516h2_8daaf6152771_02713d6af862",
+    "firefox":         "t13d1715h2_5b57614c22b0_3d5424432f57",
+    "safari":          "t13d2014h2_a09f3c656075_14788d8d241b",
+    "python-requests": "t13d4907h1_0d8feac7bc37_7395dae3b2f3",
+    "curl":            "t13d3112h1_e8f1e7e78f70_2a3f32ed4b4d"
+  }
+}

@@ -28,7 +28,7 @@ for p in (HERE, LAB):
 from defenses.pow_core import solve  # noqa: E402  (the puzzle is the same on both sides)
 
 PAYLOAD = re.compile(r'<script type="application/json" id="pow-payload">(.*?)</script>', re.S)
-# Rough on-demand price of one cloud vCPU-hour (W1 Ch7 uses the same figure). Spot capacity and botnets are cheaper.
+# Rough on-demand price of one cloud vCPU-hour (W1 Ch6 uses the same figure). Spot capacity and botnets are cheaper.
 USD_PER_VCPU_HOUR = 0.04
 
 

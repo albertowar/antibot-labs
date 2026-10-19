@@ -1,11 +1,11 @@
 """Round 5 (given): issue and verify the `pow` challenge.
 
 demo_site/ext/pow.py registers issue() and verify() with the store's challenge hook; this module is
-what they call. The puzzle is W1 Ch7's, byte for byte (pow_core.py, challenge_signed.py; shared.json):
+what they call. The puzzle is W1 Ch6's, byte for byte (pow_core.py, challenge_signed.py; shared.json):
 find a counter c so that SHA-256(f"{nonce}:{c}") has POW_BITS leading zero bits. A challenge is
 
   * signed    (HMAC over nonce, difficulty, expiry and the client address): a client cannot lower its
-              own difficulty, W1 Ch7's Round 1 attack
+              own difficulty, W1 Ch6's Round 1 attack
   * bound     to the address it was issued to, so a solution cannot be sold to a solver farm elsewhere
   * expiring  after 60 s
   * single-use: a solved nonce is spent in Redis (SET NX), or one solution would buy unlimited passes

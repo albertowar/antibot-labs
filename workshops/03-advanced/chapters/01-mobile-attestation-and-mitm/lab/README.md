@@ -1,6 +1,6 @@
 # Chapter 1 Lab: Mobile Apps, Attestation & MitM
 
-Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Lab Runner mobile API (`demo_site/ext/mobile.py`), a baseline app-shape and rate check (Round 0), the five defenses of the arms race (`pinned_client`, `attestation`, `request_signing`, `device_verdict`, `session_binding`), the attestation provider mock (`mobile_core`, now also vouching for device keys), the app SDK the shoppers and the attackers share, five attackers and the 40 shoppers recast as phone owners. `defenses/ja4.py` and `known_fingerprints.json` are copied byte for byte from W2 Ch5 (see `shared.json`).
+Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Lab Runner mobile API (`demo_site/ext/mobile.py`), a baseline app-shape and rate check (Round 0), the five defenses of the arms race (`pinned_client`, `attestation`, `request_signing`, `device_verdict`, `session_binding`), the attestation provider mock (`mobile_core`, now also vouching for device keys), the app SDK the shoppers and the attackers share, five attackers and the 40 shoppers recast as phone owners. `defenses/ja4.py` and `known_fingerprints.json` are copied byte for byte from W2 Ch3 (see `shared.json`).
 
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
@@ -36,7 +36,7 @@ This lab runs on the W3 starter's store (Kestrel Outfitters) and shows what **th
 
 - **Local only, enforced in code.** Every attack script and tool reaches the store through `tools/labclient.py`, which asks `labnet.py` at the lab root for `DEMO_URL` and refuses anything that is not this machine (side-service URLs such as `REDIS_URL` too) before a single request is sent. The store's edge accepts the lab headers only from loopback. Do not remove that check.
 - **Everything is synthetic.** Accounts are the starter's `user000..299@example.test`, plus throwaway `@mail.example` addresses the attackers register. Device ids and attestation verdicts are made by the lab's own provider mock. "Source addresses" are rented from `data/world.json` (documentation ranges, RFC 5737 and RFC 3849) and sent in `X-Lab-Client-IP`; the lab never routes through a real proxy or a proxy list.
-- **The TLS fingerprint is claimed, not measured.** The store sits behind no TLS edge (the series' labs speak plain HTTP on loopback), so a client states the JA4 its real stack would put on the wire in `X-Lab-JA4` and the gate reads it as a *claimed* fingerprint (W2 Ch5 builds the measured one). The certificate Round 1 pins is a stand-in written by `tools/make_cert.py`; nothing serves it.
+- **The TLS fingerprint is claimed, not measured.** The store sits behind no TLS edge (the series' labs speak plain HTTP on loopback), so a client states the JA4 its real stack would put on the wire in `X-Lab-JA4` and the gate reads it as a *claimed* fingerprint (W2 Ch3 builds the measured one). The certificate Round 1 pins is a stand-in written by `tools/make_cert.py`; nothing serves it.
 - The optional mitmproxy demo only intercepts your own local traffic, and `attacks/mitm_capture.py` drops any flow that is not to this machine. The lab never asks you to add a proxy CA to your system trust store.
 - Certificate-pinning bypass with Frida / objection needs a rooted device and is **discussed on the slides, not run here**; the lab models it by letting the attacker skip the client's pin check.
 - **Outbound network:** none during the rounds. Only setup needs the internet: installing packages (and mitmproxy, if you want the live demo) and container images.
@@ -47,7 +47,7 @@ lab/
   README.md              this file
   requirements.txt       pinned versions (Python 3.12+; cryptography for the provider mock and the pin)
   requirements-mitmproxy.txt  optional: mitmproxy for the live demo (pins cryptography 48, see inside)
-  shared.json            the two W2 Ch5 files copied byte for byte (python scripts/lab_diff.py <this lab> --shared)
+  shared.json            the two W2 Ch3 files copied byte for byte (python scripts/lab_diff.py <this lab> --shared)
   demo_site/ext/mobile.py    the Lab Runner API: /api/mobile/{config,nonce,register,login,buy,orders,whoami}, and the
                          enricher that verifies X-Attest and exposes the bound key and proof (Round 5)
   defenses/
@@ -59,7 +59,7 @@ lab/
     device_verdict.py    Round 4 TODO: integrity + device/address velocity
     session_binding.py   Round 5 TODO: bind the session to a device key (proof check)
     ladder.py            levels 0-5 wired (yours, but the stubs are already in it)
-    ja4.py, known_fingerprints.json   W2 Ch5's TLS module, copied
+    ja4.py, known_fingerprints.json   W2 Ch3's TLS module, copied
   attacks/
     round1_intercept.py … round5_hijack.py   one attacker per round; _common.py; mitm_capture.py (live demo)
   tools/
@@ -257,7 +257,7 @@ Real attestation uses the vendor's asymmetric keys and a hardware root of trust 
 1. **Put the weak phones behind carrier NAT.** In `tools/personas_ch1.py`, change `device_for` so four of the six `mobile_cgnat` shoppers who share the first carrier address own `rooted` or `old-uncertified` phones. Re-run Round 4: the fourth weak phone is refused as part of a "farm" (`device_verdict:farm`). What does that say about keying a velocity signal on a shared address?
 2. **A lazy replay.** Send a request with `ua="python-requests/2.34.2"` and `ja4=mobile_core.PYTHON_LIB_JA4` through `MobileApp` and read the signals (`app_shape:non_app_client`, `library_tls`). Then change only the JA4 back to the app's: which signal is still there, and what does that tell you about a claimed fingerprint?
 3. **Make Round 4 harder for the defender.** Give the farm **one** emulator per address so the per-address signal never fires. What is left to catch them? (Weak integrity alone is only a challenge in this store.)
-4. **Build the step-up.** Register a challenge type with `hooks.challenges.register(...)` in a new `demo_site/ext/` module (W3 Ch6's `step_up.py` is a model) so the three GrapheneOS customers, and the customer who restored a backup, can pass the challenge band (for the second, re-authenticate and rebind the session to the new key), then ask what the farm, which controls its own mailbox, does with it, and why the thief with only a bearer cannot.
+4. **Build the step-up.** Register a challenge type with `hooks.challenges.register(...)` in a new `demo_site/ext/` module (W3 Ch4's `step_up.py` is a model) so the three GrapheneOS customers, and the customer who restored a backup, can pass the challenge band (for the second, re-authenticate and rebind the session to the new key), then ask what the farm, which controls its own mailbox, does with it, and why the thief with only a bearer cannot.
 5. **The Docker path.** `docker compose up -d --wait`, then `REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=postgresql+psycopg://workshop:workshop@127.0.0.1:5432/shop python tools/verify.py --round 3 --catch-up`. The counts should match; the gate cost will not. `docker compose down -v` when you are done.
 6. **Raise `soft_key`.** In `defenses/session_binding.py` raise the `soft_key` signal from 10 to 30. Re-run Round 5 and read who joins the refused (`old_chrome`, `no_js`: software-backed keys on top of Round 4's 25). Is a refusal for "your key lives in software" a fair price for the thief you stop, given that Round 4 already charged these customers for the device?
 7. **Wrong clock.** Give one shopper a client clock five minutes slow (sign proofs with `ts=` shifted in `MobileApp._proof_headers`). Which signal fires, and what should the app do on a `stale` refusal?

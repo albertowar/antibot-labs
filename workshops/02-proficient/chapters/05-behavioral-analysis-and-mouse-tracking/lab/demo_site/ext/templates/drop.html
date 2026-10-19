@@ -1,0 +1,57 @@
+{# Chapter 5 override of the starter's drop.html (demo_site/ext/templates/ is searched first).
+   Same product panel; the order form is drawn at fixed positions inside #behavior-form so the
+   server knows where every box is (defenses/behavior.py), and static/js/behavior.js records how
+   it was filled in. The contract selectors stay: #drop-buy[data-sku], name="size", name="email". #}
+{% extends "base.html" %}{% block page %}drop{% endblock %}
+{% block title %}{{ p.name }} drop · {{ store_name }}{% endblock %}
+{% block content %}
+<style>
+  #behavior-form { position: relative; margin: 8px 0 16px; background: var(--surface); border: 1px solid var(--line);
+                   border-radius: var(--radius); box-shadow: var(--shadow); max-width: 100%; }
+  #behavior-form .abs { position: absolute; box-sizing: border-box; margin: 0; }
+  #behavior-form input.abs { font: inherit; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px;
+                             background: var(--bg); color: var(--ink); }
+  #behavior-form input.abs:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+  #behavior-form .hint { position: absolute; left: 20px; font-size: .78rem; color: var(--muted); }
+  #behavior-form #drop-buy { width: auto; padding: 0; }
+</style>
+<section class="pdp drop-page" data-sku="{{ p.sku }}">
+  <div class="pdp-img"><img src="/img/{{ p.sku }}.svg?w=640" alt="{{ p.name }}" width="640" height="640"></div>
+  <div class="pdp-info">
+    <span class="tag drop">Limited drop</span>
+    <h1>{{ p.name }}</h1>
+    <p class="lead">{{ p.blurb }}</p>
+    <p class="price big">${{ "%.2f"|format(p.price) }}</p>
+    <p class="stock" id="drop-stock" data-stock="{{ p.stock }}">{% if sold_out or p.stock <= 0 %}<strong>Sold out.</strong> That was fast.{% else %}<strong>{{ p.stock }}</strong> left{% if p.max_per_account %} · {{ p.max_per_account }} per account{% endif %}{% endif %}</p>
+    {% if not p.drop_open %}
+      <p class="countdown" data-drop-at="{{ p.drop_at.isoformat() }}Z">Opens {{ p.drop_at.strftime('%b %d %H:%M') }} UTC</p>
+    {% elif p.stock > 0 and not sold_out %}
+    {% set L = behavior_layout() %}{% set B = L.boxes %}
+    <form class="buy" action="/drop/{{ p.sku }}" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div id="behavior-form" data-layout='{{ L|tojson }}' style="width:{{ L.form[0] }}px;height:{{ L.form[1] }}px">
+        <span class="hint" style="top:14px">Reserve one pair. Sizes: {{ p.sizes|join(", ") }}</span>
+        {% for name, ph, ac in [("name", "Full name", "name"), ("email", "Email for your order", "email"), ("size", "Size", "off")] %}
+        {% set b = B[name] %}
+        {% if name != "email" or not user %}
+        <input id="{{ name }}" name="{{ name }}" data-field="{{ name }}" class="abs" placeholder="{{ ph }}" autocomplete="{{ ac }}"
+               {% if name == "email" %}type="email" required{% elif name == "size" %}inputmode="numeric" required{% endif %}
+               aria-label="{{ ph }}" style="left:{{ b[0] }}px;top:{{ b[1] }}px;width:{{ b[2] }}px;height:{{ b[3] }}px">
+        {% endif %}
+        {% endfor %}
+        {% set b = B["reserve"] %}
+        <button id="drop-buy" class="btn abs" type="submit" data-sku="{{ p.sku }}" data-field="reserve"
+                style="left:{{ b[0] }}px;top:{{ b[1] }}px;width:{{ b[2] }}px;height:{{ b[3] }}px"
+                {% if bought and p.max_per_account and bought >= p.max_per_account %}disabled{% endif %}>Reserve</button>
+      </div>
+      {{ slot("form:drop", p=p) }}
+    </form>
+    <p class="muted small">Lab: <a href="/lab/behavior/view/latest">view the last trace</a> · <a href="/lab/behavior/sessions">sessions</a></p>
+    <script src="/static/js/behavior.js"></script>
+    {% endif %}
+    <ul class="facts"><li>One checkout, one unit</li><li>Charged on order</li><li>No cancellations on drops</li></ul>
+  </div>
+</section>
+<section class="band"><div><h3>How drops work</h3><p class="muted">A numbered release goes live at a published time. Stock is final. Limits are per account where stated.</p></div>
+<div><h3>Fair play</h3><p class="muted">We cancel orders placed with automation. Humans first.</p></div></section>
+{% endblock %}

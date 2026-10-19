@@ -29,7 +29,7 @@ class Product(db.Model):
     colorway = db.Column(db.String(40), default="")
     sizes = db.Column(JSON, default=list)
     stock = db.Column(db.Integer, default=500)
-    hidden = db.Column(db.Boolean, default=False)       # honeypot SKUs (W1 Ch8) never appear in listings
+    hidden = db.Column(db.Boolean, default=False)       # honeypot SKUs (W1 Ch7) never appear in listings
     is_drop = db.Column(db.Boolean, default=False)
     drop_at = db.Column(db.DateTime, nullable=True)
     max_per_account = db.Column(db.Integer, default=0)  # 0 = unlimited

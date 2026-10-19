@@ -1,5 +1,5 @@
 """
-Chapter 3: feature extraction (Sections 3.2-3.5).
+Chapter 5: feature extraction (Sections 5.2-5.5).
 
 Turns one session's raw telemetry (see demo_site/static/js/behavior.js) into
 numbers the scoring layers can reason about. Standard library only.

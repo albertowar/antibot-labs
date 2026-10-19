@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="captcha" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Type the characters you see</h1>
+  <div id="captcha-box" data-testid="captcha"></div>
+  <script type="application/json" id="captcha-payload">{{ payload|tojson }}</script>
+  <noscript><p><strong>This check needs JavaScript.</strong> Without it the page stays closed.</p></noscript>
+  <p class="muted small">Cannot read the image? This store offers no audio or alternative path yet: that gap is the false positive Chapter 5 measures.</p>
+</section>
+<script src="/static/js/captcha.js" defer></script>
+{% endblock %}

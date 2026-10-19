@@ -1,0 +1,3 @@
+# W3 Ch9 lab: Python 3.12+ standard library only. Nothing to install.
+# The audit runs over a shipped decision log, so there is no demo-site
+# process, no Redis and no Docker in this chapter.

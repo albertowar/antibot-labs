@@ -1,5 +1,5 @@
 """
-Level 7 (Round 3): supply chain. CSP, SRI and a runtime fetch monitor (W3 Ch5).
+Level 7 (Round 3): supply chain. CSP, SRI and a runtime fetch monitor (W3 Ch7).
 
 The skimmer rides in a trusted third-party script (static/js/analytics-helper.js, a vendor tag the store includes
 on every page), reads the checkout and login fields, and POSTs them to an attacker origin in parallel with the
@@ -22,7 +22,7 @@ tried to exfiltrate also raises the session's score for the buy.
 Simplification, said plainly: the store's templates carry inline scripts (the sensor, the collectors), so the ext
 tags every <script> in a response with the per-response nonce. That is what an edge or a framework helper does, and
 it is safe only because Jinja escapes user input: a response that echoed attacker markup would hand the attacker the
-nonce too. W3 Ch5 is where the nonce, `strict-dynamic` and Trusted Types are taught properly.
+nonce too. W3 Ch7 is where the nonce, `strict-dynamic` and Trusted Types are taught properly.
 """
 
 import base64

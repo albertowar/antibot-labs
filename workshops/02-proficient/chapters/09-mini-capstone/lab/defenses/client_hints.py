@@ -1,5 +1,5 @@
 """
-Chapter 4, Round 3 defense (L3a): User-Agent Client Hints.
+Chapter 2, Round 3 defense (L3a): User-Agent Client Hints.
 
 Chromium browsers (Chrome, Edge, Opera, Brave, Samsung Internet) send three low-entropy Client Hints
 on every request to a secure context (HTTPS, or http://localhost):

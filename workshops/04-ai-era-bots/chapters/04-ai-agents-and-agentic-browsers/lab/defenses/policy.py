@@ -23,7 +23,7 @@ BANDS = {"monitor": 15, "challenge": 30, "block": 60}
 
 # The challenge type to serve when a check asks for a challenge without naming one.
 # None in the W1 starter: the challenge band is enforced as a block until a chapter
-# registers a type (W1 Ch6 captcha, W1 Ch7 proof of work, W2 Ch2 JS challenge).
+# registers a type (W1 Ch5 captcha, W1 Ch6 proof of work, W2 Ch4 JS challenge).
 # W4 Ch4 registers "step_up" (demo_site/ext/agents.py): a one-time code "emailed" to the account.
 DEFAULT_CHALLENGE = "step_up"
 

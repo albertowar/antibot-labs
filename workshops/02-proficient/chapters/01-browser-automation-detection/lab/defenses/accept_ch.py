@@ -1,5 +1,5 @@
 """
-Chapter 4, Round 4 defense (L4): Accept-CH negotiation.
+Chapter 2, Round 4 defense (L4): Accept-CH negotiation.
 
 High-entropy Client Hints are only sent when the server asks for them. The store answers every HTML page
 with (demo_site/ext/headers.py, at level 4 and above):
@@ -16,7 +16,7 @@ When the hints do arrive they are cross-checked as well: the UA string is frozen
 
 What it catches: Round 4 (consistent low-entropy hints, Chrome order, a plausible Sec-Fetch context).
 
-What it misses: a bot that drops the cookie on every request, so the store never "offered" (Chapter 5:
+What it misses: a bot that drops the cookie on every request, so the store never "offered" (Chapter 3:
 sessions), a real browser driven by automation, and Round 4's bot once it implements the negotiation
 (it is ten lines).
 

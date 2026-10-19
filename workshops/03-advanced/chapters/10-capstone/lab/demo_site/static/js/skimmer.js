@@ -1,4 +1,4 @@
-// static/skimmer.js — EDUCATIONAL DEMONSTRATION ONLY (W3 Ch5)
+// static/skimmer.js — EDUCATIONAL DEMONSTRATION ONLY (W3 Ch7)
 //
 // This is the payload attacks/round3_skimmer.py appends to the trusted
 // analytics-helper.js. It is what a real form-skimmer does: listen for input on

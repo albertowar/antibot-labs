@@ -1,5 +1,5 @@
 """
-Chapter 7, Round 3 defense (L3): make a pass worth less.
+Chapter 6, Round 3 defense (L3): make a pass worth less.
 
 At L1-L2 a solved challenge clears the whole session for ten minutes. A bot solves once
 and scrapes everything. From L3 the pass is stingy, in three ways:

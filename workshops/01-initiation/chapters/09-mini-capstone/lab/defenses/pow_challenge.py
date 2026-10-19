@@ -1,5 +1,5 @@
 """
-Chapter 7: issuing and verifying the `pow` challenge, one scheme per level.
+Chapter 6: issuing and verifying the `pow` challenge, one scheme per level.
 
 demo_site/ext/pow.py registers issue() and verify() with the store's challenge hook; this
 module is what they call. The scheme follows the defense level, so DEFENSE_LEVEL (or

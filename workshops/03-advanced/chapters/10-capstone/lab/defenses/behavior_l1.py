@@ -1,5 +1,5 @@
 """
-Chapter 3, Layer 1: presence & sanity (Section 3.3, Round 1).
+Chapter 5, Layer 1: presence & sanity (Section 5.3, Round 1).
 
 Did a hand do this at all? Cheap rules about what is *missing*: pointer
 travel before a click, keystrokes behind the text, time to read the page.
@@ -27,7 +27,7 @@ False positives you should expect from this layer:
       the collector pays the same, so the rule only raises the floor.
     - Voice control (Dragon, Voice Access) warps the cursor to the target's
       centre and dictates text without keys: teleport + centre + text = 55,
-      a challenge. Same score as an AI agent (Section 3.9). That is a real cost.
+      a challenge. Same score as an AI agent (Section 5.9). That is a real cost.
     - Password managers fill several fields with no keys: only 5 points here,
       because punishing autofill punishes the users with the best security habits.
 

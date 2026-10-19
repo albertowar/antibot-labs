@@ -1,5 +1,5 @@
 """
-Chapter 2 — Challenge tokens and the clearance's bindings (Section 2.3, Round 2)
+Chapter 4 — Challenge tokens and the clearance's bindings (Section 4.3, Round 2)
 
 Two different things, with two different jobs:
 

@@ -1,7 +1,7 @@
 """
 Client telemetry -> features.
 
-The page's collector (static/js/risk.js, a few lines of what W2 Ch2-4 built properly) posts one JSON
+The page's collector (static/js/risk.js, a few lines of what W2 Ch2, Ch4-5 built properly) posts one JSON
 blob per session to /api/telemetry with kind "risk": a fingerprint and a short behaviour trace.
 This module turns the raw blob into the features the fingerprint, behaviour and correlation layers
 read. The store keeps the blob itself (ctx.telemetry("risk")).

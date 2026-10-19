@@ -5,7 +5,7 @@ Two scalper families from earlier chapters, running on cheap cloud servers:
 
   naive_scalper     a script (python-requests, or a borrowed Chrome User-Agent and nothing else): no JS,
                     no assets, metronome pacing. Crawls every link on the home page, including the
-                    hidden honeypot link (W1 Ch8), and pokes the endpoint robots.txt disallows.
+                    hidden honeypot link (W1 Ch7), and pokes the endpoint robots.txt disallows.
   headless_scalper  automated Chrome with the webdriver flag patched (W2 Ch1): loads assets, runs the
                     page collector, but barely moves the mouse and fills forms instantly. Often
                     renders with SwiftShader (no GPU in the cloud). Rarely falls for the honeypot.

@@ -1,5 +1,5 @@
 """
-Chapter 3, Layer 2: kinematics & keystroke dynamics (Section 3.4, Round 2).
+Chapter 5, Layer 2: kinematics & keystroke dynamics (Section 5.4, Round 2).
 
 The bot now moves the mouse and presses real keys. Does the movement look
 like a hand, and the typing like fingers?

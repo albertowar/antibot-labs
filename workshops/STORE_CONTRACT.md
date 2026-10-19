@@ -13,11 +13,11 @@ Contract version: **1.7** (recorded in each starter's `STARTER.json`). Changing 
 | Version | Change |
 |---|---|
 | 1.0 | first version |
-| 1.1 | backward-compatible hook additions from the W1 Ch7 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
+| 1.1 | backward-compatible hook additions from the W1 Ch6 pilot: per-type clearance TTL and uses, `revoke_clearance`, `verify` may return a reason, `PAGE_HOOKS` may replace the response, `personas_*.py` auto-load, multi-attack rounds with `expect`, `verify.py --level/--all` on a free port, `Server-Timing` split into `gate` and `app`, scoreboard counts hurt people instead of stopped requests |
 | 1.2 | the series-wide guard: `labnet.py` at the lab root (a byte-identical copy of `scripts/labnet.py`) refuses non-local `DEMO_URL` and side-service URLs; the client moves from `tools/labnet.py` to `tools/labclient.py` (attacks import `labclient`); `checkpoint.py --restore`; `postgres:18.6-alpine` in compose |
 | 1.3 | additive, for W1 Ch3: the edge keeps client `X-Forwarded-For` aside as a claimed chain (`ctx.edge.xff_claimed`, `/whoami`); `world.json` pool keys `spread`, `listed`, `feeds` and top-level `groups` (honoured by `build_world.py` and `labclient.world_pool`); pools `cloud_gcp`, `cloud_v6`, `free_proxy`, `bulletproof_host`, `resi_us`..`resi_in` (group `residential_proxy_net`); `private_relay` also on the VPN list; feeds `drop_v4.json`, `firehol_level1.netset`, `manifest.json`, `README.md` (provenance); `smoke.py` checks the world |
 | 1.4 | two fixes: the baseline pins `fakeredis[lua]` so `ctx.bucket` (a Lua script) works on `REDIS_URL=memory://` instead of raising into a silent `<check>:error` allow, and `smoke.py` exercises it once; `LabClient.verdict()` returns the `X-Lab-Verdict`/`X-Lab-Score`/`X-Lab-Signals` of a blocked (4xx) response instead of `None` (the old guard treated a falsy `requests.Response` as "no response") |
-| 1.5 | additive, for W1 Ch8 (and the W4 crawl-policy chapters): `/robots.txt` is extensible — an ext registers `hooks.robots(provider)` (a callable returning extra lines, called per request so lines may vary with the level) and `routes/seo.py` appends them to the base policy; the base body is byte-identical when nothing registers |
+| 1.5 | additive, for W1 Ch7 (and the W4 crawl-policy chapters): `/robots.txt` is extensible — an ext registers `hooks.robots(provider)` (a callable returning extra lines, called per request so lines may vary with the level) and `routes/seo.py` appends them to the base policy; the base body is byte-identical when nothing registers |
 | 1.6 | additive, for the W4 chapters: (a) `hooks.on_action(name, fn)` now actually fires — the `review`, `checkout` and `drop_buy` routes (HTML and JSON) call it after a successful write with the row (`review=`/`order=`), and the handler may hold it (`status="pending"`), attribute it, or return a replacement response (e.g. a 202); nothing registered leaves the default behaviour byte-identical. (b) `hooks.on_reset(fn)` runs after `POST /lab/reset` so an ext can drop or reseed its own tables and keys. (c) the scoreboard gives a chapter-specific `outcome` (an ext setting `g.outcome`, e.g. `paywalled`/`charged`/`held`) its own column instead of folding it into `other` |
 | 1.7 | the gaps the 29 lab migrations recorded (the old `TODO.md` §1.2). **Behaviour changes:** (a) `X-Lab-Verdict` and the log's `action` report the most severe decision of the request (allow < monitor < challenge < rate_limit < deceive < block, score as the tie-break), so a zero-score 429 no longer reads `allow`; checkpoints that want the HTTP result keep reading `outcome`. (b) `/api/challenge` and `/api/challenge/verify` are exempt from the challenge band (block and rate_limit still apply): a client whose every request scores into the band can now actually solve. (c) a soft `Verdict` with a score and no signals carries its points as one synthesized signal instead of summing to 0 and deciding `allow`. (d) a `deceive` verdict is honoured on login (byte-identical wrong-password 401, password never checked), register, review and newsletter (`routes/deceive.py`, called from `guard()`); checkout and drop keep their fakes in the route. (e) `robots.txt` drops its leading `Allow: /` (allow is the RFC 9309 default), so first-match parsers honour later `Disallow` lines, a chapter's bait entries included. (f) `tools/smoke.py` asserts 122 *visible* products (`/lab/status` `visible_products`), so hidden honeypot rows may sit in the catalogue; it requires no `X-Lab-*` headers on `/robots.txt` or ungated paths; and `tools/verify.py --smoke` sets `LAB_SMOKE=1` (the gate runs an empty ladder at every level), so a lab baseline at `LADDER[0]` passes smoke. (g) on `memory://` the token bucket runs in Python under one process lock (fakeredis serialized every thread for the whole Lua interpretation, ~10 ms per call under a 16-thread attack; real Redis keeps Lua). **Additive:** `hooks.ungate(prefix, session=True)` (Ctx, session cookie, enrichers and a log row, but no ladder); `hooks.on_response(fn)` (every response, gated or not, timed as gate cost); `hooks.stopped_outcome(*names)`; `on_action` also fires for `register` (after the account) and `login` (every attempt, `result={"user", "ok", "reason"}`); `Ctx.route/view_args/query_string/scheme`, `ctx.resumed`, `ctx.cleared(type)`, public `gate.spend_clearance`; `policy.decide` may declare `ctx=`; a challenge interstitial that interrupted a form POST carries the form in a hidden `#challenge-replay` resubmit (and `window.labReplay()`); held orders — the scoreboard counts only `status="paid"` orders as purchases, and `demo_site/orders.py cancel_order(order)` returns stock; a `legit:` actor kind (welcome automation) with its own scoreboard columns, added only when such actors exist, and judged by the checkpoint (`Round.legit_hurt_max`, default 0: a stopped verified crawler is a false positive that fails the round); `Round.setup(level, caught_up)/teardown(level)/people/threads` and `scenario=None`; `population.POST_HOOKS`; `labclient.browser_context(..., ja4=, user_agent=, headers=, headers_fn=)`; `defenses/netinfo.py` (network type from the feeds) joins the skeleton |
 
@@ -158,13 +158,13 @@ score breaks ties), not its highest-scoring one; `outcome` says what the client 
   before the app runs; only the decision logger and the order record read it. `tools/smoke.py` fails
   any defense or ext that reads it.
 - `X-Lab-JA4` is kept as a *claimed* fingerprint (`ctx.edge.ja4_source == "claimed"`) until a TLS edge
-  (W2 Ch5) sets a measured one. Every other `X-Lab-*` request header is dropped — the prefix is
+  (W2 Ch3) sets a measured one. Every other `X-Lab-*` request header is dropped — the prefix is
   **reserved for the edge**, so a chapter's own request header (a login token, a lab calendar stamp)
   must use another name or the edge eats it.
 - A TLS edge reports a measurement through two WSGI environ keys the gate reads:
   `environ["lab.ja4_measured"]` (sets `ctx.edge.ja4` with `ja4_source == "measured"`, outranking any
   claim) and `environ["lab.h2"]` (the HTTP/2 fingerprint, `ctx.edge.h2`). Nothing in the starter sets
-  them; W2 Ch5's `ext/tls_edge.py` middleware fills them from fingerproxy's headers (and strips the
+  them; W2 Ch3's `ext/tls_edge.py` middleware fills them from fingerproxy's headers (and strips the
   headers), and any lab that wants a measured JA4 reuses that shim.
 - Client-supplied `X-Forwarded-For` is removed from the headers and never trusted by the edge. Like a CDN,
   the edge appends the peer and keeps the chain aside as `ctx.edge.xff_claimed` (`"<client value>, <ip>"`,
@@ -200,7 +200,7 @@ score breaks ties), not its highest-scoring one; `outcome` says what the client 
   `created_at`; plus `mallory@example.test` / `mallory-owns-this-1`, the attacker's own account.
   PBKDF2-SHA256 at `LAB_HASH_ITERS`.
 - 200 gift cards `GC-XXXX-XXXX` ($10-$100), ~800 historical orders.
-- `hidden=True` products never appear in listings or the sitemap: the honeypot-SKU hook (W1 Ch8).
+- `hidden=True` products never appear in listings or the sitemap: the honeypot-SKU hook (W1 Ch7).
 - Chapter-specific columns go in the `extra` JSON of each table, or in a chapter's own model.
 
 ### 3.8 Sessions and cookies
@@ -281,7 +281,7 @@ def init(app):
 `init(app)` is also the ext's lifecycle hook: start a background worker there (keep its state under
 `lab:…` keys so `POST /lab/reset` clears it, or register `on_reset`), and start a side service (a mock
 provider, a TLS edge) there on a thread bound to a free loopback port — or lazily from the attack
-callables that need it, as W2 Ch5 does; `tools/verify.py` itself starts nothing but the store.
+callables that need it, as W2 Ch3 does; `tools/verify.py` itself starts nothing but the store.
 
 Chapter templates go in `demo_site/ext/templates/<name>/` (searched first, so a chapter may override a
 starter template) and chapter JS in `demo_site/static/js/<name>.js`. Ext modules load in name order.

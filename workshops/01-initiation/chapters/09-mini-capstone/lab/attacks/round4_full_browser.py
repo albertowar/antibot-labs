@@ -14,8 +14,8 @@ What it costs the attacker, and what Workshop 2 adds:
   - a browser per unit and a sticky residential address per unit: real money at scale, which is the
     point of W1's layers
   - automation leaves traces below HTTP: navigator.webdriver and CDP artefacts (W2 Ch1), a JS
-    challenge that checks the environment (W2 Ch2), mouse and keyboard behaviour (W2 Ch3),
-    fingerprint consistency (W2 Ch4), and the TLS/HTTP2 handshake (W2 Ch5)
+    challenge that checks the environment (W2 Ch4), mouse and keyboard behaviour (W2 Ch5),
+    fingerprint consistency (W2 Ch2), and the TLS/HTTP2 handshake (W2 Ch3)
 
 Expected (tools/checkpoint.py):
   Round 4 / Drop Day  still buys a share of the drop

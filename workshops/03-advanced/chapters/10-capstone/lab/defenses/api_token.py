@@ -1,5 +1,5 @@
 """
-Level 5: API tokens bound to the TLS fingerprint (W3 Ch2, W2 Ch5).
+Level 5: API tokens bound to the TLS fingerprint (W3 Ch2, W2 Ch3).
 
 W2 Ch6 bound the *login* to a session. The API has the same soft spot one layer up: a stolen or replayed bearer
 token is as good as a password. A mobile app or a partner script that harvests one token can scrape the API from
@@ -12,7 +12,7 @@ stack no longer matches. This is a *consistency* control, exactly like JA4 itsel
 builds apart, and it does nothing against a stealth browser that owns the TLS stack it presents. What it stops is
 the cheap case, a token lifted out of one client and replayed by another with a different handshake.
 
-In this lab the JA4 is CLAIMED (`X-Lab-JA4`), not measured: there is no TLS edge in front of the store (W2 Ch5
+In this lab the JA4 is CLAIMED (`X-Lab-JA4`), not measured: there is no TLS edge in front of the store (W2 Ch3
 teaches the measured version). The binding logic is the same.
 
 Tokens are short JWTs signed with the store's secret (PyJWT, HS256). In production prefer asymmetric keys, so an

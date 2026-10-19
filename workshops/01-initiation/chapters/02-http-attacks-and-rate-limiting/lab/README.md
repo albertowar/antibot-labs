@@ -107,7 +107,7 @@ curl -s 'localhost:5000/lab/decisions?actor=bot:&limit=5' | python -m json.tool
 Every response carries `X-Lab-Verdict`, `X-Lab-Score`, `X-Lab-Signals`, `Retry-After` (on a 429) and `Server-Timing` (the
 per-check gate cost). They tell the attacker exactly what tripped: never send them in production (`LAB_HEADERS=0`).
 
-**There is no challenge type in this chapter.** CAPTCHAs arrive in Chapter 6 and proof of work in Chapter 7. The rate limits
+**There is no challenge type in this chapter.** CAPTCHAs arrive in Chapter 5 and proof of work in Chapter 6. The rate limits
 answer `429`; the monitor in Round 1 answers nothing at all.
 
 ## How to measure a round

@@ -26,7 +26,7 @@ round's problem). The 43 people (tools/personas_api.py: the 40 shoppers of the W
 phone and a partner integration) buy the drop and use the API in the same minute:
 
     blocked      a false positive: the round FAILS on any blocked person (the no-JavaScript visitor is the accepted
-                 cost of the sensor gate, as in W2 Ch1 and Ch3)
+                 cost of the sensor gate, as in W2 Ch1 and Ch5)
     challenged   friction, listed per profile: the round fails above the round's budget
 
 Defender cost: the gate's time on the drop POST (Server-Timing), which from level 6 includes the stream's inline work.

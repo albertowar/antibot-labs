@@ -13,7 +13,7 @@ is where CGNAT, campus networks and the shopper's own agent live, and because
 a decoy served to a person is a lie told to a customer. The cost of the
 limit: an extractor that rents residential egress and sends telemetry is not
 poisoned here. It is caught by what it does next (honeypot fetches, volume,
-W2 Ch4 clustering), not by what it read.
+W2 Ch2 clustering), not by what it read.
 """
 
 from . import extractor_traps

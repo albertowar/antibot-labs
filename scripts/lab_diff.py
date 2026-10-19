@@ -43,7 +43,7 @@ def hashes(base):
                     continue
                 p = os.path.join(root, f)
                 out[os.path.relpath(p, base)] = hashlib.sha256(open(p, "rb").read()).hexdigest()
-    for rel in git_ignored(base, out):                  # build output (e.g. W2 Ch2's variant pool) is not the lab
+    for rel in git_ignored(base, out):                  # build output (e.g. W2 Ch4's variant pool) is not the lab
         del out[rel]
     return out
 

@@ -1,5 +1,5 @@
 """
-trapkit: what the Chapter 8 bots and shoppers share, so each script stays about its idea.
+trapkit: what the Chapter 7 bots and shoppers share, so each script stays about its idea.
 
   parse_form        the inputs of one form with everything around them (a bot's view of the HTML)
   parse_css         which classes traps.css hides (display:none) or throws off-screen

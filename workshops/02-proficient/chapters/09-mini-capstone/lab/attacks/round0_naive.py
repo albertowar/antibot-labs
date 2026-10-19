@@ -5,7 +5,7 @@ Three cheap bots, the kind that is still most of the bot traffic on the internet
 seen every Round 0 layer fire (level 1):
 
     --tool requests      python-requests: a library UA, a library TLS stack, no JavaScript
-                         -> ua_inspector, header_inspector, ja4_denylist (W2 Ch1, Ch5) at the request,
+                         -> ua_inspector, header_inspector, ja4_denylist (W2 Ch1, Ch3) at the request,
                             sensor_gate at the buy
     --tool curl_cffi     a perfect Chrome ClientHello and header set, but not a browser: no JavaScript
                          -> nothing at the request (its TLS and headers ARE Chrome's), sensor_gate at the buy

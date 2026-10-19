@@ -1,5 +1,5 @@
 /*
- * Chapter 7: the browser's PoW solver, running in a Web Worker.
+ * Chapter 6: the browser's PoW solver, running in a Web Worker.
  *
  * Puzzle (same as defenses/pow_core.py): find a counter such that
  * SHA-256("<nonce>:<counter>") starts with `bits` zero bits.

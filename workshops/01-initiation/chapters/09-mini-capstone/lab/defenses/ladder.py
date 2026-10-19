@@ -10,9 +10,9 @@ before the slower checks run.
     L1  W1 Ch2 + Ch4   trusted_proxy, rate_limit, prefix_limit, the drop's own rate limit,
                        then the four header checks (UA, header set, Client Hints, header order)
     L2  W1 Ch3         ip_reputation (cloud ranges, hosting ASNs, VPN lists; Private Relay is trusted)
-    L3  W1 Ch8 + Ch5   the drop form's honeypot and timing token, the crawl traps,
+    L3  W1 Ch7 + Ch8   the drop form's honeypot and timing token, the crawl traps,
                        then the session as evidence (landing page, JS cookie, session age)
-    L4  W1 Ch7 + Ch5   the proof-of-work gate (adaptive price, single-use, bound pass),
+    L4  W1 Ch6 + Ch8   the proof-of-work gate (adaptive price, single-use, bound pass),
                        one hoodie per customer, the session bound to its browser and network,
                        and the sanction a trapped client carries (responses)
 

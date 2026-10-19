@@ -1,5 +1,5 @@
 """
-Chapter 3: a ghost-cursor-style humanizer for Playwright (Section 3.5).
+Chapter 5: a ghost-cursor-style humanizer for Playwright (Section 5.5).
 
 Modelled on the recipe popularised by ghost-cursor (Xetera, npm, 2019-2026)
 and its many ports, re-implemented here in ~60 lines so you can read it:

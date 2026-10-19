@@ -8,8 +8,8 @@ This file registers the scenario "ch9_drop": each shopper replays, in order, wha
     2. POST /api/telemetry   the sensor report that browser produces (kind "sensor")
     3. sign in               POST /api/login with the login token the page would mint (level 5 asks for
                              it; the page always fetches one), or register live (the first-timer)
-    4. GET /drop/<sku>       the drop page, whose layout the server drew (W2 Ch3)
-    5. POST /api/telemetry   the behavior record the collector would have made (tools/humans.py, W2 Ch3)
+    4. GET /drop/<sku>       the drop page, whose layout the server drew (W2 Ch5)
+    5. POST /api/telemetry   the behavior record the collector would have made (tools/humans.py, W2 Ch5)
     6. wait, then POST the form; when the gate answers with the "proof" challenge, solve it and submit again
 
 Who is who is fixed per persona (PEOPLE below), so a cohort's false positives show up under the same name

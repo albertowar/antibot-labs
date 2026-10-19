@@ -1,5 +1,5 @@
 """
-Chapter 3: the glue between the behavior layers and the store's gate.
+Chapter 5: the glue between the behavior layers and the store's gate.
 
 The drop page (demo_site/ext/templates/drop.html) draws the reservation form at
 fixed positions inside #behavior-form, and static/js/behavior.js records how it

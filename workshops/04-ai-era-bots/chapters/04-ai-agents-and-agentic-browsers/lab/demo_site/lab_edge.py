@@ -18,7 +18,7 @@ Rules, enforced here:
   4. X-Lab-Actor is ground truth ("human:home:03", "bot:wave2") for the
      scoreboard. It is removed BEFORE the defenses run, so no check can read it.
   5. Every other X-Lab-* request header is removed too. X-Lab-JA4 is kept
-     aside as a *claimed* TLS fingerprint until a TLS edge (W2 Ch5) measures
+     aside as a *claimed* TLS fingerprint until a TLS edge (W2 Ch3) measures
      a real one.
 
 A browser you open yourself sends no X-Lab-* headers: it gets the world's

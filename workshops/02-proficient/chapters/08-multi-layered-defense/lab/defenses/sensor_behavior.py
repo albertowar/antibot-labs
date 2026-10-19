@@ -1,5 +1,5 @@
 """
-Layer: behaviour (stand-in for W2 Ch3)
+Layer: behaviour (stand-in for W2 Ch5)
 
 Looks at the short mouse/keyboard trace that came with the login:
 - no pointer events at all

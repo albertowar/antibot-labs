@@ -5,7 +5,7 @@ Everything else in this lab models agents at the HTTP layer so a round runs in
 seconds with no browser. This bonus drives a real Chromium through the store the
 way an agentic browser would: load the product, add to cart, fill checkout,
 click. It exists so you can confirm the HTTP-level story holds against a real
-DOM-driven agent, and watch the behaviour layer (W2 Ch3/Ch9, shadow here) light
+DOM-driven agent, and watch the behaviour layer (W2 Ch5/Ch9, shadow here) light
 up next to the agent signals.
 
 Needs Chromium:  pip install playwright==1.63.0 && python -m playwright install chromium

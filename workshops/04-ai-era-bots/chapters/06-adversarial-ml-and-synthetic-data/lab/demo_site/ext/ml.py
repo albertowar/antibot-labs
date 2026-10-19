@@ -10,7 +10,7 @@ module adds all of it without touching a starter file:
   2. telemetry        kinds "fp" (device claims) and "beh" (behaviour summary) on the contract's
                       POST /api/telemetry; each report is also appended to the session's log
   3. honeypots        a hidden link (/archive) and a robots.txt-disallowed endpoint (/partner-feed):
-                      hits become bot labels (defenses/labels.py), exactly as in W1 Ch8
+                      hits become bot labels (defenses/labels.py), exactly as in W1 Ch7
   4. lab routes       GET /lab/ml/status, GET /lab/ml/export (the training-data pull)
 
 Nothing here is a defense. The decisions live in defenses/*.py (ml_check, oracle_guard), and they are

@@ -14,7 +14,7 @@ levels 1 to 4 (levels 3 and 4 hold two layers each), and from level 5 the layer 
 LAYER_OF = {
     "ua_inspector": "L0", "header_inspector": "L0", "client_hints": "L0", "header_order": "L0", "ja4_denylist": "L0",
     "tls_family": "L0", "sensor_gate": "L0", "automation_artifacts": "L0", "login_throttle": "L0",
-    "ua": "L0", "headers": "L0", "rate_limit": "L0",        # signal layers of the Chapter 1 and 6 header and throttle checks
+    "ua": "L0", "headers": "L0", "rate_limit": "L0",        # signal layers of the Chapter 1 and 4 header and throttle checks
     "consistency": "L1", "lie_detection": "L1",
     "behavior_l1": "L2", "behavior_l2": "L2", "flow": "L2",
     "session_model": "L3",

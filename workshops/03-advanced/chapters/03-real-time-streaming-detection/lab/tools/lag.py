@@ -11,7 +11,7 @@ While the consumer is faster than the traffic the backlog stays near zero and a 
 milliseconds. When it is slower, the backlog grows without bound; the flag for the 21st request is
 not computed until the consumer reaches it, and the attacker keeps being served in the meantime.
 The fix is horizontal: more consumers in the group (`--consumers`), which is the operations story
-of W3 Ch4. Nothing here is a pass/fail number: the backlog depends on your machine, so read the
+of W3 Ch8. Nothing here is a pass/fail number: the backlog depends on your machine, so read the
 shape of the table, not the digits.
 
     python tools/lag.py                          # a consumer that costs 100 ms per event: falls behind

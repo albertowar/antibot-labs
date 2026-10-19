@@ -1,7 +1,7 @@
 # Post-incident report: the capstone drop
 
 *Template for the final debrief. Fill one in (alone, against the reference answers in the README). It is the same
-shape W3 Ch4 (Detection Signal Lifecycle & Ops) uses, because writing the kill chain down is how a stack actually
+shape W3 Ch8 (Detection Signal Lifecycle & Ops) uses, because writing the kill chain down is how a stack actually
 improves between drops.*
 
 ---

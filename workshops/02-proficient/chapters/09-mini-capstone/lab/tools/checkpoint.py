@@ -20,7 +20,7 @@ store (by contract) and Round 0's layer is therefore level 1. So the "before" co
     -----  -----  ---------------------------------  -------------------------------------------------
       0      1    requests, curl_cffi, stock Chromium  headers, TLS consistency (claimed JA4), no-JS, webdriver
       1      2    headless Patchright                  fingerprint coherence (W2 Ch1 layers 2 and 3)
-      2      3    scripted Camoufox                    behavior (W2 Ch3) and flow (server-measured)
+      2      3    scripted Camoufox                    behavior (W2 Ch5) and flow (server-measured)
       3      4    humanized Camoufox + account farm    the session and account model
       4      5    credential stuffing                  login token binding, failures per fingerprint cluster
 
@@ -28,7 +28,7 @@ Every round runs EVERY scalper, so you see both what the current layers stop and
 (the next round's problem). The 40 shoppers (tools/personas_ch9.py) buy the same drop in the same minute:
 
     blocked      a false positive: the round FAILS on any blocked shopper (the no-JavaScript visitor is the
-                 accepted cost of the sensor gate, as in W2 Ch1 and Ch3)
+                 accepted cost of the sensor gate, as in W2 Ch1 and Ch5)
     challenged   friction, listed per profile: the round fails above the round's budget
 
 Defender cost: the gate's time on the drop POST (Server-Timing) and, from Round 3, the model's.
@@ -69,7 +69,7 @@ BOTS = {
 }
 # Shoppers that may meet the "proof" challenge in a round (friction, not a loss: they solve it and buy). Measured:
 # from Round 1 the privacy-extension user (Chapter 1's lie detection reads the extension's wrapped navigator),
-# from Round 2 also the voice-control user (teleported click, text without keys: Chapter 3's own cost) and the
+# from Round 2 also the voice-control user (teleported click, text without keys: Chapter 5's own cost) and the
 # password-manager user who buys in 1.2 to 1.6 s (flow's dwell line).
 FRICTION_BUDGET = {0: 0, 1: 1, 2: 3, 3: 3, 4: 3}
 

@@ -10,8 +10,8 @@ Signals and points (policy.IP_POINTS), summed on the 0-100 scale:
 
     score >= 75 block, >= 40 challenge, >= 20 monitor (policy.BANDS)
 
-There is no challenge type in this chapter (CAPTCHA arrives in Chapter 6, proof of work in
-Chapter 7), so the challenge band is enforced as a block: a challenged shopper is a lost one.
+There is no challenge type in this chapter (CAPTCHA arrives in Chapter 5, proof of work in
+Chapter 6), so the challenge band is enforced as a block: a challenged shopper is a lost one.
 
 What it catches: fresh cloud VMs. A VM bought five minutes ago is on no blocklist, but it
 sits in a published cloud range and usually in a hosting ASN.

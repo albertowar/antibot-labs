@@ -26,7 +26,7 @@ False positives, and why the rules are shaped like this:
   - One rule alone is worth 25 ("suspicious"). Only "teleported AND dead
     centre" (or an untrusted event) reaches 40.
 
-This is the shallow end of behavioural detection; Chapter 3
+This is the shallow end of behavioural detection; Chapter 5
 builds the real thing (trajectories, timing, keystroke dynamics).
 
 Enabled for POST /api/cart/add (phase action:cart_add) when DEFENSE_LEVEL >= 5 (Round 4; round N runs at level N+1). The page sends the

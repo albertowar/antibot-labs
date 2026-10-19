@@ -14,12 +14,12 @@ a real browser IS a real browser.
 
 What would stop it is integrity, not more signals: an obfuscated,
 per-session sensor whose output is bound to a server challenge and cannot
-be computed without executing it (Chapter 2), plus behaviour
-that cannot be replayed (Chapter 3).
+be computed without executing it (Chapter 4), plus behaviour
+that cannot be replayed (Chapter 5).
 
 Expected results:
   - every level → 200 on /api/products and /api/cart/add: the report, the headers and the click
-    are a real browser's. Only Chapter 2's integrity checks can tell them apart.
+    are a real browser's. Only Chapter 4's integrity checks can tell them apart.
 
 Run the store first (python demo_site/app.py), then:
     python attacks/round5_forged_sensor.py [profile-name]

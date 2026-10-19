@@ -1,5 +1,5 @@
 """
-Round 3 attack: a third-party form skimmer (W3 Ch5). Level 7 stops it; below it the exfil lands.
+Round 3 attack: a third-party form skimmer (W3 Ch7). Level 7 stops it; below it the exfil lands.
 
 A skimmer rides in a trusted third-party script (static/js/analytics-helper.js, a vendor tag on every page), reads
 the checkout or login fields and POSTs them to an attacker origin in parallel with the honest submit

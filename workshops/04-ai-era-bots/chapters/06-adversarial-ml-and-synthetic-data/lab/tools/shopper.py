@@ -9,8 +9,8 @@ the drop-day journey the store is built around:
 Real users (tools/personas_ch6.py) and bots (attacks/*.py) use the SAME engine. They differ only in
 their Persona, which is exactly the point: the model can only learn from what the persona leaks.
 
-Fingerprints and behaviour summaries stand in for what the page collectors from W2 Ch3 (behaviour)
-and W2 Ch4 (fingerprinting) would POST to /api/telemetry. No real browser runs in this lab.
+Fingerprints and behaviour summaries stand in for what the page collectors from W2 Ch5 (behaviour)
+and W2 Ch2 (fingerprinting) would POST to /api/telemetry. No real browser runs in this lab.
 
 Lab time. `think()` sleeps a VIRTUAL duration times LAB_TIME_SCALE (default 0.02), so a 10 s pause is
 0.2 s. The model's features divide every measured gap by the same factor (defenses/features.py).
@@ -133,7 +133,7 @@ def fingerprint(rng, device, locale, ua_key, canvas=None):
             "webdriver": False, "canvas": canvas}
 
 
-# --- behaviour summaries (what the W2 Ch3 collector would report) -------------
+# --- behaviour summaries (what the W2 Ch5 collector would report) -------------
 
 def _clamp(x, lo=0.0, hi=1.0):
     return max(lo, min(hi, x))

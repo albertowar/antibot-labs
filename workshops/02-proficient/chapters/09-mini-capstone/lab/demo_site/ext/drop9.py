@@ -5,7 +5,7 @@ edited, and nothing here decides anything (the decisions live in defenses/*.py).
     enricher            stamps the session when a drop page is served (defenses/flow.py reads it: the
                         server's own clock, not the collector's)
     challenge "proof"   the challenge the middle of the score scale serves: a small hashcash a browser
-                        solves in well under a second (policy.PROOF_BITS). Chapters 1 to 3 enforce the
+                        solves in well under a second (policy.PROOF_BITS). Chapters 1, 4 and 5 enforce the
                         challenge band as a block because their stores register no type; the capstone
                         registers one so that "challenged" and "blocked" are different costs, which is
                         the trade-off Round 1's VDI customer is about.

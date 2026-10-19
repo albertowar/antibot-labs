@@ -2,6 +2,6 @@
   "defenses/httpsig.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/defenses/httpsig.py",
   "defenses/key_directory.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/defenses/key_directory.py",
   "defenses/web_bot_auth.py": "workshops/04-ai-era-bots/chapters/02-verified-bot-identity/lab/solutions/round5/defenses/web_bot_auth.py",
-  "defenses/pow_core.py": "workshops/01-initiation/chapters/07-proof-of-work-and-computational-challenges/lab/defenses/pow_core.py",
-  "defenses/challenge_signed.py": "workshops/01-initiation/chapters/07-proof-of-work-and-computational-challenges/lab/defenses/challenge_signed.py"
+  "defenses/pow_core.py": "workshops/01-initiation/chapters/06-proof-of-work-and-computational-challenges/lab/defenses/pow_core.py",
+  "defenses/challenge_signed.py": "workshops/01-initiation/chapters/06-proof-of-work-and-computational-challenges/lab/defenses/challenge_signed.py"
 }

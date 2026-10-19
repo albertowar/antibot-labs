@@ -5,7 +5,7 @@ Two sources, kept apart on purpose:
   * Client telemetry (`POST /api/telemetry {"kind": "agent", ...}`, sent by static/js/agent.js and,
     for the simulated shoppers, by tools/personas_ch4.py): a browser fingerprint and, per page, the
     pointer / key / scroll / overlay events the collector recorded. Evidence, never proof: it all
-    runs in the client and can be forged (W2 Ch2).
+    runs in the client and can be forged (W2 Ch4).
   * The server's own flow log: when each HTML page was served to this session. A bot cannot edit it,
     so the cadence between pages is the one timing signal the client does not control.
 
