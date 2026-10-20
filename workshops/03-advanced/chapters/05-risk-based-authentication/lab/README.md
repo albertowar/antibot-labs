@@ -3,6 +3,25 @@
 Starts from: `workshops/03-advanced/starter/` (contract 1.7). Adds: see the block below.
 
 <!-- lab-diff:start -->
+**Adds** (files not in the starter):
+
+- `defenses/blanket_otp.py`
+- `defenses/breachcorpus.py`
+- `defenses/breached_passwords.py`
+- `defenses/login_throttle.py`
+- `defenses/ratelimit.py`
+- `defenses/rba_score.py`
+- `defenses/recovery_risk.py`
+- `defenses/stepup_policy.py`
+- `demo_site/ext/rba.py`
+- `demo_site/ext/rba_world.py`
+- `tools/calibrate.py`
+- `tools/personas_ch5.py`
+
+**Edits** (student and tuning files):
+
+- `defenses/ladder.py`
+- `defenses/policy.py`
 <!-- lab-diff:end -->
 
 ## Rules of engagement

@@ -1,0 +1,6 @@
+{
+  "defenses/login_throttle.py": "workshops/02-proficient/chapters/06-account-takeover/lab/solutions/round1/defenses/login_throttle.py",
+  "defenses/breached_passwords.py": "workshops/02-proficient/chapters/06-account-takeover/lab/solutions/round3/defenses/breached_passwords.py",
+  "defenses/ratelimit.py": "workshops/02-proficient/chapters/06-account-takeover/lab/defenses/ratelimit.py",
+  "defenses/breachcorpus.py": "workshops/02-proficient/chapters/06-account-takeover/lab/defenses/breachcorpus.py"
+}

@@ -22,10 +22,10 @@ one email. Large providers do the same for recoveries from unfamiliar devices.
 
 What it misses: an attacker who also holds the remembered-device cookie scores "low" here too (the
 Round 2 hole), and an attacker who never needs the reset (the mailbox crew, password in hand).
-Both are where phishing-resistant factors come in (§5.5, theory).
+Both are where phishing-resistant factors come in (§5.6, theory).
 
 Who it hurts: the honest customer who forgot their password on a new phone. They wait three days,
-and the store needs a support path for the urgent cases (§5.6). That is the `forgot_new_phone`
+and the store needs a support path for the urgent cases (§5.7). That is the `forgot_new_phone`
 cost the checkpoint reports.
 """
 

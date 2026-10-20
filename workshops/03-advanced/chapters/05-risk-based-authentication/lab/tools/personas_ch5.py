@@ -145,14 +145,14 @@ def scenario_signin(p, client, rng):
     return _login(p, client, rng, password_for(p.account))
 
 
-def scenario_ch9(p, client, rng):
+def scenario_ch5(p, client, rng):
     """Browse for the starter's shoppers, sign in for the cohort."""
     if isinstance(p, SignIn):
         return scenario_signin(p, client, rng)
     return population.scenario_browse(p, client, rng)
 
 
-population.SCENARIOS["ch9"] = scenario_ch9
+population.SCENARIOS["ch5"] = scenario_ch5
 
 
 def friction(results):
