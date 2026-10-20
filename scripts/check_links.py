@@ -22,7 +22,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-TOP = ("workshops/", "scripts/", "onboarding/", "theme/", "pitch/")
+TOP = ("workshops/", "scripts/", "onboarding/", "theme/", "pitch/", "university/")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 REPO_PATH = re.compile(r"(?<![\w./-])((?:" + "|".join(re.escape(t) for t in TOP) + r")[\w./@+-]*)")
 PLACEHOLDER = re.compile(r"[<>*{}]|\.\.\.|…|NN|<w>")

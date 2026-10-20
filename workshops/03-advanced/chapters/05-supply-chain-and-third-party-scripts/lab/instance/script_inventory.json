@@ -1,0 +1,44 @@
+{
+  "/": [
+    {
+      "url": "http://127.0.0.1:34889/static/js/store.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/js/shop-bundle.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/vendor/analytics-helper.js",
+      "third_party": false
+    }
+  ],
+  "/login": [
+    {
+      "url": "http://127.0.0.1:34889/static/js/store.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/js/shop-bundle.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/vendor/analytics-helper.js",
+      "third_party": false
+    }
+  ],
+  "/checkout": [
+    {
+      "url": "http://127.0.0.1:34889/static/js/store.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/js/shop-bundle.js",
+      "third_party": false
+    },
+    {
+      "url": "http://127.0.0.1:34889/static/vendor/analytics-helper.js",
+      "third_party": false
+    }
+  ]
+}

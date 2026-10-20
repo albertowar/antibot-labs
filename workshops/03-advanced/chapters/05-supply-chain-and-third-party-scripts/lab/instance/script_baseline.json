@@ -1,0 +1,5 @@
+{
+  "http://127.0.0.1:34889/static/js/store.js": "sha256-23c9d0d63cbdff0174f3c32525b91d4002f889f38ff9487d0656fbf22e82afea",
+  "http://127.0.0.1:34889/static/js/shop-bundle.js": "sha256-a9e67649254555f527e13af2f5ecd35e03254b2a52161b54be841a4a8d67a8b5",
+  "http://127.0.0.1:34889/static/vendor/analytics-helper.js": "sha256-0110af55e3bb53037a584bd1d58f73b132a0917716855cb0af74d8126aea9d16"
+}

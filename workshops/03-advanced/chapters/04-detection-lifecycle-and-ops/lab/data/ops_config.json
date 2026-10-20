@@ -1,0 +1,11 @@
+{
+  "canary_pct": 50,
+  "note": "containment, expires at clock 4233105",
+  "stepup_asn": 64496,
+  "until_clock": 4233105,
+  "weights": {
+    "header_order_mismatch": 0,
+    "mouse_too_straight": 25,
+    "timing_too_regular": 25
+  }
+}
