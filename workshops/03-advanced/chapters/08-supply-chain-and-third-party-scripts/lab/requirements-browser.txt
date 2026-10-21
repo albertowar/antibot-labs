@@ -1,0 +1,4 @@
+# W3 Ch8 drives a real Chromium (the shoppers, the victims and the inventory crawl). After installing:
+#   python -m playwright install chromium
+# W2 Ch9 is the documented exception (camoufox needs playwright<1.63) and keeps its own pin.
+playwright==1.63.0

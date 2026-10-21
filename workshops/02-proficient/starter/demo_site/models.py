@@ -91,7 +91,35 @@ class Address(db.Model):
     country = db.Column(db.String(2), default="US")
 
     def to_dict(self):
-        return {"line1": self.line1, "city": self.city, "postcode": self.postcode, "country": self.country}
+        return {"id": self.id, "line1": self.line1, "city": self.city, "postcode": self.postcode, "country": self.country}
+
+
+class AccountChange(db.Model):
+    """One row per change to the account's email, password, addresses or saved card (contract 1.8).
+
+    The row is the audit trail the routes and a chapter's defenses share. `payload` holds what the
+    change is, never a secret: a password change is `{}` (the new credential waits in
+    `extra["credential"]` until it applies, then moves to `extra["before"]`'s counterpart), and a card
+    is brand/bin6/last4/fingerprint only. `status`: `applied`, `pending` (held; a clock or a reviewer
+    releases it), `confirm` (an email change waiting for the link mailed to the NEW address) or
+    `cancelled`. `token` is the secret in the confirm and cancel links mailed to the owner.
+    """
+    __tablename__ = "account_changes"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    kind = db.Column(db.String(12), nullable=False)                 # email | password | address | card
+    payload = db.Column(JSON, default=dict)
+    status = db.Column(db.String(12), default="applied", index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+    applied_at = db.Column(db.DateTime, nullable=True)
+    extra = db.Column(JSON, default=dict)                           # hold, until, before, reason, ...
+    token = db.Column(db.String(32), default="")
+
+    def to_dict(self):
+        return {"id": self.id, "user_id": self.user_id, "kind": self.kind, "payload": self.payload or {},
+                "status": self.status, "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
+                "applied_at": self.applied_at.isoformat() + "Z" if self.applied_at else None,
+                "extra": {k: v for k, v in (self.extra or {}).items() if k not in ("credential", "before")}}
 
 
 class Order(db.Model):

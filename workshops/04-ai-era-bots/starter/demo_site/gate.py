@@ -47,6 +47,38 @@ def _edge_info():
                     xff_claimed=request.environ.get("lab.xff_claimed", ""))
 
 
+def _auth(s):
+    """ctx.auth from the session's stamps (contract 1.8). Read-only: `_gate` stamps `seen_at`."""
+    import json
+    at, methods, seen = s.redis.hmget(s.key, "auth_at", "auth_methods", "seen_at")
+    now = time.time()
+    return {"at": float(at) if at else None, "methods": json.loads(methods) if methods else [],
+            "idle_s": round(now - float(seen), 3) if seen else None,
+            "age_s": round(now - float(at), 3) if at else None}
+
+
+def stamp_login(ctx):
+    """A password login (or a registration, which set a password a moment ago) just opened the
+    session: record when and how. Routes call it next to `session.set("uid", ...)`."""
+    import json
+    ctx.session.set("auth_at", f"{time.time()}")
+    ctx.session.set("auth_methods", json.dumps(["password"]))
+
+
+def stamp_step_up(ctx, ctype):
+    """A challenge registered with reauth=True was just solved inside a signed-in session: append
+    its type to auth_methods and refresh auth_at. It never writes `uid` (the session already has one)."""
+    import json
+    methods = json.loads(ctx.session.get("auth_methods") or "[]")
+    ctx.session.set("auth_methods", json.dumps(methods + ([ctype] if ctype not in methods else [])))
+    ctx.session.set("auth_at", f"{time.time()}")
+
+
+def clear_auth(ctx):
+    for name in ("auth_at", "auth_methods"):
+        ctx.session.delete(name)
+
+
 def build_ctx(app):
     redis = app.extensions["lab_redis"]
     s = _session(redis)
@@ -67,7 +99,7 @@ def build_ctx(app):
               user=user, redis=redis, level=app.config["LAB"].defense_level,
               route=request.endpoint or "", view_args=dict(request.view_args or {}),
               query_string=request.query_string.decode("utf-8", "replace"), scheme=request.scheme,
-              resumed=_cleared() if hooks.challenges.types else False, _clearance=_cleared,
+              resumed=_cleared() if hooks.challenges.types else False, _clearance=_cleared, auth=_auth(s),
               _telemetry=lambda kind: _read_telemetry(redis, s.sid, kind))
     return ctx
 
@@ -223,6 +255,8 @@ def install(app):
         g.gate_ms += (time.perf_counter() - t_ctx) * 1000      # Ctx build + enrichers count as gate cost
         if mode == "session":                                  # hooks.ungate(..., session=True):
             return None                                        # Ctx, cookie and a log row — no ladder
+        s = ctx.session
+        s.redis.hset(s.key, "seen_at", f"{time.time()}")       # after ctx.auth read the previous one
         d = run_phase("request", ctx)
         if d.action == "challenge" and request.path in ("/api/challenge", "/api/challenge/verify"):
             # A client in the challenge band must still be able to fetch and deliver the answer:

@@ -4,10 +4,12 @@ from its init(app). Starter files are never edited by a lab.
 
     slot(name, template)                    render a chapter template inside base.html or a form:
                                             "head", "body_end", "nav", "form:checkout", "form:login",
-                                            "form:register", "form:drop", "form:review", "product:aside"
+                                            "form:register", "form:drop", "form:review", "form:account",
+                                            "product:aside"
     telemetry.register(kind, handler)       handle POST /api/telemetry {"kind": kind, ...}
-    challenges.register(type, issue, verify, render=None)
-                                            a challenge type the policy "challenge" band can serve
+    challenges.register(type, issue, verify, render=None, reauth=False)
+                                            a challenge type the policy "challenge" band can serve;
+                                            reauth=True marks an in-session step-up (ctx.auth)
     enricher(fn)                            fn(ctx) runs before the checks; fill ctx.attrs
     ungate(prefix)                          paths the gate skips (static assets, your lab routes)
     ungate(prefix, session=True)            skip the ladder but still build the Ctx, set the session
@@ -16,7 +18,10 @@ from its init(app). Starter files are never edited by a lab.
     on_action(name, fn)                     fn(ctx, result, response) after a route's write or outcome
                                             (review/checkout/drop_buy after the row is written;
                                             register after the account; login after EVERY attempt,
-                                            with result={"user":..., "ok": bool, "reason":...});
+                                            with result={"user":..., "ok": bool, "reason":...};
+                                            change_email/change_password/address_add/card_add with
+                                            result={"change":..., "user":...}; gift_card_redeem;
+                                            password_reset_confirm);
                                             return a replacement response to hold/swap it, or None
     on_response(fn)                         fn(info) on every response, gated or not, just before the
                                             gate stamps it; info: ctx (None if ungated), path, method,
@@ -141,7 +146,7 @@ class Challenges:
     def __init__(self):
         self.types = {}
 
-    def register(self, name, issue, verify, render=None, api=True, clearance_ttl=None, uses=None):
+    def register(self, name, issue, verify, render=None, api=True, clearance_ttl=None, uses=None, reauth=False):
         """
         issue(ctx) -> dict: the challenge payload (sent as JSON, and to `render`)
         verify(ctx, answer: dict) -> bool, or (bool, reason): the reason goes to the client's error
@@ -149,12 +154,16 @@ class Challenges:
         render: a template for the HTML interstitial; None uses templates/challenge.html
         clearance_ttl: seconds a solved challenge clears the session (default policy.CLEARANCE_TTL)
         uses: how many challenge verdicts one solve absorbs (default unlimited within the TTL)
+        reauth: an in-session step-up (contract 1.8). A solve appends `name` to the session's
+               auth_methods and refreshes auth_at (ctx.auth). It must never write `uid`: the
+               session is already signed in, and a verify that opens a session (W3 Ch5's login
+               `otp` does) cannot be reused after login
 
         Register the module's functions through a lambda (`issue=lambda ctx: mod.issue(ctx)`) if
         they live in defenses/: the reloader replaces modules, not the references you hold.
         """
         self.types[name] = {"issue": issue, "verify": verify, "render": render, "api": api,
-                            "clearance_ttl": clearance_ttl, "uses": uses}
+                            "clearance_ttl": clearance_ttl, "uses": uses, "reauth": reauth}
 
     def get(self, name):
         return self.types.get(name)

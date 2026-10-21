@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block page %}notice{% endblock %}{% block title %}{{ title }} · {{ store_name }}{% endblock %}
+{% block content %}<section class="card narrow interstitial"><p class="eyebrow">Account</p><h1 data-testid="{{ testid }}">{{ title }}</h1><p>{{ message }}</p><p><a class="btn" href="/account">Back to your account</a></p></section>{% endblock %}

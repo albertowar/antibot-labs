@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.7",
+  "contract_version": "1.8",
   "workshop": 2,
   "source": "skeleton+manifest",
   "skeleton": "workshops/01-initiation/starter",
   "manifest": "workshops/02-proficient/starter.manifest.json",
-  "built_from": "c624e58e",
+  "built_from": "87e9c4e2",
   "default_level": 0,
   "baseline_checks": [],
   "pending_checks": [],

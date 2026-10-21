@@ -108,6 +108,10 @@ class Session:
         return time.time() - float(created) if created else 0.0
 
 
+def _no_auth():
+    return {"at": None, "methods": [], "idle_s": None, "age_s": None}
+
+
 @dataclass
 class Ctx:
     method: str
@@ -132,6 +136,10 @@ class Ctx:
     resumed: bool = False       # a valid clearance exists for a registered challenge type: this
                                 # request is likely the retry after a solve, so per-attempt
                                 # counters (velocity, failures) should not count it twice
+    auth: dict = field(default_factory=_no_auth)   # how this session proved who it is (contract 1.8):
+                                # {"at": epoch s of the last password login or step-up, "methods":
+                                # ["password", "reauth", ...], "idle_s": s since the session's
+                                # previous gated request, "age_s": s since "at"}; None where unknown
     attrs: dict = field(default_factory=dict)   # enrichers write here; checks read
     notes: dict = field(default_factory=dict)   # goes to the decision log's `extra`
     _telemetry: object = None

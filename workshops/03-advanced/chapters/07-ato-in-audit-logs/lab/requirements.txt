@@ -1,0 +1,13 @@
+# W3 Ch7 lab. Python 3.12+. Pins verified October 2026.
+# One venv per chapter (see README).
+# The generator (tools/make_log.py) needs only the standard library; everything
+# below is for the notebooks, the helper module, the scorer and the reference detectors.
+numpy==2.5.4
+pandas==3.0.6
+scikit-learn==1.9.1
+networkx==3.4.2
+matplotlib==3.10.6
+jupyterlab==4.6.4
+ipykernel==6.30.1
+# dev only: strips outputs before committing notebooks
+nbstripout==0.8.1

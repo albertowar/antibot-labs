@@ -9,7 +9,7 @@ account fans out (beats the cross-key join). Every detector sees only a weak sig
 Most sessions still try four stolen credentials, because stuffing means trying them. That
 residual (failing logins while a campaign is live on the stream) is what the composite catches
 through its global campaign term. A patient quarter tries one credential per session and keeps
-every term low: those get through, and that honest residual is the hand-off to W3 Ch8.
+every term low: those get through, and that honest residual is the hand-off to W3 Ch10.
 
     python attacks/round4_jittered_browser.py
 """

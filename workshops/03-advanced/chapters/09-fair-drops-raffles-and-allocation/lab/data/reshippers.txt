@@ -1,0 +1,8 @@
+# Synthetic package-forwarding addresses (street, city, postcode). One per line.
+# A forwarding service gives each customer a "suite" at a warehouse and re-ships from there.
+# Plenty of honest customers use one (expats, people who live where a brand will not ship), so a hit here is a
+# reason to look, never a verdict by itself. These addresses are invented; none is a real business.
+2200 Logistics Parkway, Wilmington, 19801
+88 Freight Yard Road, Newark, 19702
+415 Harborline Drive, Portsmouth, 03801
+9 Consolidation Way, Reno, 89502

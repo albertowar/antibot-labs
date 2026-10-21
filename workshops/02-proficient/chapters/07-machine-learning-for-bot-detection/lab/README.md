@@ -221,7 +221,7 @@ The starter's scoreboard counts a customer as hurt when the *last thing the gate
 
 - Compare the five scoreboards. Which defense cost the most real customers, and which cohort paid?
 - Which attack would you expect next, and which layer from Chapter 8 would you add instead of another feature?
-- `artifacts/reference_features.parquet` is the training-time feature distribution. W3 Ch8 monitors drift of exactly this kind (a reference against live traffic), but it trains its own model, so nothing carries over automatically.
+- `artifacts/reference_features.parquet` is the training-time feature distribution. W3 Ch10 monitors drift of exactly this kind (a reference against live traffic), but it trains its own model, so nothing carries over automatically.
 
 ---
 

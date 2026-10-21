@@ -29,6 +29,10 @@ DOM = {
     "/register": [r'id="register-form"'],
     "/gift-cards": [r'name="code"'],
 }
+# Behind login (contract 1.8): checked on the account page of a fresh registration.
+DOM_ACCOUNT = [r'<form id="email-form"', r'<form id="password-form"', r'<form id="address-form"', r'<form id="card-form"',
+               r'name="new_email"', r'name="current_password"', r'name="new_password"', r'name="line1"', r'name="city"',
+               r'name="postcode"', r'name="card"']
 GETS = ["/", "/products", "/catalog", "/products?category=shoes&sort=price_asc&page=2", "/search?q=runner", "/product/p001",
         "/drop/lab-runner-9", "/cart", "/login", "/register", "/gift-cards", "/robots.txt", "/sitemap.xml", "/feed.xml",
         "/health", "/img/p001.svg", "/static/css/store.css", "/api/products", "/api/products/p001", "/api/search?q=pack",
@@ -75,6 +79,80 @@ def check_bucket():
         check(takes == [True, True, False], f"token_bucket: bucket of 2 gave {takes}, expected [True, True, False]")
     except Exception as e:
         check(False, f"token_bucket raised {type(e).__name__}: {e} (fakeredis needs the [lua] extra)")
+
+
+def check_account():
+    """Contract 1.8: one change per route, the mail links, a cancel, checkout with address_id."""
+    from demo_site.account import card_facts, normalize_address
+    check(normalize_address("12 Elm Street, Apartment 4", "Portland ", "97201") == "12 ELM STREET APT 4, PORTLAND, 97201",
+          "normalize_address: apartment -> APT")
+    check(normalize_address("1 Main St Suite 5", "X", "1") == normalize_address("1 main st., ste 5", "x", "1"), "normalize_address: suite/ste")
+    check("UNIT 3" in normalize_address("9 Oak Rd #3", "X", "1"), "normalize_address: # -> UNIT")
+    f = card_facts("4242 4242 4242 4242")
+    check(f and (f["brand"], f["bin6"], f["last4"], len(f["fingerprint"])) == ("Visa", "424242", "4242", 16), f"card_facts: {f}")
+    check(card_facts("not a card") is None, "card_facts rejects non-digits")
+
+    email, pw = "smoke-acct@example.test", "smoke-pass-1"
+    me = LabClient("human:smoke:01", ip=world_pool("home_broadband")[6])
+    r = me.post("/api/register", json={"email": email, "password": pw, "name": "Smoke Acct"})
+    check(r.status_code == 201, f"account: register -> {r.status_code}")
+    html = me.get("/account").text
+    for pat in DOM_ACCOUNT:
+        check(re.search(pat, html), f"DOM contract: /account lacks {pat}")
+    csrf = csrf_of(html)
+    auth = me.get("/whoami").json()["auth"]
+    check(auth["methods"] == ["password"] and auth["at"] and auth["age_s"] is not None and auth["idle_s"] is not None, f"ctx.auth after login: {auth}")
+
+    r = me.post("/api/account/address", json={"line1": "12 Elm Street, Apt 4", "city": "Portland", "postcode": "97201"})
+    check(r.status_code == 200 and r.json()["status"] == "applied", f"address_add -> {r.status_code} {r.text[:80]}")
+    r = me.post("/account/card", {"csrf": csrf, "card": "4242 4242 4242 4242"})
+    check(r.status_code in (302, 303), f"HTML card_add -> {r.status_code}")
+    r = me.get("/api/account").json()
+    check(r["saved_card"] == "Visa •••• 4242" and r["addresses"] and "id" in r["addresses"][0], f"account after address+card: {r}")
+    r = me.post("/api/account/password", json={"current_password": "wrong-guess", "new_password": "smoke-pass-2"})
+    check(r.status_code == 403 and r.json()["error"]["code"] == "wrong_password", f"change_password wrong current -> {r.status_code}")
+    r = me.post("/api/account/password", json={"current_password": pw, "new_password": "smoke-pass-2"})
+    check(r.status_code == 200 and r.json()["status"] == "applied", f"change_password -> {r.status_code}")
+    pw = "smoke-pass-2"
+    again = LabClient("human:smoke:02", ip=world_pool("home_broadband")[7])
+    check(again.post("/api/login", json={"email": email, "password": pw}).status_code == 200, "login with the changed password")
+
+    new1, new2 = "smoke-acct-b@example.test", "smoke-acct-c@example.test"
+    r = me.post("/api/account/email", json={"new_email": new1, "password": pw})
+    check(r.status_code == 200 and r.json()["status"] == "confirm", f"change_email -> {r.status_code} {r.text[:80]}")
+    check(me.get("/api/account").json()["email"] == email, "email unchanged until the link is followed")
+    msgs = admin("GET", f"/lab/mailbox/{new1}")["messages"]
+    link = next((m["confirm_url"] for m in msgs if "confirm_url" in m), None)
+    check(link, f"confirm link mailed to the new address: {msgs}")
+    check(any("cancel_url" in m for m in admin("GET", f"/lab/mailbox/{email}")["messages"]), "notice with a cancel link mailed to the old address")
+    r = requests.get(BASE_URL + link, timeout=30)
+    check(r.status_code == 200 and me.get("/api/account").json()["email"] == new1, f"email confirm link -> {r.status_code}")
+    r = me.post("/api/account/email", json={"new_email": new2})
+    check(r.status_code == 200 and r.json()["status"] == "confirm", "second change_email waits for its link")
+    cancel = next((m["cancel_url"] for m in reversed(admin("GET", f"/lab/mailbox/{new1}")["messages"]) if "cancel_url" in m), None)
+    check(cancel, "cancel link mailed to the (now current) address")
+    r = requests.get(BASE_URL + cancel, timeout=30)
+    check(r.status_code == 200, f"cancel link -> {r.status_code}")
+    check(requests.get(BASE_URL + cancel, timeout=30).status_code == 200, "cancel is idempotent")
+    rows = admin("GET", f"/lab/account/changes?user={new1}")["items"]
+    seen = sorted((x["kind"], x["status"]) for x in rows)
+    check(seen == [("address", "applied"), ("card", "applied"), ("email", "applied"), ("email", "cancelled"), ("password", "applied")],
+          f"/lab/account/changes: {seen}")
+    check(not any("hash" in str(x["payload"]) or "smoke-pass" in str(x) for x in rows), "no secret in the change rows")
+
+    addr_id = me.get("/api/account").json()["addresses"][0]["id"]
+    me.post("/api/cart/add", json={"sku": "p002", "size": ""})
+    r = me.post("/api/checkout", json={"address_id": addr_id})
+    check(r.status_code == 201, f"checkout with address_id -> {r.status_code} {r.text[:80]}")
+    me.post("/api/cart/add", json={"sku": "p002", "size": ""})
+    r = me.post("/api/checkout", json={"line1": "7 Birch Lane", "city": "Denver", "postcode": "80202", "card": "5555 4444 3333 2222"})
+    check(r.status_code == 201, f"checkout with a new address and card -> {r.status_code}")
+    dec = admin("GET", "/lab/decisions?actor=human:smoke:01&path=/api/checkout")["items"]
+    ex = [d["extra"] for d in dec if d["phase"].startswith("action:checkout")] or [d["extra"] for d in dec]
+    check(len(ex) >= 2, f"checkout decisions logged: {len(ex)}")
+    if len(ex) >= 2:
+        check(ex[-2].get("ship_to_new") is False and ex[-2].get("card_saved") is True, f"checkout facts, saved address+card: {ex[-2]}")
+        check(ex[-1].get("ship_to_new") is True and ex[-1].get("card_saved") is False, f"checkout facts, new address+card: {ex[-1]}")
 
 
 def run():
@@ -158,6 +236,8 @@ def run():
     check("human:smoke" in kinds and "bot:smoke" in kinds, f"scoreboard groups actors: {kinds}")
     dec = admin("GET", "/lab/decisions?actor=human:smoke&limit=3")
     check(dec["total"] >= 5 and all(d["actor"].startswith("human:smoke") for d in dec["items"]), "decision log filter by actor")
+
+    check_account()
 
     # Ground truth never reaches a defense
     for sub in ("defenses", os.path.join("demo_site", "ext")):

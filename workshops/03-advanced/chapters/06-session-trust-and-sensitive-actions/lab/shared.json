@@ -1,0 +1,12 @@
+{
+  "defenses/login_throttle.py": "workshops/02-proficient/chapters/06-account-takeover/lab/solutions/round1/defenses/login_throttle.py",
+  "defenses/breached_passwords.py": "workshops/02-proficient/chapters/06-account-takeover/lab/solutions/round3/defenses/breached_passwords.py",
+  "defenses/ratelimit.py": "workshops/02-proficient/chapters/06-account-takeover/lab/defenses/ratelimit.py",
+  "defenses/breachcorpus.py": "workshops/02-proficient/chapters/06-account-takeover/lab/defenses/breachcorpus.py",
+  "defenses/blanket_otp.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/solutions/round1/defenses/blanket_otp.py",
+  "defenses/rba_score.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/solutions/round2/defenses/rba_score.py",
+  "defenses/recovery_risk.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/solutions/round3/defenses/recovery_risk.py",
+  "defenses/stepup_policy.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/defenses/stepup_policy.py",
+  "demo_site/ext/rba.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/demo_site/ext/rba.py",
+  "demo_site/ext/rba_world.py": "workshops/03-advanced/chapters/05-risk-based-authentication/lab/demo_site/ext/rba_world.py"
+}

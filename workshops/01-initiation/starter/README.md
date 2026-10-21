@@ -1,6 +1,6 @@
 # Kestrel Outfitters: the W1 starter (the skeleton store)
 
-**Contract:** `workshops/STORE_CONTRACT.md` (version 1.7). **Source:** bare; this is the skeleton every
+**Contract:** `workshops/STORE_CONTRACT.md` (version 1.8). **Source:** bare; this is the skeleton every
 other starter derives from. **Baseline defenses:** none (`defenses/ladder.py` has an empty `LADDER[0]`).
 
 This folder is copied, never imported, by every Workshop 1 chapter lab. Do not edit it inside a lab;

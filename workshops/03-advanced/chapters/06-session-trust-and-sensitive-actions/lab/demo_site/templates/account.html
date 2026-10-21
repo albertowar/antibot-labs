@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block page %}account{% endblock %}{% block title %}Account · {{ store_name }}{% endblock %}
+{% block content %}
+{% if notice %}<div class="flash ok" role="status" data-testid="{{ notice.testid }}">{{ notice.msg }}</div>{% endif %}
+<div class="section-head"><h1>Hi {{ user.name.split()[0] if user.name else 'there' }}</h1><form action="/logout" method="post"><button class="link" type="submit">Log out</button></form></div>
+<div class="tiles">
+  <div class="card"><p class="eyebrow">Loyalty</p><p class="big-num">{{ user.loyalty_points }}</p><p class="muted">points · redeem a <a href="/gift-cards">gift card</a></p></div>
+  <div class="card"><p class="eyebrow">Payment</p><p>{% if user.saved_card_last4 %}{{ user.saved_card_brand }} •••• {{ user.saved_card_last4 }}{% else %}No saved card{% endif %}</p><p class="muted">Member since {{ user.created_at.strftime('%b %Y') if user.created_at }}</p></div>
+  <div class="card"><p class="eyebrow">Address</p>{% if user.addresses %}<p>{{ user.addresses[0].line1 }}<br>{{ user.addresses[0].city }} {{ user.addresses[0].postcode }}, {{ user.addresses[0].country }}</p>{% else %}<p class="muted">No address saved</p>{% endif %}</div>
+</div>
+<section><div class="section-head"><h2>Manage your account</h2></div>
+<p class="muted small">Every change is logged, and we email the address on file whenever one is made, with a link to cancel it.</p>
+<div class="tiles">
+  <form id="email-form" class="card" action="/account/email" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="eyebrow">Email</p>
+    {% with label="New email", name="new_email", type="email", required=True, autocomplete="email" %}{% include "partials/_field.html" %}{% endwith %}
+    <p class="muted small">We send a confirmation link to the new address; nothing changes until you follow it.</p>
+    <button class="btn small" type="submit">Change email</button></form>
+  <form id="password-form" class="card" action="/account/password" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="eyebrow">Password</p>
+    {% with label="Current password", name="current_password", type="password", required=True, autocomplete="current-password" %}{% include "partials/_field.html" %}{% endwith %}
+    {% with label="New password", name="new_password", type="password", required=True, autocomplete="new-password" %}{% include "partials/_field.html" %}{% endwith %}
+    <button class="btn small" type="submit">Change password</button></form>
+  <form id="address-form" class="card" action="/account/address" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="eyebrow">Add an address</p>
+    {% with label="Address", name="line1", required=True, autocomplete="street-address" %}{% include "partials/_field.html" %}{% endwith %}
+    <div class="row">
+      {% with label="City", name="city", required=True, autocomplete="address-level2" %}{% include "partials/_field.html" %}{% endwith %}
+      {% with label="Postcode", name="postcode", required=True, autocomplete="postal-code" %}{% include "partials/_field.html" %}{% endwith %}
+    </div>
+    <button class="btn small" type="submit">Add address</button></form>
+  <form id="card-form" class="card" action="/account/card" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="eyebrow">Saved card</p>
+    {% with label="Card number", name="card", required=True, autocomplete="cc-number", placeholder="4242 4242 4242 4242" %}{% include "partials/_field.html" %}{% endwith %}
+    <p class="muted small">Test store. Any card number is accepted and nothing is charged.</p>
+    <button class="btn small" type="submit">Save card</button></form>
+</div>
+{{ slot("form:account") }}</section>
+<section><div class="section-head"><h2>Recent orders</h2><a href="/orders" class="muted">All orders</a></div>
+{% include "partials/_orders.html" %}</section>
+{% endblock %}

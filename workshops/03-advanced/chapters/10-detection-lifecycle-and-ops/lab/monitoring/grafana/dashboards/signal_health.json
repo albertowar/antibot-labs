@@ -1,0 +1,184 @@
+{
+  "title": "Bot Defense \u2014 Signal Health (W3 Ch10)",
+  "uid": "w3ch4-signal-health",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "refresh": "5s",
+  "tags": [
+    "antibot",
+    "w3ch4"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Signal fire rate (per 5m)",
+      "type": "timeseries",
+      "description": "Each detection signal's rate. A line falling to zero is a silent signal (Round 1).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(signal_fired_total[5m])",
+          "legendFormat": "{{signal}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Decisions by action (per 5m)",
+      "type": "timeseries",
+      "description": "allow / pow / step_up / block. A falling block rate is the Round 1 symptom.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(decisions_total[5m])",
+          "legendFormat": "{{action}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Known-good false positives (per 5m)",
+      "type": "timeseries",
+      "description": "Signals firing on the monitor cohort: the only live FP rate. Round 2's alarm.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(known_good_signal_total[5m])",
+          "legendFormat": "{{signal}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Login outcomes (per 5m)",
+      "type": "timeseries",
+      "description": "valid / wrong_password / unknown_user. A surge in failures is a stuffing run (Round 4).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(logins_total[5m])",
+          "legendFormat": "{{cred}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Corpus age (weeks)",
+      "type": "timeseries",
+      "description": "Weeks since each data source was refreshed. Page when it exceeds its window (Round 2).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "corpus_age_weeks",
+          "legendFormat": "{{corpus}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Pipeline p95 (s)",
+      "type": "timeseries",
+      "description": "What detection costs per login.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(pipeline_seconds_bucket[5m]))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Model score p50 by role",
+      "type": "timeseries",
+      "description": "prod / shadow / canary score distributions (Round 3).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, rate(model_score_bucket[5m]))",
+          "legendFormat": "{{role}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

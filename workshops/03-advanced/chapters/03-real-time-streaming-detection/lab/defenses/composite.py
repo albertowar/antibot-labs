@@ -16,7 +16,7 @@ scores high. The other terms are the soft scores the detectors kept per session.
 
 Honesty: this does not catch everything. A patient attacker who keeps every term low (one failure
 per session, well under the global velocity, no account fan-out) stays below the line; that
-residual is real, and it is the hand-off to W3 Ch8 (monitoring, drift, retraining). And if the
+residual is real, and it is the hand-off to W3 Ch10 (monitoring, drift, retraining). And if the
 consumer falls behind the stream (tools/lag.py), the verdict arrives after the attacker is done:
 the latency gap, reopened.
 

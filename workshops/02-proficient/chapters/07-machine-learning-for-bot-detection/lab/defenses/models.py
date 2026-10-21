@@ -4,10 +4,10 @@ Model artifacts: where they live, what each defense level needs, and how the sto
     artifacts/model_v1.txt + .json    LightGBM text model + sidecar (features, threshold, budget)  (Round 1)
     artifacts/model_v2.txt + .json    the same with cohort features                                 (Round 2)
     artifacts/anomaly_v3.json         device-claim likelihood tables + threshold                    (Round 3)
-    artifacts/reference_features.parquet  the training-time feature distribution W3 Ch8 monitors
+    artifacts/reference_features.parquet  the training-time feature distribution W3 Ch10 monitors
 
 LightGBM's native text format, never pickle: a pickled model executes code when it is loaded, so a
-model file becomes a supply-chain target (W3 Ch7). Models reload when their files change, so
+model file becomes a supply-chain target (W3 Ch8). Models reload when their files change, so
 retraining needs no restart.
 """
 

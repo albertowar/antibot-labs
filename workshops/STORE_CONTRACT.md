@@ -6,7 +6,7 @@ and the hook points a chapter uses to add a defense or a feature. The Demo Store
 (`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
-Contract version: **1.7** (recorded in each starter's `STARTER.json`). Changing anything under
+Contract version: **1.8** (recorded in each starter's `STARTER.json`). Changing anything under
 "Canonical surface" is a contract bump: rebuild the starters (`scripts/build_starter.py`) and rerun
 `tools/smoke.py` in every lab.
 
@@ -20,6 +20,7 @@ Contract version: **1.7** (recorded in each starter's `STARTER.json`). Changing 
 | 1.5 | additive, for W1 Ch7 (and the W4 crawl-policy chapters): `/robots.txt` is extensible — an ext registers `hooks.robots(provider)` (a callable returning extra lines, called per request so lines may vary with the level) and `routes/seo.py` appends them to the base policy; the base body is byte-identical when nothing registers |
 | 1.6 | additive, for the W4 chapters: (a) `hooks.on_action(name, fn)` now actually fires — the `review`, `checkout` and `drop_buy` routes (HTML and JSON) call it after a successful write with the row (`review=`/`order=`), and the handler may hold it (`status="pending"`), attribute it, or return a replacement response (e.g. a 202); nothing registered leaves the default behaviour byte-identical. (b) `hooks.on_reset(fn)` runs after `POST /lab/reset` so an ext can drop or reseed its own tables and keys. (c) the scoreboard gives a chapter-specific `outcome` (an ext setting `g.outcome`, e.g. `paywalled`/`charged`/`held`) its own column instead of folding it into `other` |
 | 1.7 | the gaps the 29 lab migrations recorded (the old `TODO.md` §1.2). **Behaviour changes:** (a) `X-Lab-Verdict` and the log's `action` report the most severe decision of the request (allow < monitor < challenge < rate_limit < deceive < block, score as the tie-break), so a zero-score 429 no longer reads `allow`; checkpoints that want the HTTP result keep reading `outcome`. (b) `/api/challenge` and `/api/challenge/verify` are exempt from the challenge band (block and rate_limit still apply): a client whose every request scores into the band can now actually solve. (c) a soft `Verdict` with a score and no signals carries its points as one synthesized signal instead of summing to 0 and deciding `allow`. (d) a `deceive` verdict is honoured on login (byte-identical wrong-password 401, password never checked), register, review and newsletter (`routes/deceive.py`, called from `guard()`); checkout and drop keep their fakes in the route. (e) `robots.txt` drops its leading `Allow: /` (allow is the RFC 9309 default), so first-match parsers honour later `Disallow` lines, a chapter's bait entries included. (f) `tools/smoke.py` asserts 122 *visible* products (`/lab/status` `visible_products`), so hidden honeypot rows may sit in the catalogue; it requires no `X-Lab-*` headers on `/robots.txt` or ungated paths; and `tools/verify.py --smoke` sets `LAB_SMOKE=1` (the gate runs an empty ladder at every level), so a lab baseline at `LADDER[0]` passes smoke. (g) on `memory://` the token bucket runs in Python under one process lock (fakeredis serialized every thread for the whole Lua interpretation, ~10 ms per call under a 16-thread attack; real Redis keeps Lua). **Additive:** `hooks.ungate(prefix, session=True)` (Ctx, session cookie, enrichers and a log row, but no ladder); `hooks.on_response(fn)` (every response, gated or not, timed as gate cost); `hooks.stopped_outcome(*names)`; `on_action` also fires for `register` (after the account) and `login` (every attempt, `result={"user", "ok", "reason"}`); `Ctx.route/view_args/query_string/scheme`, `ctx.resumed`, `ctx.cleared(type)`, public `gate.spend_clearance`; `policy.decide` may declare `ctx=`; a challenge interstitial that interrupted a form POST carries the form in a hidden `#challenge-replay` resubmit (and `window.labReplay()`); held orders — the scoreboard counts only `status="paid"` orders as purchases, and `demo_site/orders.py cancel_order(order)` returns stock; a `legit:` actor kind (welcome automation) with its own scoreboard columns, added only when such actors exist, and judged by the checkpoint (`Round.legit_hurt_max`, default 0: a stopped verified crawler is a false positive that fails the round); `Round.setup(level, caught_up)/teardown(level)/people/threads` and `scenario=None`; `population.POST_HOOKS`; `labclient.browser_context(..., ja4=, user_agent=, headers=, headers_fn=)`; `defenses/netinfo.py` (network type from the feeds) joins the skeleton |
+| 1.8 | additive, the canonical account-management surface for W3 Ch6 (session trust) and Ch9 (fair drops): (a) `AccountChange` table and `demo_site/account.py`; `/account/{email,password,address,card}` (HTML forms on `/account`) and `POST /api/account/{email,password,address,card}` behind the gates `change_email`, `change_password`, `address_add`, `card_add`; a check that sets `ctx.attrs["hold"]` parks the change `pending` (202), an email change waits for a link mailed to the NEW address, the account's current address gets a notice with a cancel link, `GET /lab/account/changes` and `POST …/<id>/release`. (b) `on_action` handlers get `change=`; `gift_card_redeem` and `password_reset_confirm` finally fire the gate and the hook. (c) checkout takes an optional `address_id` or address fields and records `order.extra["ship_to"]`/`["card"]`, passed to the gate as kwargs. (d) the session records `auth_at`/`auth_methods`/`seen_at`; `ctx.auth`; `hooks.challenges.register(..., reauth=True)`. (e) `Address.to_dict()` gains `id`; `/whoami` gains `auth`; seed `User.extra` gains `phone` and `card_bin`/`card_fp` (no existing value moves) |
 
 ## 1. The store
 
@@ -70,7 +71,9 @@ X.Y is the contract version the lab was built (or last re-based) against.
 | `/checkout` GET/POST | address + test card, atomic stock decrement | carding, fraud |
 | `/drop/<sku>` GET/POST | limited drop: countdown, size, one unit per request | scalpers |
 | `/login`, `/logout`, `/register` | account | credential stuffing, fake accounts |
-| `/account`, `/orders` | profile, loyalty, saved card, orders | account takeover |
+| `/account`, `/orders` | profile, loyalty, saved card, orders; four change forms (below) | account takeover |
+| `/account/email`, `/account/password`, `/account/address`, `/account/card` | login required; GET redirects to `/account`, POST changes the detail (1.8) | account takeover, mule addresses |
+| `GET /account/email/confirm?token=`, `GET /account/changes/<id>/cancel?token=` | the links in the mails; no login, the token is the proof | link phishing |
 | `/gift-cards` GET/POST | balance check, redeem | gift-card cracking |
 | `POST /review/<sku>` | post a review | review spam |
 | `POST /newsletter` | sign-up | list bombing |
@@ -78,6 +81,18 @@ X.Y is the contract version the lab was built (or last re-based) against.
 | `/img/<sku>.svg?w=` | product image (generated, cacheable) | asset fetch patterns |
 
 HTML forms carry a hidden `csrf` field (session-bound). Every form works with JavaScript disabled.
+
+**Account changes (1.8).** One shape for the four forms and their JSON twins. Each validates, runs its gate
+(`change_email`, `change_password`, `address_add`, `card_add`; facts such as `new_email`, `address_new`,
+`card_fp`, `card_new`, `password_ok` are on `ctx.notes`), writes an `AccountChange` row and applies it.
+A check that set `ctx.attrs["hold"] = {"hours": h, "reason": r}` makes it `pending` instead: HTML shows
+`[data-testid="change-pending"]` (status 202), JSON answers 202. An email change is stored `confirm` and
+applies only when the link mailed to the NEW address is followed (a hold set at request time is kept and
+starts then); a plain 200 for it, so the hold is not announced early. Unless `ctx.attrs["notify"]` is
+`False`, the account's CURRENT address is mailed a notice with a cancel link at request time. The cancel
+link works on `pending` and `confirm` changes only. `/account/password` verifies the current password
+itself (403 `wrong_password`, after the gate has seen the attempt); a chapter may demand more. A password
+change is logged as `{}`, a card as brand/bin6/last4/fingerprint: no secret is ever in the log.
 Mind `/feed.xml` in a crawl-economics chapter: it hands any crawler the 20 newest records (name, blurb,
 link) for free, so a lab that prices or gates the catalogue must include it in its paid or governed paths.
 
@@ -86,9 +101,23 @@ link) for free, so a lab that prices or gates the catalogue must include it in i
 `GET /api/products` (same filters as the page), `GET /api/products/<sku>` (with `stock`), `GET /api/search`,
 `GET /api/reviews/<sku>`, `POST /api/reviews`, `GET /api/cart`, `POST /api/cart/add`, `POST /api/cart/remove`,
 `POST /api/checkout`, `POST /api/buy` (drops: `{sku, size, email?}`), `POST /api/login`, `POST /api/register`,
-`POST /api/logout`, `GET /api/account`, `GET /api/orders`, `POST /api/password-reset`,
+`POST /api/logout`, `GET /api/account`, `GET /api/orders`,
+`POST /api/account/email` (`{new_email, password?}`), `POST /api/account/password` (`{current_password, new_password}`),
+`POST /api/account/address` (`{line1, city, postcode, country?}`), `POST /api/account/card` (`{card}`),
+`POST /api/password-reset`,
 `POST /api/password-reset/confirm`, `GET /api/gift-cards/balance?code=`, `POST /api/gift-cards/redeem`,
 `POST /api/telemetry`, `GET /api/challenge?type=`, `POST /api/challenge/verify`.
+
+`POST /api/checkout` also takes an optional ship-to and card: `{address_id}` (one of the account's saved
+addresses; `Address.to_dict()` carries `id`) or `{line1, city, postcode, country?}`, and `{card}`. Without
+them it behaves as before. The order keeps `extra["ship_to"] = {normalized, new, address_id}` and
+`extra["card"] = {saved, brand, bin6, last4, fingerprint}`, and the `checkout` gate gets the same facts
+(`ship_to`, `ship_to_new`, `card_saved`, `card_bin6`, `card_fp` on `ctx.notes`). `new` means "not one of the
+account's saved addresses" (so every guest address is new); an address is compared after
+`account.normalize_address`, which is deliberately simple.
+
+Account-change answers: 200 `{ok, status: "applied"|"confirm", change_id}`; 202 `{status: "pending",
+change_id, until}` when a check held it; 400 `invalid*`, 401, 403 `wrong_password`, 409 `exists`.
 
 Shapes: lists are `{items, page, pages, total}`; errors are `{"error": {"code", "message"}}` with the
 HTTP status; money is `price_cents` plus a convenience `price`. JSON routes rely on the `SameSite=Lax`
@@ -118,7 +147,9 @@ travels only via `X-Lab-Actor` (moved to `environ["lab.actor"]`, unreadable by a
 | `POST /lab/reset?mode=state\|full&stock=` | state: drop stock, lab rows, Redis, log; full: reseed |
 | `POST /lab/level {"level": N}` | change `DEFENSE_LEVEL` live |
 | `POST /lab/reload` | force a reload of `defenses/*` |
-| `GET /lab/mailbox/<email>` | reset tokens and OTPs the store "emailed" |
+| `GET /lab/mailbox/<email>` | reset tokens, OTPs and account-change mails (`cancel_url`, `confirm_url`) the store "emailed" |
+| `GET /lab/account/changes?user=&status=&kind=` | the `AccountChange` rows (`user` is an email or id); `payload` and `extra` never hold a secret (1.8) |
+| `POST /lab/account/changes/<id>/release` | apply a `pending` (held) change now: a chapter's cooling-off clock or a reviewer calls it (1.8) |
 
 ### 3.4 Response headers (on every gated response, `LAB_HEADERS=1`)
 
@@ -200,13 +231,17 @@ score breaks ties), not its highest-scoring one; `outcome` says what the client 
   `created_at`; plus `mallory@example.test` / `mallory-owns-this-1`, the attacker's own account.
   PBKDF2-SHA256 at `LAB_HASH_ITERS`.
 - 200 gift cards `GC-XXXX-XXXX` ($10-$100), ~800 historical orders.
+- `User.extra` (1.8, drawn from a stream of its own, so nothing above moves): `phone` for ~60 % of the 300 users,
+  fictional `+1-555-01xx` (the 555-0100..0199 range is reserved for fiction), and `card_bin`/`card_fp` for every
+  user with a saved card, consistent with `account.card_facts` (a made-up number whose last four match
+  `saved_card_last4`). `POST /lab/reset` undoes applied account changes and deletes the change rows.
 - `hidden=True` products never appear in listings or the sitemap: the honeypot-SKU hook (W1 Ch7).
 - Chapter-specific columns go in the `extra` JSON of each table, or in a chapter's own model.
 
 ### 3.8 Sessions and cookies
 
 `sid` (HttpOnly, Lax, 7 days) is an opaque id for a Redis hash `lab:s:<sid>` holding `uid`, `csrf`,
-`created_at`, `created_ip`, `created_asn`, flags and counters. `did` (Lax, 400 days) is a device cookie
+`created_at`, `created_ip`, `created_asn`, `auth_at`/`auth_methods`/`seen_at` (1.8, see `ctx.auth` in 4.2), flags and counters. `did` (Lax, 400 days) is a device cookie
 for token-binding chapters. Per-defense session state uses `ctx.session.ns("<name>")` as a key prefix.
 
 ### 3.9 DOM contract (asserted by `tools/smoke.py`; attacks and shoppers may rely on these)
@@ -214,6 +249,10 @@ for token-binding chapters. Per-defense session state uses `ctx.session.ns("<nam
 `.product-card[data-sku]`, `#cart-count`, `#add-to-cart`, `form.buy` with `input[name=sku|size|qty|csrf]`,
 `#drop-buy[data-sku]`, `form#checkout`, `form#login-form`, `form#register-form`,
 `input[name=email|password|code|csrf]`, `[data-testid="order-confirmed"]`. Changing one is a contract bump.
+Since 1.8, on `/account` (login required): `form#email-form`, `form#password-form`, `form#address-form`,
+`form#card-form` with `input[name=new_email|current_password|new_password|line1|city|postcode|card]`,
+`[data-testid="change-pending"]` (a held change) and `[data-testid="change-confirm"]` (an email change
+waiting for its link). Checkout adds only optional fields (`address_id`, `country`).
 
 ## 4. The gate and the hook points
 
@@ -265,13 +304,15 @@ def init(app):
     hooks.challenges.register("pow", issue=_issue, verify=_verify, render="pow/interstitial.html")
     hooks.slot("body_end", "pow/solver.html")           # also: head, nav, form:checkout, form:login,
     hooks.slot("form:checkout", "pow/fields.html")      #   form:register, form:drop, form:review,
-    hooks.telemetry.register("pow_bench", _bench)       #   product:aside, challenge
+    hooks.telemetry.register("pow_bench", _bench)       #   form:account (1.8), product:aside, challenge
     hooks.enricher(_tag_difficulty)                     # fn(ctx): fill ctx.attrs before the checks
     hooks.ungate("/lab/pow/")                           # paths the gate must skip
     hooks.ungate("/lab/fp/", session=True)              # skip the ladder but keep Ctx, cookie and log row
     hooks.robots(lambda: ["Disallow: /lab/pow/"])       # extra robots.txt lines (called per request)
     hooks.on_action("review", _hold)                    # fn(ctx, result, response) after a review/checkout/
-                                                        #   drop_buy/register write, or any login attempt
+                                                        #   drop_buy/register write, an account change
+                                                        #   (result["change"]), or any login attempt
+    hooks.challenges.register("reauth", issue, verify, reauth=True)   # an in-session step-up (see 4.3)
     hooks.on_response(_observe)                         # fn(info) on every response, gated or ungated
     hooks.on_reset(_reseed)                             # fn(app) after POST /lab/reset: clear your tables
     hooks.stopped_outcome("paywalled")                  # count an ext outcome as a scoreboard stop
@@ -286,6 +327,26 @@ callables that need it, as W2 Ch3 does; `tools/verify.py` itself starts nothing 
 Chapter templates go in `demo_site/ext/templates/<name>/` (searched first, so a chapter may override a
 starter template) and chapter JS in `demo_site/static/js/<name>.js`. Ext modules load in name order.
 
+**The account actions (1.8).** `change_email`, `change_password`, `address_add` and `card_add` are gate
+actions like `checkout`: a check in `action:<name>` sees the facts on `ctx.notes` and may block, challenge,
+or **hold**. Holding is a side channel, not a verdict: a check that returns `allow` after setting
+`ctx.attrs["hold"] = {"hours": h, "reason": r}` makes the route store the change `pending`; whoever owns
+the clock later calls `demo_site/account.py release_change(change)` (or `POST /lab/account/changes/<id>/release`),
+and `cancel_change(change, reason)` ends it. `on_action(name, fn)` for these actions gets
+`result = {"change": AccountChange, "user": User}` (an email change fires it twice: at request, status
+`confirm`, and at confirm with `confirmed=True`); `change_cancel` fires when the owner's link cancels one.
+`gift_card_redeem` (`user`, `gift_card`) and `password_reset_confirm` (`user`) fire too, and the latter now
+has a `guard()` before the write. A check that sets `ctx.attrs["notify"] = False` suppresses the default
+mails (a "no notice" baseline); `ctx.attrs["reauth"] = {"password_ok": bool}` is set when the request
+carried a password (W2 Ch6's shape).
+
+**`ctx.auth` (1.8).** `{"at", "methods", "idle_s", "age_s"}` describes how the session proved who it is:
+a password login or registration sets `auth_at` and `auth_methods = ["password"]` in the session, every
+gated request refreshes `seen_at` (so `idle_s` is the gap since the previous one), and a challenge
+registered with `reauth=True` appends its type to `methods` and refreshes `at` when it verifies in a
+signed-in session. Values are `None`/`[]` where unknown (anonymous, or a session opened by an ext that
+writes `uid` itself). Logout clears the stamps.
+
 Things that are easy to get wrong:
 
 - **An ext that writes SQL per request opens its own engine.** The app's Flask-SQLAlchemy
@@ -294,6 +355,10 @@ Things that are easy to get wrong:
   then starve the pool — the store stalls for the 30 s pool timeout, not the disk. Create a
   separate engine on the same `DATABASE_URL` (W4 Ch7's `defenses/rule_store.py` is the model;
   on SQLite set WAL + `synchronous=NORMAL` so readers and the store's writer coexist).
+- **An in-session step-up never writes `uid`.** A `reauth=True` challenge proves the person at the keyboard
+  inside a session that already has a `uid`; its `verify` must not set or change it. A login challenge
+  that opens the session (W2 Ch6's and W3 Ch5's `otp` write `uid` on success) cannot be reused after login:
+  solving it would re-open or swap the session. Register a separate type for the step-up.
 - **Enrichers run at every level.** Per-round behaviour belongs in a check (which only runs at its level).
   A check may fill `ctx.attrs` for a later step of the same request (`issue()` of a challenge, a route):
   the gate and the route share one `Ctx` per request.
@@ -315,6 +380,11 @@ form POST, the interstitial carries the submitted fields in a hidden `#challenge
 csrf, no JavaScript needed; a solver calls `window.labReplay()`), so the customer does not lose the
 form — the fields, password included, are echoed only to the client that sent them.
 `policy.DEFAULT_CHALLENGE` names the type served when a check does not.
+
+`register(..., reauth=True)` (1.8) marks a type as an **in-session step-up**: a successful verify while
+signed in appends the type to `ctx.auth["methods"]` and refreshes `ctx.auth["at"]`, which is what a
+sensitive-action check reads ("was there a fresh second factor in the last N seconds?"). The rule that
+goes with it: **a step-up never writes `uid`** — see 4.2.
 
 ```python
 hooks.challenges.register("pow", issue, verify, render="pow/interstitial.html",
@@ -346,6 +416,11 @@ uptime monitors, link unfurlers, whose stops are false positives, not bots stopp
 `legit`, `legit_hurt`, `legit_requests`, `legit_requests_stopped` appear only when such actors exist) —
 and reports bots stopped next to shoppers hurt, purchases by kind and drop stock. Chapter-specific
 fields go in `extra` via `ctx.note()`.
+
+A held account change has its own status, not an outcome label: its request is answered 202 and the
+scoreboard counts it as `served`; a chapter that wants it counted separately sets `g.outcome = "held"` in
+its `on_action` handler, as the order holds do. Account-change gate facts (`new_email`, `card_fp`,
+`ship_to_new`, …) appear in the decision row's `extra` because `guard()` notes them.
 
 A write route (`review`, `checkout`, `drop_buy`, `register`, HTML and JSON) fires
 `hooks.on_action(name, fn)` after it commits, with the written row in `result` (`{"review": …}`,

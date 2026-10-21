@@ -8,6 +8,7 @@ lab's expected-results table is reproducible on any machine.
                   (the credential-stuffing subset); plus mallory@example.test, the
                   attacker's own legitimately registered account
     200 gift cards, ~600 reviews, ~800 historical orders
+    extra: ~60 % of users have a fictional phone; saved cards carry card_bin and card_fp (1.8)
 
 Password hashing is PBKDF2-SHA256 at LAB_HASH_ITERS (5000). That is a lab
 speed setting: production uses Argon2id with current OWASP parameters, and
@@ -26,7 +27,8 @@ from datetime import timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from demo_site.models import Address, Decision, GiftCard, Newsletter, Order, OrderItem, Product, Review, User, db, utcnow  # noqa: E402
+from demo_site.account import card_facts, undo_change  # noqa: E402
+from demo_site.models import AccountChange, Address, Decision, GiftCard, Newsletter, Order, OrderItem, Product, Review, User, db, utcnow  # noqa: E402
 
 CATEGORIES = ["shoes", "packs", "jackets", "headlamps", "poles", "kitchen"]
 NOUNS = {
@@ -132,6 +134,24 @@ def drop_rows(drop_stock):
     ]
 
 
+def _account_facts(users, seed):
+    """Contract 1.8: ~60 % of users get a fictional phone (+1-555-0100..0199 is reserved for fiction),
+    and every saved card gets the bin and fingerprint checkout and /account/card compute. A stream of
+    its own, so none of the draws above (or the seeded counts built on them) move."""
+    rng = random.Random(seed * 100003 + 18)
+    for u in users:
+        extra = dict(u.extra or {})
+        if rng.random() < 0.6:
+            extra["phone"] = f"+1-555-01{rng.randint(0, 99):02d}"
+        if u.saved_card_last4:
+            lead = {"Visa": "4", "Mastercard": "5", "Amex": "37"}[u.saved_card_brand]
+            n = 15 if u.saved_card_brand == "Amex" else 16
+            digits = lead + "".join(str(rng.randint(0, 9)) for _ in range(n - len(lead) - 4)) + u.saved_card_last4
+            facts = card_facts(digits)
+            extra.update(card_bin=facts["bin6"], card_fp=facts["fingerprint"])
+        u.extra = extra
+
+
 def seed_all(seed=1337, drop_stock=50, hash_iters=5000, reset=False):
     """Fill an empty database. With reset=True, wipe it first. Returns a summary dict."""
     if reset:
@@ -158,6 +178,7 @@ def seed_all(seed=1337, drop_stock=50, hash_iters=5000, reset=False):
     mallory = User(email=ATTACKER_ACCOUNT[0], name="Mallory Vane", created_at=utcnow() - timedelta(days=3))
     set_password(mallory, ATTACKER_ACCOUNT[1], hash_iters)
     users.append(mallory)
+    _account_facts(users[:N_USERS], seed)
     db.session.add_all(users)
     db.session.flush()
 
@@ -209,6 +230,9 @@ def reset_state(drop_stock=50):
     """
     for p in Product.query.filter_by(is_drop=True):
         p.stock = drop_stock
+    for c in AccountChange.query.order_by(AccountChange.id.desc()):    # newest first: put edits back
+        undo_change(c)
+    AccountChange.query.delete()
     lab_orders = [o.id for o in Order.query.filter(Order.session_id.isnot(None))]
     if lab_orders:
         OrderItem.query.filter(OrderItem.order_id.in_(lab_orders)).delete(synchronize_session=False)

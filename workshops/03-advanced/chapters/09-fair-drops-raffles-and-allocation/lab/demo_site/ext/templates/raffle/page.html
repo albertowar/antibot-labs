@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% block page %}raffle{% endblock %}
+{% block title %}{{ p.name }} raffle · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="pdp drop-page" data-sku="{{ p.sku }}">
+  <div class="pdp-img"><img src="/img/{{ p.sku }}.svg?w=640" alt="{{ p.name }}" width="640" height="640"></div>
+  <div class="pdp-info">
+    <span class="tag drop">Raffle</span>
+    <h1>{{ p.name }}</h1>
+    <p class="lead">{{ p.blurb }}</p>
+    <p class="price big">${{ "%.2f"|format(p.price) }}</p>
+    {% if ev is none %}
+      <p class="muted" id="raffle-mode" data-mode="first_come">This drop is sold first come, first served. <a href="/drop/{{ p.sku }}">Go to the drop</a>.</p>
+    {% else %}
+      <p class="stock" id="raffle-state" data-state="{{ ev.state }}"><strong>{{ ev.units }}</strong> pairs · one entry per person · {{ "entries are open" if ev.state == "open" else "the draw has run" }}</p>
+      {% if not user %}
+        <p class="muted small"><a href="/login?next=/raffle/{{ p.sku }}">Log in</a> to enter. Guest entries are not accepted.</p>
+      {% elif ev.state == "open" %}
+        <form id="raffle-form" action="/raffle/{{ p.sku }}/enter" method="post">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if p.sizes %}<fieldset class="sizes"><legend>Size</legend>{% for s in p.sizes %}<label><input type="radio" name="size" value="{{ s }}" {% if s == "10" %}checked{% endif %}><span>{{ s }}</span></label>{% endfor %}</fieldset>{% endif %}
+          <label class="field"><span>Card (optional, charged only if you win)</span><input type="text" name="card" autocomplete="cc-number" placeholder="saved card used if blank"></label>
+          <button id="raffle-enter" class="btn big" type="submit">Enter the draw</button>
+        </form>
+      {% endif %}
+      {% if mine %}<p class="muted" id="raffle-me" data-status="{{ mine.status }}">Your entry: <strong>{{ mine.status|replace("_", " ") }}</strong></p>
+        {% if mine.status == "won" %}
+        <form id="raffle-claim" action="/raffle/{{ p.sku }}/claim" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn big" type="submit">Claim your pair</button></form>{% endif %}
+      {% endif %}
+    {% endif %}
+    <ul class="facts"><li>Payment is taken only if you win</li><li>One entry per person</li><li>We review entries before the draw</li></ul>
+  </div>
+</section>
+{% endblock %}

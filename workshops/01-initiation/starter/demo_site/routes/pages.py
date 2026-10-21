@@ -1,13 +1,16 @@
 """HTML pages. Every form works without JavaScript; static/js/store.js only improves them."""
 
+import hmac
 import secrets
 
 from flask import Blueprint, abort, g, redirect, request, url_for
 from sqlalchemy import or_
 
-from ..models import GiftCard, Newsletter, Order, OrderItem, Product, Review, User, db, utcnow
+from .. import account as acct
+from .. import gate
+from ..models import AccountChange, GiftCard, Newsletter, Order, OrderItem, Product, Review, User, db, utcnow
 from ..seed import check_password, set_password
-from . import Cart, after_action, api_error, csrf_ok, current_user, guard, render
+from . import Cart, after_action, api_error, csrf_ok, current_user, guard, render, settle_change, submit_change
 
 bp = Blueprint("pages", __name__)
 PAGE_SIZE = 24
@@ -181,12 +184,20 @@ def checkout():
     if not email or "@" not in email:
         flash("Enter an email address.", "warn")
         return redirect(url_for("pages.checkout"))
-    r = guard("checkout", total_cents=c.total_cents())
+    f = request.form
+    try:
+        ship, card = acct.checkout_facts(user, f.get("line1") or f.get("address", ""), f.get("city", ""), f.get("postcode", ""),
+                                            f.get("address_id"), f.get("card", ""))
+    except acct.ChangeError as e:
+        flash(e.message, "warn")
+        return redirect(url_for("pages.checkout"))
+    r = guard("checkout", total_cents=c.total_cents(), ship_to=ship["normalized"], ship_to_new=ship["new"],
+              card_saved=card["saved"], card_bin6=card["bin6"], card_fp=card["fingerprint"])
     if r:
         return r
     if getattr(g, "deceive", False):
         return render("order_confirmed.html", order=None, fake=True)
-    order, problem = place_order(lines, email, user, {"kind": "cart"})
+    order, problem = place_order(lines, email, user, {"kind": "cart", "ship_to": ship, "card": card})
     if problem:
         flash(problem, "warn")
         return redirect(url_for("pages.cart"))
@@ -246,6 +257,7 @@ def login():
     from flask import current_app
     if check_password(user, password, current_app.config["LAB"].hash_iters):
         g.ctx.session.set("uid", user.id)
+        gate.stamp_login(g.ctx)
         user.last_login_at = utcnow()
         db.session.commit()
         g.ctx.note(login="ok")
@@ -261,6 +273,7 @@ def login():
 @bp.route("/logout", methods=["POST", "GET"])
 def logout():
     g.ctx.session.delete("uid")
+    gate.clear_auth(g.ctx)
     return redirect(url_for("pages.home"))
 
 
@@ -286,17 +299,119 @@ def register():
     db.session.add(u)
     db.session.commit()
     g.ctx.session.set("uid", u.id)
+    gate.stamp_login(g.ctx)
     flash("Welcome to Kestrel.", "ok")
     return after_action("register", redirect(url_for("pages.account")), user=u)
 
 
+def account_page(notice=None, status=200):
+    orders = Order.query.filter_by(user_id=current_user().id).order_by(Order.created_at.desc()).limit(5).all()
+    return render("account.html", orders=orders, notice=notice), status
+
+
 @bp.route("/account")
 def account():
+    if not current_user():
+        return redirect(url_for("pages.login", next="/account"))
+    return account_page()[0]
+
+
+def _change_view(kind):
+    """POST /account/<kind>: the HTML side of an account change (the forms on /account)."""
     user = current_user()
     if not user:
         return redirect(url_for("pages.login", next="/account"))
-    orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).limit(5).all()
-    return render("account.html", orders=orders)
+    if request.method == "GET":
+        return redirect(url_for("pages.account"))
+    if not csrf_ok():
+        abort(400)
+    try:
+        change, early = submit_change(kind, user, request.form.to_dict())
+    except acct.ChangeError as e:
+        flash(e.message, "warn")
+        return account_page(status=e.status)
+    if early:
+        return early
+    if change.status == "applied":
+        flash("Saved. We emailed the address on file.", "ok")
+        resp = redirect(url_for("pages.account"))
+    elif change.status == "pending":
+        resp = account_page({"testid": "change-pending", "msg": "Your change is on hold for review. We emailed the address on file; "
+                             "you can cancel it from that message."}, 202)
+    elif change.status == "confirm":
+        resp = account_page({"testid": "change-confirm", "msg": "Check your new address: we sent a link to confirm it."})
+    else:
+        flash("That change could not be applied.", "warn")
+        resp = redirect(url_for("pages.account"))
+    return settle_change(change, user, resp)
+
+
+@bp.route("/account/email", methods=["GET", "POST"])
+def account_email():
+    return _change_view("email")
+
+
+@bp.route("/account/password", methods=["GET", "POST"])
+def account_password():
+    return _change_view("password")
+
+
+@bp.route("/account/address", methods=["GET", "POST"])
+def account_address():
+    return _change_view("address")
+
+
+@bp.route("/account/card", methods=["GET", "POST"])
+def account_card():
+    return _change_view("card")
+
+
+def _notice(testid, title, message, status=200):
+    """The answer to a link followed from a mail: JSON for API clients, a small page for browsers."""
+    if gate.wants_json():
+        return {"status": testid.removeprefix("change-"), "message": message}, status
+    return render("notice.html", testid=testid, title=title, message=message), status
+
+
+def _change_for_link(**match):
+    token = request.args.get("token", "")
+    row = AccountChange.query.filter_by(**match).first() if token else None
+    return row if row and hmac.compare_digest(row.token or "", token) else None
+
+
+@bp.route("/account/email/confirm")
+def email_confirm():
+    """The link mailed to the NEW address. No login: opening it proves the mailbox is theirs."""
+    change = _change_for_link(token=request.args.get("token", ""), kind="email")
+    if change is None:
+        return _notice("unknown-link", "Unknown link", "That link is not valid.", 404)
+    if change.status == "cancelled":
+        return _notice("change-cancelled", "Change cancelled", "This change was cancelled.", 410)
+    if change.status != "confirm":
+        return _notice("change-confirmed", "Already confirmed", "This address is already confirmed.")
+    user = db.session.get(User, change.user_id)
+    hold = (change.extra or {}).get("hold")
+    acct.hold_change(change, hold) if hold else acct.apply_change(change)
+    resp = (_notice("change-pending", "On hold", "Confirmed. The change is on hold for review.", 202) if change.status == "pending"
+            else _notice("change-confirmed", "Email confirmed", "Your email address is updated.") if change.status == "applied"
+            else _notice("change-cancelled", "Not applied", "That address is no longer available.", 409))
+    return settle_change(change, user, resp, confirmed=True)
+
+
+@bp.route("/account/changes/<int:cid>/cancel")
+def change_cancel(cid):
+    """The cancel link in the notice mailed to the old address. No login: it is the owner's link."""
+    change = db.session.get(AccountChange, cid)
+    if change is None or not hmac.compare_digest(change.token or "", request.args.get("token", "")):
+        return _notice("unknown-link", "Unknown link", "That link is not valid.", 404)
+    if change.status == "applied":
+        return _notice("change-applied", "Too late to cancel", "This change has already been applied.", 409)
+    first = change.status != "cancelled"
+    acct.cancel_change(change, "owner_link")
+    resp = _notice("change-cancelled", "Change cancelled", "The change was cancelled. Nothing was updated.")
+    if first:
+        resp = after_action("change_cancel", resp, change=change, user=db.session.get(User, change.user_id))
+    return resp
 
 
 @bp.route("/orders")

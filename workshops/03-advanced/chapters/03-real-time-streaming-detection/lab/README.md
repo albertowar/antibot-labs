@@ -155,7 +155,7 @@ the attacker (microburst)
 
 - **Attack step:** `attacks/round4_jittered_browser.py`: 80 browser-like sessions, own address each, page views, jittered timing, rotated accounts; most try four credentials, a patient quarter tries one.
 - **Defense step:** `defenses/composite.py`: a weighted sum whose largest term is a *campaign* term (this session failed twice, and the global failed-login velocity or IP fan-out is far past normal).
-- **Observe:** level 3 serves all 269; level 4 serves 159, and 57 of 80 sessions meet a refusal. The patient quarter never fails twice and stays under the line: the honest residual, and the hand-off to W3 Ch8.
+- **Observe:** level 3 serves all 269; level 4 serves 159, and 57 of 80 sessions meet a refusal. The patient quarter never fails twice and stays under the line: the honest residual, and the hand-off to W3 Ch10.
 - **Lag step (observe, no pass/fail):** run the micro-burst against a slow consumer, then against more of them:
   ```bash
   python tools/lag.py                          # 100 ms of work per event: capacity 10 events/s against 30 arriving
@@ -180,7 +180,7 @@ the attacker (microburst)
 
 ## Wrap-up: the scoreboard
 
-Every round reported **0 shoppers hurt of 40** next to the attacker's column. Walk it: which detector caught which shape, how many attempts each let through before it landed (21, 120, 116, 159), what the flag cost the person it named (an IP behind a NAT, a session, an account's owner), and why W3 Ch8 owns the monitoring, drift and retraining that keep these thresholds honest over time.
+Every round reported **0 shoppers hurt of 40** next to the attacker's column. Walk it: which detector caught which shape, how many attempts each let through before it landed (21, 120, 116, 159), what the flag cost the person it named (an IP behind a NAT, a session, an account's owner), and why W3 Ch10 owns the monitoring, drift and retraining that keep these thresholds honest over time.
 
 ## Expected results (self-check)
 

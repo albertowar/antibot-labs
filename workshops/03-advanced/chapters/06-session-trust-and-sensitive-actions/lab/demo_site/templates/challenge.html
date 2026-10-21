@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block page %}challenge{% endblock %}{% block title %}One moment · {{ store_name }}{% endblock %}
+{% block content %}
+<section class="card narrow interstitial" data-challenge="{{ challenge }}" data-next="{{ next }}">
+  <p class="eyebrow">Quick check</p>
+  <h1>Just making sure you're not a bot</h1>
+  <p class="muted">This page serves the <code>{{ challenge }}</code> challenge. A chapter's extension replaces it with a real interstitial.</p>
+  <pre class="payload">{{ payload|tojson(indent=1) }}</pre>
+  {{ slot("challenge", challenge=challenge, payload=payload) }}
+  {% if replay %}
+  {# The form this challenge interrupted, carried along so one click resubmits it after the
+     solve (no JavaScript needed; window.labReplay() submits it for an ext that solves inline). #}
+  <form method="post" action="{{ next }}" id="challenge-replay">
+    <input type="hidden" name="csrf" value="{{ replay_csrf }}">
+    {% for k, v in replay.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">
+    {% endfor %}<button type="submit" class="btn">Continue where you left off</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

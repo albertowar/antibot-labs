@@ -2,7 +2,7 @@
 
 import secrets
 
-from flask import g, jsonify, render_template, request
+from flask import current_app, g, jsonify, render_template, request
 
 from .. import gate
 
@@ -46,7 +46,9 @@ def after_action(action, response, **result):
 
     The write actions (review/checkout/drop_buy, and register since contract 1.7) call this on
     their success path, after the row is written, with the row(s) in `result` (e.g. order=order
-    or user=u). `login` calls it on EVERY attempt with result={"user": ..., "ok": bool,
+    or user=u). Contract 1.8 adds the account changes (change=AccountChange, user=u, for
+    change_email/change_password/address_add/card_add, plus change_cancel when the owner's link
+    cancels one), gift_card_redeem (user=, gift_card=) and password_reset_confirm (user=). `login` calls it on EVERY attempt with result={"user": ..., "ok": bool,
     "reason": ...}, so a defense can meter failures or step up after a success. Each
     `hooks.on_action(action, fn)` handler is fn(ctx, result, response); it may mutate the
     persisted row (hold a review as `pending`, mark an order `pending`, attribute an agent
@@ -59,6 +61,48 @@ def after_action(action, response, **result):
         r = fn(ctx, result, response)
         if r is not None:
             response = r
+    return response
+
+
+def submit_change(kind, user, fields):
+    """The write path every account change shares (HTML and JSON), contract 1.8.
+
+    validate -> gate (`change_email` | `change_password` | `address_add` | `card_add`) -> row ->
+    apply, hold or wait for the email link. Returns (change, early_response): early_response is
+    whatever the gate answered, in which case nothing was written. Raises account.ChangeError for
+    bad input (before the gate) and for a wrong current password (after it, so a defense still
+    sees the attempt). A check that sets ctx.attrs["hold"] = {"hours", "reason"} parks the change."""
+    from .. import account
+    from ..models import AccountChange, db
+    payload, extra, facts, proof = account.prepare_change(kind, fields, user, current_app.config["LAB"].hash_iters)
+    if proof is not None:                                # same shape W2 Ch6's change_email check reads
+        g.ctx.attrs["reauth"] = {"password_ok": proof}
+    r = guard(account.ACTIONS[kind], **facts)
+    if r:
+        return None, r
+    if kind == "password" and not proof:
+        raise account.ChangeError("wrong_password", "That is not your current password.", 403)
+    hold = g.ctx.attrs.get("hold")
+    hold = hold if isinstance(hold, dict) and float(hold.get("hours") or 0) > 0 else None
+    change = AccountChange(user_id=user.id, kind=kind, payload=payload, token=secrets.token_urlsafe(16),
+                           status="confirm" if kind == "email" else "pending", extra=dict(extra, sid=g.ctx.session.sid))
+    if hold:
+        change.extra["hold"] = hold
+    db.session.add(change)
+    db.session.commit()
+    if kind != "email":                                  # an email change waits for its link, hold or not
+        account.hold_change(change, hold) if hold else account.apply_change(change)
+    g.ctx.note(account_change=kind, change_status=change.status)
+    return change, None
+
+
+def settle_change(change, user, response, **result):
+    """After the response is chosen: fire the action hooks, then mail the default notices (unless a
+    check set ctx.attrs["notify"] = False). Returns the response a hook may have replaced."""
+    from .. import account
+    response = after_action(account.ACTIONS[change.kind], response, change=change, user=user, **result)
+    if g.ctx.attrs.get("notify", True):
+        account.notify(g.ctx.redis, change, user)
     return response
 
 

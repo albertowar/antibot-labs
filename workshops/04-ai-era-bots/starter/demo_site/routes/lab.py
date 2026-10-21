@@ -10,6 +10,8 @@ part of the production surface, and skipped by the gate.
     POST /lab/reset         ?mode=state (default: drop stock, lab rows, Redis) | full (reseed)
     POST /lab/level         {"level": N}
     GET  /lab/mailbox/<email>  reset tokens and OTPs the store "emailed"
+    GET  /lab/account/changes  account changes (?user=<email|id>&status=&kind=), oldest first
+    POST /lab/account/changes/<id>/release   apply a pending (held) change now
 """
 
 import json
@@ -21,7 +23,8 @@ from flask import Blueprint, current_app, jsonify, request
 from defenses import reloader, store
 
 from .. import hooks
-from ..models import Decision, Order, Product, Review, User, db
+from .. import account as acct
+from ..models import AccountChange, Decision, Order, Product, Review, User, db
 from ..seed import reset_state, seed_all
 
 bp = Blueprint("lab", __name__)
@@ -38,7 +41,7 @@ def whoami():
     last = Decision.query.filter_by(sid=ctx.session.sid).order_by(Decision.id.desc()).first()
     return jsonify(ip=ctx.edge.ip, asn=ctx.edge.asn, org=ctx.edge.org, country=ctx.edge.country, pool=ctx.edge.pool,
                    ja4=ctx.edge.ja4, ja4_source=ctx.edge.ja4_source, xff_claimed=ctx.edge.xff_claimed, actor=request.environ.get("lab.actor", "you"),
-                   session=ctx.session.sid, session_age_s=round(ctx.session.age_seconds, 1), user=ctx.user.email if ctx.user else None,
+                   session=ctx.session.sid, session_age_s=round(ctx.session.age_seconds, 1), user=ctx.user.email if ctx.user else None, auth=ctx.auth,
                    level=current_app.config["LAB"].defense_level, ua=ctx.ua.family, last_decision=last.to_dict() if last else None)
 
 
@@ -192,3 +195,28 @@ def mailbox(email):
     r = current_app.extensions["lab_redis"]
     msgs = [json.loads(m) for m in r.lrange(f"lab:mailbox:{email.lower()}", 0, -1)]
     return jsonify(email=email, messages=msgs)
+
+
+@bp.route("/lab/account/changes")
+def account_changes():
+    q = AccountChange.query
+    who = request.args.get("user", "")
+    if who:
+        u = User.query.get(int(who)) if who.isdigit() else User.query.filter_by(email=who.lower()).first()
+        q = q.filter(AccountChange.user_id == (u.id if u else -1))
+    for col in ("status", "kind"):
+        if request.args.get(col):
+            q = q.filter(getattr(AccountChange, col) == request.args[col])
+    rows = q.order_by(AccountChange.id).limit(min(5000, request.args.get("limit", 500, type=int))).all()
+    return jsonify(items=[r.to_dict() for r in rows], total=q.count())
+
+
+@bp.route("/lab/account/changes/<int:cid>/release", methods=["POST"])
+def account_change_release(cid):
+    """Apply a held change: what a cooling-off clock or a reviewer does in a chapter's lab."""
+    change = db.session.get(AccountChange, cid)
+    if change is None:
+        return jsonify(error={"code": "not_found", "message": "No such change."}), 404
+    if change.status != "pending":
+        return jsonify(error={"code": "not_pending", "message": f"Change is {change.status}."}), 409
+    return jsonify(ok=True, change=acct.release_change(change).to_dict())

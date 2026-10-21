@@ -5,10 +5,11 @@ import secrets
 
 from flask import Blueprint, current_app, g, jsonify, request
 
+from .. import account as acct
 from .. import gate, hooks
 from ..models import GiftCard, Order, Product, Review, User, db, utcnow
 from ..seed import check_password, set_password
-from . import Cart, after_action, api_error, current_user, guard
+from . import Cart, after_action, api_error, current_user, guard, settle_change, submit_change
 from .pages import listing_query, paginate, place_order
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -99,12 +100,18 @@ def checkout():
         return api_error("empty_cart", "Your cart is empty.")
     if "@" not in email:
         return api_error("invalid_email", "Enter an email address.")
-    r = guard("checkout", total_cents=c.total_cents())
+    try:                          # optional ship-to and card choice: {address_id} or {line1, city, postcode}, {card}
+        ship, card = acct.checkout_facts(user, body.get("line1") or body.get("address", ""), body.get("city", ""),
+                                         body.get("postcode", ""), body.get("address_id"), body.get("card", ""))
+    except acct.ChangeError as e:
+        return api_error(e.code, e.message, e.status)
+    r = guard("checkout", total_cents=c.total_cents(), ship_to=ship["normalized"], ship_to_new=ship["new"],
+              card_saved=card["saved"], card_bin6=card["bin6"], card_fp=card["fingerprint"])
     if r:
         return r
     if getattr(g, "deceive", False):
         return jsonify(ok=True, order={"number": "K" + secrets.token_hex(4).upper(), "status": "paid", "fake": True}), 201
-    order, problem = place_order(lines, email, user, {"kind": "cart", "api": True})
+    order, problem = place_order(lines, email, user, {"kind": "cart", "api": True, "ship_to": ship, "card": card})
     if problem:
         return api_error("sold_out", problem, 409)
     c.clear()
@@ -153,6 +160,7 @@ def login():
     user = User.query.filter_by(email=email).first()
     if check_password(user, password, current_app.config["LAB"].hash_iters):
         g.ctx.session.set("uid", user.id)
+        gate.stamp_login(g.ctx)
         user.last_login_at = utcnow()
         db.session.commit()
         g.ctx.note(login="ok")
@@ -179,12 +187,14 @@ def register():
     db.session.add(u)
     db.session.commit()
     g.ctx.session.set("uid", u.id)
+    gate.stamp_login(g.ctx)
     return after_action("register", (jsonify(ok=True, user=u.to_dict()), 201), user=u)
 
 
 @bp.route("/logout", methods=["POST"])
 def logout():
     g.ctx.session.delete("uid")
+    gate.clear_auth(g.ctx)
     return jsonify(ok=True)
 
 
@@ -194,6 +204,45 @@ def account():
     if not user:
         return api_error("unauthenticated", "Log in first.", 401)
     return jsonify(user.to_dict())
+
+
+def _change(kind):
+    """POST /api/account/<kind>: see routes.submit_change. 202 only when a check held the change."""
+    user = current_user()
+    if not user:
+        return api_error("unauthenticated", "Log in first.", 401)
+    try:
+        change, early = submit_change(kind, user, request.get_json(silent=True) or request.form.to_dict())
+    except acct.ChangeError as e:
+        return api_error(e.code, e.message, e.status)
+    if early:
+        return early
+    code, body = acct.describe(change)
+    return settle_change(change, user, (jsonify(body), code))
+
+
+@bp.route("/account/email", methods=["POST"])
+def account_email():
+    """{new_email, password?}: stored `confirm`; the link goes to the NEW address, the notice to the old."""
+    return _change("email")
+
+
+@bp.route("/account/password", methods=["POST"])
+def account_password():
+    """{current_password, new_password}: the route verifies the current password itself."""
+    return _change("password")
+
+
+@bp.route("/account/address", methods=["POST"])
+def account_address():
+    """{line1, city, postcode, country?}: adds an Address row (or holds it)."""
+    return _change("address")
+
+
+@bp.route("/account/card", methods=["POST"])
+def account_card():
+    """{card}: replaces the saved card (brand, last4; bin and fingerprint in user.extra)."""
+    return _change("card")
 
 
 @bp.route("/orders")
@@ -228,10 +277,13 @@ def password_reset_confirm():
     if not uid or len(str(body.get("password", ""))) < 8:
         return api_error("invalid_token", "Token unknown, expired, or password too short.")
     user = User.query.get(int(uid))
+    r = guard("password_reset_confirm", email=user.email)
+    if r:
+        return r
     set_password(user, str(body["password"]), current_app.config["LAB"].hash_iters)
     db.session.commit()
     g.ctx.redis.delete(f"lab:reset:{body['token']}")
-    return jsonify(ok=True)
+    return after_action("password_reset_confirm", jsonify(ok=True), user=user)
 
 
 @bp.route("/gift-cards/balance")
@@ -263,7 +315,7 @@ def gift_card_redeem():
     user.loyalty_points = (user.loyalty_points or 0) + card.balance_cents // 100
     card.redeemed_by = user.id
     db.session.commit()
-    return jsonify(ok=True, loyalty_points=user.loyalty_points)
+    return after_action("gift_card_redeem", jsonify(ok=True, loyalty_points=user.loyalty_points), user=user, gift_card=card)
 
 
 @bp.route("/telemetry", methods=["POST"])
@@ -302,4 +354,6 @@ def challenge_verify():
     if not ok:
         return api_error("challenge_failed", reason or "That answer did not verify.", 403, reason=reason)
     gate.grant_clearance(g.ctx, name)
+    if ctype.get("reauth") and g.ctx.user is not None:
+        gate.stamp_step_up(g.ctx, name)
     return jsonify(ok=True, cleared=name)
