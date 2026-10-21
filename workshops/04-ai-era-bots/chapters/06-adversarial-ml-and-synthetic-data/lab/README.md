@@ -5,8 +5,6 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: see the b
 <!-- lab-diff:start -->
 **Adds** (files not in the starter):
 
-- `data/surrogate_patient.json`
-- `data/surrogate_patient.txt`
 - `defenses/anomaly.py`
 - `defenses/augment.py`
 - `defenses/baseline_model.py`
@@ -36,6 +34,7 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: see the b
 
 - `defenses/ladder.py`
 - `defenses/policy.py`
+- `demo_site/templates/account.html`
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
