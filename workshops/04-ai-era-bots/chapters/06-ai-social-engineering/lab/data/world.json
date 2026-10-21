@@ -1,0 +1,118 @@
+{
+ "asns": [
+  {
+   "asn": 64601,
+   "index": 0,
+   "kind": "residential",
+   "name": "Example Residential Broadband 1"
+  },
+  {
+   "asn": 64602,
+   "index": 1,
+   "kind": "residential",
+   "name": "Example Residential Broadband 2"
+  },
+  {
+   "asn": 64603,
+   "index": 2,
+   "kind": "residential",
+   "name": "Example Residential Broadband 3"
+  },
+  {
+   "asn": 64604,
+   "index": 3,
+   "kind": "residential",
+   "name": "Example Residential Broadband 4"
+  },
+  {
+   "asn": 64605,
+   "index": 4,
+   "kind": "residential",
+   "name": "Example Residential Broadband 5"
+  },
+  {
+   "asn": 64606,
+   "index": 5,
+   "kind": "residential",
+   "name": "Example Residential Broadband 6"
+  },
+  {
+   "asn": 64611,
+   "index": 0,
+   "kind": "mobile",
+   "name": "Example Mobile 1"
+  },
+  {
+   "asn": 64612,
+   "index": 1,
+   "kind": "mobile",
+   "name": "Example Mobile 2"
+  },
+  {
+   "asn": 64613,
+   "index": 2,
+   "kind": "mobile",
+   "name": "Example Mobile 3"
+  },
+  {
+   "asn": 64621,
+   "index": 0,
+   "kind": "hosting",
+   "name": "Example Cloud Hosting 1"
+  },
+  {
+   "asn": 64622,
+   "index": 1,
+   "kind": "hosting",
+   "name": "Example Cloud Hosting 2"
+  },
+  {
+   "asn": 64623,
+   "index": 2,
+   "kind": "hosting",
+   "name": "Example Cloud Hosting 3"
+  },
+  {
+   "asn": 64631,
+   "index": 0,
+   "kind": "vpn",
+   "name": "Example VPN 1"
+  },
+  {
+   "asn": 64632,
+   "index": 1,
+   "kind": "vpn",
+   "name": "Example VPN 2"
+  }
+ ],
+ "default_avatars": [
+  "av_724c09c044",
+  "av_5e6495a5d2",
+  "av_204030cb22",
+  "av_ce04afe9a3",
+  "av_9d8dfd0684",
+  "av_1f46bbe875"
+ ],
+ "genuine_domains": [
+  "kestrel-outfitters.example",
+  "trailmaps.example",
+  "photos.example",
+  "gearlist.example"
+ ],
+ "notes": "All addresses are non-routable (198.18.0.0/15 residential, 100.64.0.0/10 mobile, 203.0.113.0/24 hosting, 198.51.100.0/24 VPN); ASNs are private (RFC 6996).",
+ "regions": {
+  "AU-E": 10,
+  "BR": -3,
+  "DE": 2,
+  "GB": 1,
+  "JP": 9,
+  "PH": 8,
+  "US-E": -4,
+  "US-W": -7
+ },
+ "window": {
+  "end": "2026-09-29T00:00:00Z",
+  "festival": "2026-08-10T00:00:00Z",
+  "start": "2026-07-01T00:00:00Z"
+ }
+}

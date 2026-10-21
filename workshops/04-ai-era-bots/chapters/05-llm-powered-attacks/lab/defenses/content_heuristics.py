@@ -91,7 +91,7 @@ def looks_generated(text):
 
     Real detectors are better than this, but share its failure mode: careful human writers (and
     non-native speakers who write formally) look 'generated', while a model asked for a casual tone does
-    not. A bot signal has to be about the *account and the traffic*, not the prose (W4 Ch6 returns to this).
+    not. A bot signal has to be about the *account and the traffic*, not the prose (W4 Ch8 returns to this).
     """
     words = _WORD.findall(text.lower())
     if len(words) < 12:

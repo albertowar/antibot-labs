@@ -1,0 +1,20 @@
+{#- W4 Ch11: the deception layer's page furniture + the telemetry collector.
+    cap_traps() (demo_site/ext/capstone_store.py) returns nothing below L3; from L3,
+    defenses/deception_limits.py decides WHO gets decoys — never a session using the
+    accessibility API, never a crawler honouring the reservation. -#}
+{% set traps = cap_traps(request.path) %}
+{% if traps.hidden_records or traps.canary_note or traps.decoy_paragraphs %}
+<div class="vh" aria-hidden="true" data-decoy="1" style="position:absolute;left:-10000px">
+  {% if traps.canary_note %}<p>{{ traps.canary_note }}</p>{% endif %}
+  {% for h in traps.hidden_records %}
+  <div class="product-card" data-sku="{{ h.sku }}">
+    <a href="/product/{{ h.sku }}">{{ h.name }}</a> · ${{ "%.2f"|format(h.price) }} · SKU {{ h.sku }}
+  </div>
+  {% endfor %}
+  {% for d in traps.decoy_paragraphs %}<p>{{ d }}</p>{% endfor %}
+</div>
+{% endif %}
+{% for hp in traps.honeypot_links %}
+<a class="hp" style="display:none" href="/product/{{ hp }}" tabindex="-1" aria-hidden="true">{{ hp }}</a>
+{% endfor %}
+<script src="/static/js/capstone.js" defer></script>

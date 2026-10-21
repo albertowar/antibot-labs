@@ -353,7 +353,7 @@ Things that are easy to get wrong:
   pool is sized for the routes (15 connections); an `on_response` or `on_action` handler that
   borrows it makes every request hold two of its connections at once, and 16 server threads
   then starve the pool — the store stalls for the 30 s pool timeout, not the disk. Create a
-  separate engine on the same `DATABASE_URL` (W4 Ch7's `defenses/rule_store.py` is the model;
+  separate engine on the same `DATABASE_URL` (W4 Ch9's `defenses/rule_store.py` is the model;
   on SQLite set WAL + `synchronous=NORMAL` so readers and the store's writer coexist).
 - **An in-session step-up never writes `uid`.** A `reauth=True` challenge proves the person at the keyboard
   inside a session that already has a `uid`; its `verify` must not set or change it. A login challenge
