@@ -30,7 +30,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: a vendor scr
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** four rounds of defend 🔵 and attack 🔴, then a debrief. See `../chapter_08_content.md`, §8.6. **Style: pre-written.** Every control ships complete; you read it, switch `DEFENSE_LEVEL`, and watch what the next skimmer does to it. `solutions/roundN/defenses/ladder.py` is the ladder as it stands after Round N, and `--catch-up` installs it (your own `ladder.py` is kept as `.bak`; `--restore` puts it back). Catching up also just means running the round at its level, which the checkpoint does for you.
+**Format:** four rounds of defend 🔵 and attack 🔴, then a debrief. See `workshops/03-advanced/chapters/08-supply-chain-and-third-party-scripts/chapter_08_content.md` (slides repo), §8.6. **Style: pre-written.** Every control ships complete; you read it, switch `DEFENSE_LEVEL`, and watch what the next skimmer does to it. `solutions/roundN/defenses/ladder.py` is the ladder as it stands after Round N, and `--catch-up` installs it (your own `ladder.py` is kept as `.bak`; `--restore` puts it back). Catching up also just means running the round at its level, which the checkpoint does for you.
 
 **This lab works on a slice of the store, on purpose.** A client-side skimmer lives in the browser, so the store here is the starter's, unchanged, but the lab exercises only the two forms a skimmer targets: the checkout (`form#checkout`, with a card field) and the login (`form#login-form`, with a password), plus the path that reaches them (a product, the cart) and a third-party script include the store hosts. The include and the controls ride every HTML page (the slots are site-wide); the catalogue, the drops, the JSON API and the bot-facing machinery of other chapters are not part of this lab and are not measured. Nothing in the starter is edited.
 
@@ -87,7 +87,7 @@ These checks run in a "page" phase (see `defenses/page_controls.py`): they decid
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds a real browser, because the controls are enforced by one:
+Work through `PREWORK.md` first. This lab adds a real browser, because the controls are enforced by one:
 
 ```bash
 cd lab

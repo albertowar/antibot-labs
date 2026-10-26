@@ -25,7 +25,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: seven rate-l
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** setup, 5 rounds of attack and defense, then a debrief. See `../chapter_02_content.md`, section 2.14.
+**Format:** setup, 5 rounds of attack and defense, then a debrief. See `workshops/01-initiation/chapters/02-http-attacks-and-rate-limiting/chapter_02_content.md` (slides repo), section 2.14.
 
 **This lab is wire-it.** Each round you read one defense module (its docstring says what it catches, what it misses and
 who it hurts), fill in its short `TODO (Round N)`, wire it into `defenses/ladder.py`, and run the checkpoint. The reference
@@ -78,7 +78,7 @@ unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `PREWORK.md`. For this lab:
 
 ```bash
 cd lab

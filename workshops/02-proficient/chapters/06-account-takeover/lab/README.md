@@ -21,7 +21,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the login'
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `../chapter_06_content.md`, §6.6. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the checks and `ladder.py`), and `--restore` puts your files back.
+**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `workshops/02-proficient/chapters/06-account-takeover/chapter_06_content.md` (slides repo), §6.6. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the checks and `ladder.py`), and `--restore` puts your files back.
 
 You play both sides of the store's sign-in. The attacker holds a synthetic combo list, then infostealer output; you add one defense per round, run the attacker that beats it, and read the scoreboard: accounts taken over next to the real people the defense hurt.
 
@@ -53,7 +53,7 @@ The rest of the store (catalog, cart, checkout, the simulated edge, the decision
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages:
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages:
 
 ```bash
 cd lab

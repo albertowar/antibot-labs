@@ -67,7 +67,7 @@ The rest of the store (catalog, cart, checkout, the simulated edge, the decision
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages (no browser, no Ollama):
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages (no browser, no Ollama):
 
 ```bash
 cd lab

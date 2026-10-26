@@ -24,7 +24,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.7). Adds: a Redis Stre
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** five rounds (0 to 4) of defend 🔵 and attack 🔴, then a debrief. See `../chapter_03_content.md`, §3.6. **Style: pre-written.** Every detector ships complete; you read it, switch `DEFENSE_LEVEL`, and watch what the next attacker does to it. `solutions/roundN/defenses/ladder.py` is the ladder as it stands after Round N, and `--catch-up` installs it (your own `ladder.py` is kept as `.bak`; `--restore` puts it back). Catching up also just means running the round at its level, which the checkpoint does for you.
+**Format:** five rounds (0 to 4) of defend 🔵 and attack 🔴, then a debrief. See `workshops/03-advanced/chapters/03-real-time-streaming-detection/chapter_03_content.md` (slides repo), §3.6. **Style: pre-written.** Every detector ships complete; you read it, switch `DEFENSE_LEVEL`, and watch what the next attacker does to it. `solutions/roundN/defenses/ladder.py` is the ladder as it stands after Round N, and `--catch-up` installs it (your own `ladder.py` is kept as `.bak`; `--restore` puts it back). Catching up also just means running the round at its level, which the checkpoint does for you.
 
 The spine of the chapter: **a streaming verdict stops what comes after it, never what came before.** Every request becomes one event on a Redis Stream. A consumer scores the stream in milliseconds and raises a flag; the gate refuses the next request that flag names. You measure the price of that latency in the attacker's column (how many attempts were served before the first refusal) and in the shoppers' column (how many people the flag hurt), and you watch the consumer's backlog, because a detector that falls behind the traffic reopens the gap it came to close.
 
@@ -75,7 +75,7 @@ A detector has two halves. `detect()` runs in the consumer, on the stream, and m
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages (plus fakeredis's `probabilistic` extra):
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages (plus fakeredis's `probabilistic` extra):
 
 ```bash
 cd lab

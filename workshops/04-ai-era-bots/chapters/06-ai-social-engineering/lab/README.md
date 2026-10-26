@@ -2,7 +2,7 @@
 
 Starts from: no store. This is an analyst-side lab with no `demo_site/`, no server and no `attacks/`. A deterministic generator writes the log, and you work in notebooks.
 
-**Format:** Round 0 explore, four defense rounds, reveal. See `../chapter_06_content.md`, §6.6.
+**Format:** Round 0 explore, four defense rounds, reveal. See `workshops/04-ai-era-bots/chapters/06-ai-social-engineering/chapter_06_content.md` (slides repo), §6.6.
 **Lab style:** analyst notebooks. The reference detectors in `solutions/` are complete. Catching up installs their output as your round file.
 
 Trailmates is Kestrel Outfitters' hobby community. Members message each other about trips, sell used gear on a swap board, and pay through the community wallet. You are its trust-and-safety team, and you have ninety days of its records. Four crews are working members for money in them. **The lab is defense only.** You never run, write or read a scam. The crews exist as the traces their operations leave: accounts, message metadata, payments and reports. Each round is still a 🔵 defense, followed by a 🔴 campaign tier built to slip past the previous round's detector family. Each round also has a checkpoint and a number.
@@ -38,7 +38,7 @@ python tests/test_make_trailmates.py                    # determinism: your data
 jupyter lab notebooks/
 ```
 
-This lab needs nothing beyond the toolchain in `onboarding/setup/PREWORK.md`. It needs no Docker, no browser and no model.
+This lab needs nothing beyond the toolchain in `PREWORK.md`. It needs no Docker, no browser and no model.
 
 ## The data
 

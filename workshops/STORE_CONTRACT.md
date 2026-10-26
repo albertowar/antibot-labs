@@ -2,8 +2,8 @@
 
 **Kestrel Outfitters** is the one e-commerce store every chapter of the series defends. This file is the
 contract between the store, the chapter labs and the attack scripts: routes, data, headers, environment,
-and the hook points a chapter uses to add a defense or a feature. The Demo Store deck
-(`onboarding/demo-store/`) walks through the shop, the Lab Harness deck (`onboarding/lab-harness/`)
+and the hook points a chapter uses to add a defense or a feature. In the slides repo, the Demo Store
+deck (`onboarding/demo-store/`) walks through the shop and the Lab Harness deck (`onboarding/lab-harness/`)
 through the hook points; every starter and lab README points here.
 
 Contract version: **1.8** (recorded in each starter's `STARTER.json`). Changing anything under

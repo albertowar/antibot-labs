@@ -28,7 +28,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: a `pow` chal
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack and defense, two lessons on PoW in production and the people it hurts, and a debrief. See `../chapter_06_content.md`, section 6.7.
+**Format:** 6 rounds of attack and defense, two lessons on PoW in production and the people it hurts, and a debrief. See `workshops/01-initiation/chapters/06-proof-of-work-and-computational-challenges/chapter_06_content.md` (slides repo), section 6.7.
 
 You play both sides. The scraper wants the whole catalog: all 120 product records. The defender puts a proof-of-work (PoW) gate in front of it, and each round tightens the gate.
 
@@ -68,7 +68,7 @@ starter, unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `PREWORK.md`. For this lab:
 
 ```bash
 cd lab

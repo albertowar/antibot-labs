@@ -94,7 +94,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Workshop
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** pre-written (level style), five rounds (0 to 4), with one small `TODO (Round N)` exercise in each of Rounds 1 to 3. See `../chapter_12_content.md`, section 12.7.
+**Format:** pre-written (level style), five rounds (0 to 4), with one small `TODO (Round N)` exercise in each of Rounds 1 to 3. See `workshops/03-advanced/chapters/12-capstone/chapter_12_content.md` (slides repo), section 12.7.
 
 The store drops 50 pairs of the **Lab Runner 9**, one per account. You are the defender and the attacker, round by round: each round the attacker reaches for the next technique, you turn on the next layer and measure what it catches **and who it hurts**. Forty-three simulated people (the 40 shoppers of the W2 capstone, plus a mobile app, a second phone and a partner integration) use the store in the same minute as every attack, and every round prints both columns.
 
@@ -163,7 +163,7 @@ Round 0 runs at level 4, Round 1 at 5, Round 2 at 6, Rounds 3 and 4 at 7. The "b
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab (one venv, inside `lab/`; the chapter pins Playwright 1.62 because Camoufox 0.5.8, the optional browser of the bonus, needs it, so never share this venv):
+Setup is covered once for the whole series in `PREWORK.md`. For this lab (one venv, inside `lab/`; the chapter pins Playwright 1.62 because Camoufox 0.5.8, the optional browser of the bonus, needs it, so never share this venv):
 
 ```bash
 cd lab

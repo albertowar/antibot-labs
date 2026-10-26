@@ -26,7 +26,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the Lab Runn
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** five rounds of attack 🔴 and defend 🔵, then a debrief. See `../chapter_01_content.md`, §1.7 (the device-bound session theory is §1.6). **Style: wire-it.** Each defense ships as a stub with a `TODO (Round N)` and the finished file is in `solutions/roundN/`; `--catch-up` installs rounds 1..N and `--restore` puts your files back. The provider mock, `defenses/mobile_core.py`, is infrastructure, not a TODO.
+**Format:** five rounds of attack 🔴 and defend 🔵, then a debrief. See `workshops/03-advanced/chapters/01-mobile-attestation-and-mitm/chapter_01_content.md` (slides repo), §1.7 (the device-bound session theory is §1.6). **Style: wire-it.** Each defense ships as a stub with a `TODO (Round N)` and the finished file is in `solutions/roundN/`; `--catch-up` installs rounds 1..N and `--restore` puts your files back. The provider mock, `defenses/mobile_core.py`, is infrastructure, not a TODO.
 
 You play both sides. First you are the reverse engineer: you intercept a mobile app's API, replay it, beat certificate pinning, forge and then steal attestation verdicts, farm genuine ones from emulators, and finally steal the session itself. After each attack you put on the defender's hat and add the layer that stops it, and you measure what that layer costs the real customers running the app.
 
@@ -80,7 +80,7 @@ python tools/doctor.py                      # preflight
 python demo_site/app.py                     # http://127.0.0.1:5000, SQLite + in-process Redis, no Docker
 ```
 
-Setup beyond the shared walkthrough (`onboarding/setup/PREWORK.md`) is the line for `cryptography`. Each round runs the store at a `DEFENSE_LEVEL`; the checkpoint sets it for you (`POST /lab/level`), so you rarely restart anything. To drive it by hand:
+Setup beyond the shared walkthrough (`PREWORK.md`) is the line for `cryptography`. Each round runs the store at a `DEFENSE_LEVEL`; the checkpoint sets it for you (`POST /lab/level`), so you rarely restart anything. To drive it by hand:
 
 | DEFENSE_LEVEL | Adds | Module | Round |
 |---|---|---|---|

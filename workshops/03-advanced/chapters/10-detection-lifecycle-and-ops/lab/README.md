@@ -64,7 +64,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: the sign-in 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** pre-written (level-style) lab: Round 0 plus 4 attack ⚔️ defend rounds, one lab week each. See `../chapter_10_content.md`, §10.6.
+**Format:** pre-written (level-style) lab: Round 0 plus 4 attack ⚔️ defend rounds, one lab week each. See `workshops/03-advanced/chapters/10-detection-lifecycle-and-ops/chapter_10_content.md` (slides repo), §10.6.
 
 The sign-in stack is **already written and already in production**: you read it, you do not build it. The store is the W3 starter (Kestrel Outfitters); `defenses/ladder.py` wires the stack onto the login at `DEFENSE_LEVEL=1` (`0` is the bare store, which is what `tools/verify.py --smoke` tests). The job is to **operate** it as the world moves: notice a signal going quiet, measure drift before it becomes a crisis, retrain and ship a model without hurting anyone, and run the incident when an attack finally slips through. What changes from round to round is **operational state** (a JSON file of overrides, a corpus refresh, a model registry, analyst labels), not code.
 

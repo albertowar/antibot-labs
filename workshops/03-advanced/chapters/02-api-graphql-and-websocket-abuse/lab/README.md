@@ -26,7 +26,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: three ext mo
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** five rounds of attack 🔴 and defend 🔵, then a debrief. See `../chapter_02_content.md`, §2.8. **Style: wire-it.** Each defense ships as a stub with a `TODO (Round N)` and the finished file is in `solutions/roundN/`; `--catch-up` installs rounds 1..N and `--restore` puts your files back. The checks are already wired into `defenses/ladder.py`, so a round's work is one function.
+**Format:** five rounds of attack 🔴 and defend 🔵, then a debrief. See `workshops/03-advanced/chapters/02-api-graphql-and-websocket-abuse/chapter_02_content.md` (slides repo), §2.8. **Style: wire-it.** Each defense ships as a stub with a `TODO (Round N)` and the finished file is in `solutions/roundN/`; `--catch-up` installs rounds 1..N and `--restore` puts your files back. The checks are already wired into `defenses/ladder.py`, so a round's work is one function.
 
 You play both sides. Bots attack the data plane of the Kestrel Outfitters store (its REST API, its GraphQL endpoint and its WebSocket feed) and you add the defense that catches each one, measuring what it costs the real customers at every step.
 
@@ -76,7 +76,7 @@ python tools/doctor.py                                   # preflight
 python demo_site/app.py                                  # http://127.0.0.1:5000, SQLite + in-process Redis, no Docker
 ```
 
-Setup beyond the shared walkthrough (`onboarding/setup/PREWORK.md`) is the five lines for GraphQL, WebSockets and tokens in `requirements.txt`. Each round runs the store at a `DEFENSE_LEVEL`; the checkpoint sets it for you (`POST /lab/level`) and reloads the defenses on change, so you rarely restart anything. (Edits to `demo_site/ext/` need a restart; you should not need to make any.) To drive it by hand:
+Setup beyond the shared walkthrough (`PREWORK.md`) is the five lines for GraphQL, WebSockets and tokens in `requirements.txt`. Each round runs the store at a `DEFENSE_LEVEL`; the checkpoint sets it for you (`POST /lab/level`) and reloads the defenses on change, so you rarely restart anything. (Edits to `demo_site/ext/` need a restart; you should not need to make any.) To drive it by hand:
 
 | DEFENSE_LEVEL | Adds | Module | Beats | Round |
 |---|---|---|---|---|

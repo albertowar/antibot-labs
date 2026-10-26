@@ -24,7 +24,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: six IP check
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** setup, 5 rounds of attack and defense, then a debrief. See `../chapter_03_content.md`, section 3.6.
+**Format:** setup, 5 rounds of attack and defense, then a debrief. See `workshops/01-initiation/chapters/03-ip-reputation-and-proxy-detection/chapter_03_content.md` (slides repo), section 3.6.
 
 You play both sides. The scraper wants the whole catalog: all 120 product records from `/api/products/<sku>`. Every round
 it changes **where its traffic comes from**: one cloud VM, free proxies, a fleet of fresh VMs, a forged `X-Forwarded-For`,
@@ -74,7 +74,7 @@ unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ## Setup (5 min)
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `PREWORK.md`. For this lab:
 
 ```bash
 cd lab

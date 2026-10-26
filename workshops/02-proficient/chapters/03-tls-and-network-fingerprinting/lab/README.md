@@ -33,7 +33,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a TLS edge
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `../chapter_03_content.md`, §3.8. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back.
+**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `workshops/02-proficient/chapters/03-tls-and-network-fingerprinting/chapter_03_content.md` (slides repo), §3.8. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back.
 
 The W1 Ch4 attacker copies every header from DevTools, so nothing at the HTTP layer gives it away. In this lab you move the defense one layer down, to the TLS ClientHello and the HTTP/2 connection preface. Each round you write a few lines of a new layer, run the attacker that beats it, and measure two things: what the layer catches, and which real people it costs.
 
@@ -83,7 +83,7 @@ The rest of the store (catalog, cart, checkout, accounts, the simulated edge, th
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds browsers, a certificate and the TLS edge binary:
+Work through `PREWORK.md` first. This lab adds browsers, a certificate and the TLS edge binary:
 
 ```bash
 cd lab

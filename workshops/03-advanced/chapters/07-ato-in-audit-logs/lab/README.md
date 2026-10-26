@@ -1,6 +1,6 @@
 # W3 Ch7 Lab — Investigating Account Takeover in Audit Logs
 
-**Format:** Round 0 explore + five detection rounds + reveal. See `../chapter_07_content.md`, §7.4.
+**Format:** Round 0 explore + five detection rounds + reveal. See `workshops/03-advanced/chapters/07-ato-in-audit-logs/chapter_07_content.md` (slides repo), §7.4.
 
 This chapter's attacker is not a script you run. It already ran: nine account-takeover campaigns are buried in 90 days of a store's account audit log, next to every legitimate behaviour that looks like one. Each round is still a 🔵 defense (a detection family you build in a notebook), a 🔴 attack (the tier of campaigns built to evade the previous round's family), a checkpoint and a number. The answer key stays sealed until the reveal; the scorer tells you how you are doing without telling you why.
 

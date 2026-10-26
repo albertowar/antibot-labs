@@ -26,7 +26,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a register
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 6 rounds of attack ⚔️ defend plus a closing debrief. See `../chapter_04_content.md`, §4.7. **Style: pre-written.** Every defense ships complete; you read it, switch the level and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`. The `TODO (Round N, optional)` markers in `defenses/` and `tools/obfuscate.mjs` are tuning exercises, not steps: every defense already works, and the checkpoints pass without touching them.
+**Format:** 6 rounds of attack ⚔️ defend plus a closing debrief. See `workshops/02-proficient/chapters/04-javascript-challenges-and-obfuscation/chapter_04_content.md` (slides repo), §4.7. **Style: pre-written.** Every defense ships complete; you read it, switch the level and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`. The `TODO (Round N, optional)` markers in `defenses/` and `tools/obfuscate.mjs` are tuning exercises, not steps: every defense already works, and the checkpoints pass without touching them.
 
 The store's catalogue sits behind a JavaScript challenge that gets stronger every round. You play both sides:
 
@@ -64,7 +64,7 @@ The rest of the store (catalogue, product pages, cart, checkout, drops, accounts
 
 ## Setup
 
-You need **Python 3.12+** and **Node 24 LTS (24.15 or later)**. Work through `onboarding/setup/PREWORK.md` first; this lab adds:
+You need **Python 3.12+** and **Node 24 LTS (24.15 or later)**. Work through `PREWORK.md` first; this lab adds:
 
 ```bash
 cd lab

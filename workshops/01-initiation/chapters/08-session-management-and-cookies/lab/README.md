@@ -27,7 +27,7 @@ flag rides in a signed client-side cookie, four session defenses (`promo_state`,
 **Format:** **pre-written.** The defenses ship complete; each round you read one, wire it into `defenses/ladder.py`,
 run the attack, then read the attack that beats it. `solutions/roundN/` holds the finished `ladder.py` (and, for
 Round 3, the tuned `policy.py`). `python tools/checkpoint.py --round N --catch-up` installs them if you fall
-behind. See `../chapter_08_content.md`, section 8.8.
+behind. See `workshops/01-initiation/chapters/08-session-management-and-cookies/chapter_08_content.md` (slides repo), section 8.8.
 
 You play both sides. The store sells a promo voucher at `/promo/`: answer a one-line quiz to unlock, then
 redeem once. The bug is that the "unlocked" flag lives in a signed cookie, so the bot tries to turn one unlock

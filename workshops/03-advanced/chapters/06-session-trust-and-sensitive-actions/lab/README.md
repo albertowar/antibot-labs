@@ -62,7 +62,7 @@ python tools/doctor.py
 python demo_site/app.py                                  # or let tools/checkpoint.py start nothing: run it next to this
 ```
 
-The general setup (toolchain, the store, the smoke test) is `onboarding/setup/PREWORK.md`; this lab needs
+The general setup (toolchain, the store, the smoke test) is `PREWORK.md`; this lab needs
 nothing beyond it.
 
 ## What is in the lab

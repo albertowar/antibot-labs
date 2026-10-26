@@ -149,4 +149,4 @@ against the budget column, not the exact figure.
 reseller 100% vs ≤25%) — the same fresh-environment training fragility recorded for W2 Ch7,
 whose pipeline this chapter extends. The rounds still demonstrate their attacks and defenses;
 their PASS gates are honest only on the history they were tuned against. The defect and fix
-direction are in [`../TODO.md`](../TODO.md).
+direction are in [`TODO.md`](TODO.md).

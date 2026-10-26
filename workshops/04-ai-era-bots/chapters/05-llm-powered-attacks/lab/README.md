@@ -92,7 +92,7 @@ model call.
 
 ## Setup (under 10 minutes)
 
-One venv per chapter; see `onboarding/setup/PREWORK.md` for the toolchain.
+One venv per chapter; see `PREWORK.md` for the toolchain.
 
 ```bash
 cd lab

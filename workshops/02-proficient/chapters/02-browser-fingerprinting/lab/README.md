@@ -37,7 +37,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a fingerpr
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `../chapter_02_content.md`, §2.7–2.8. **Style: pre-written.** Every layer ships complete in `defenses/`: you read it, switch the level, and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`; catching up means running at the round's level (the checkpoint does it, and `--catch-up` installs those two files).
+**Format:** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. See `workshops/02-proficient/chapters/02-browser-fingerprinting/chapter_02_content.md` (slides repo), §2.7–2.8. **Style: pre-written.** Every layer ships complete in `defenses/`: you read it, switch the level, and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`; catching up means running at the round's level (the checkpoint does it, and `--catch-up` installs those two files).
 
 The store's sign-up page (`/register`) is what a farm wants: every account earns loyalty points and early access to drops, so a bot wants hundreds of them. You play both sides:
 
@@ -75,7 +75,7 @@ The rest of the store (catalog, cart, checkout, drops, accounts, the simulated e
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds a browser:
+Work through `PREWORK.md` first. This lab adds a browser:
 
 ```bash
 cd lab

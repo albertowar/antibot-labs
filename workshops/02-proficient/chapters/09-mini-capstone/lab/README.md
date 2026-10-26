@@ -75,7 +75,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: the capsto
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** pre-written (level style), five rounds (0 to 4). See `../chapter_09_content.md`, section 9.7.
+**Format:** pre-written (level style), five rounds (0 to 4). See `workshops/02-proficient/chapters/09-mini-capstone/chapter_09_content.md` (slides repo), section 9.7.
 
 A limited sneaker drop: **the "Lab Runner 9", one per account**. You are the scalper and the defender, round by round. Each round the attacker gets a better tool; you read and switch on the next layer of the Workshop 2 stack and measure two things: what it catches, and who it hurts. Forty simulated shoppers buy the same drop in the same minute as every scalper, and every round prints both columns.
 
@@ -145,7 +145,7 @@ Round N runs at level N+1, because the W2 starter's level 0 is the bare store (b
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab (one venv, inside `lab/`; the chapter pins Playwright 1.62 because Camoufox 0.5.8 needs it, so never share this venv):
+Setup is covered once for the whole series in `PREWORK.md`. For this lab (one venv, inside `lab/`; the chapter pins Playwright 1.62 because Camoufox 0.5.8 needs it, so never share this venv):
 
 ```bash
 cd lab

@@ -1,6 +1,6 @@
 # Chapter 10 Lab: Reservation, Agent Policy, Governance Record
 
-**Format:** 3 rounds, plus a debrief. See `../chapter_10_content.md`, §10.4.
+**Format:** 3 rounds, plus a debrief. See `workshops/04-ai-era-bots/chapters/10-ai-policy-law-and-ethics/chapter_10_content.md` (slides repo), §10.4.
 
 This chapter's attacker is three different things. In Round 1 it is a fleet of AI crawlers, honest and otherwise, reading the signals you publish. In Round 2 it is a scalping farm that has learned that, since *Amazon v. Perplexity* (9th Cir., August 2026), a shopper's own agent is legally the shopper, and hides behind that. In Round 3 it is the other team, reading your AI governance record the way an auditor would. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 

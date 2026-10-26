@@ -33,7 +33,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.7). Adds: a request 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `../chapter_07_content.md`, §7.6. **Style: wire-it.** Four modules ship as stubs with a `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `--catch-up` installs rounds 1..N (and **trains the reference models**), and `--restore` puts your files back. Everything around the stubs (features, labels, training, the explainer, the simulators) is finished code you read and run.
+**Format:** Round 0 plus 4 rounds of defend 🛡️ and attack 🗡️, then a debrief. See `workshops/02-proficient/chapters/07-machine-learning-for-bot-detection/chapter_07_content.md` (slides repo), §7.6. **Style: wire-it.** Four modules ship as stubs with a `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `--catch-up` installs rounds 1..N (and **trains the reference models**), and `--restore` puts your files back. Everything around the stubs (features, labels, training, the explainer, the simulators) is finished code you read and run.
 
 It is drop day at Kestrel Outfitters: the Kestrel One Hoodie (`lab-hoodie-1`) goes live. You play both sides. As the **defender** you train a model on the store's own event log and switch it on at the purchase. As the **attacker** you run the bot that beats it. Every round ends with a checkpoint that reports bots stopped *and* real customers blocked.
 
@@ -82,7 +82,7 @@ The rest of the store (catalog, cart, checkout, the simulated edge, the decision
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds the model stack; nothing else:
+Work through `PREWORK.md` first. This lab adds the model stack; nothing else:
 
 ```bash
 cd lab

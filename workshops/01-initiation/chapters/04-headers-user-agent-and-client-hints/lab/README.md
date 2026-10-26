@@ -26,7 +26,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: five header 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 5 rounds (0–4) of attack ⚔️ defend. See `../chapter_04_content.md`, §4.7. **Lab style:** pre-written.
+**Format:** 5 rounds (0–4) of attack ⚔️ defend. See `workshops/01-initiation/chapters/04-headers-user-agent-and-client-hints/chapter_04_content.md` (slides repo), §4.7. **Lab style:** pre-written.
 Every defense is written and already wired into `defenses/ladder.py`; each round you read one layer, the checkpoint
 switches the store to that round's `DEFENSE_LEVEL`, and you re-run the attacks.
 
@@ -69,7 +69,7 @@ unchanged. Its contract is `workshops/STORE_CONTRACT.md`.
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `PREWORK.md`. For this lab:
 
 ```bash
 cd lab

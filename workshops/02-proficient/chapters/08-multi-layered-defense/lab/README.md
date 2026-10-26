@@ -35,7 +35,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.7). Adds: the eight 
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** pre-written (level-style) lab, shadow mode plus 4 rounds. See `../chapter_08_content.md`, section 8.5.
+**Format:** pre-written (level-style) lab, shadow mode plus 4 rounds. See `workshops/02-proficient/chapters/08-multi-layered-defense/chapter_08_content.md` (slides repo), section 8.5.
 
 In W1 and the earlier W2 chapters you built one defense at a time. This lab puts eight of them in front of one login form and asks the question every production team eventually faces: **how do the layers decide together, and who pays when they get it wrong?**
 

@@ -1,6 +1,6 @@
 # Chapter 11 Lab: Counsel, Auditor, Referee
 
-**Format:** 3 rounds plus a debrief. See `../chapter_11_content.md`, §11.4.
+**Format:** 3 rounds plus a debrief. See `workshops/03-advanced/chapters/11-legal-ethical-and-future/chapter_11_content.md` (slides repo), §11.4.
 
 This chapter's attacker is not a script. In Round 1 it is the scraper's lawyer, in Round 2 it is a bot campaign that has learned to look like the people your policy protects, and in Round 3 it is the opposing side reading your rules of engagement for the hole they will use in the Capstone. Each round still has a 🔵 defense, a 🔴 attack that beats it, a checkpoint and a number.
 

@@ -46,7 +46,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: W1 Ch4's h
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 plus 4 attack ⚔️ defend rounds and a closing attack. See `../chapter_01_content.md`, §1.6. **Style: wire-it.** Each round you finish one `TODO (Round N)` function in a layer module; `--catch-up` installs the reference versions from `solutions/round<N>/`.
+**Format:** Round 0 plus 4 attack ⚔️ defend rounds and a closing attack. See `workshops/02-proficient/chapters/01-browser-automation-detection/chapter_01_content.md` (slides repo), §1.6. **Style: wire-it.** Each round you finish one `TODO (Round N)` function in a layer module; `--catch-up` installs the reference versions from `solutions/round<N>/`.
 
 You play both sides. The attacker drives a real browser at the store. The defender adds a layer to the bot sensor that runs inside the page, then measures two things: what the layer catches, and what it costs real users. Then the attacker works out what to try next.
 
@@ -79,7 +79,7 @@ The rest of the store (catalog, product pages, cart, checkout, drops, accounts, 
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds browsers:
+Work through `PREWORK.md` first. This lab adds browsers:
 
 ```bash
 cd lab

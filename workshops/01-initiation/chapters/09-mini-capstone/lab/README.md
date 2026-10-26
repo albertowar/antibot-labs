@@ -59,7 +59,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: the capstone
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 to 4 plus Drop Day. See `../chapter_09_content.md`, section 9.6.
+**Format:** Round 0 to 4 plus Drop Day. See `workshops/01-initiation/chapters/09-mini-capstone/chapter_09_content.md` (slides repo), section 9.6.
 
 Twenty limited-edition hoodies go on sale at once. Forty simulated shoppers want one each, and five waves of scalper bots want all of them. You compose the Workshop 1 defenses into one gate, round by round, and after every round you read both halves of the scoreboard: who got the hoodies, and what your defense cost the shoppers.
 
@@ -110,7 +110,7 @@ Each level includes every level below it. Until level 4 nothing can be served in
 
 ## Setup
 
-Setup is covered once for the whole series in `onboarding/setup/PREWORK.md`. For this lab:
+Setup is covered once for the whole series in `PREWORK.md`. For this lab:
 
 ```bash
 cd lab

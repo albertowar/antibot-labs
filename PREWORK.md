@@ -1,9 +1,11 @@
 # Pre-work: get the store running before you start
 
 Do this before your first chapter of any workshop. It takes about 20 minutes on a laptop with a normal connection,
-and it is the only setup the series needs. The Setup deck (`onboarding/setup/slides.md`) narrates the same
-steps; the Demo Store deck (`onboarding/demo-store/slides.md`) shows the shop you just started, and the Lab
-Harness deck (`onboarding/lab-harness/slides.md`) shows how the labs measure attacks and defenses against it.
+and it is the only setup the series needs. Three short decks in the slides repo
+([antibot-workshop-slides](https://github.com/albertowar/antibot-workshop-slides)) go with it: the Setup
+deck (`onboarding/setup/`) narrates the same steps, the Demo Store deck (`onboarding/demo-store/`) shows
+the shop you just started, and the Lab Harness deck (`onboarding/lab-harness/`) shows how the labs measure
+attacks and defenses against it.
 
 ## 1. Install the toolchain
 
@@ -11,7 +13,7 @@ Harness deck (`onboarding/lab-harness/slides.md`) shows how the labs measure att
 |---|---|---|
 | Python | **3.12** (3.13 fine) | every lab; `python3.12 --version` |
 | Git | any | clone the repo |
-| Node.js | 24 LTS | only to view the slide decks locally, and for W2 Ch4's JS toolchain |
+| Node.js | 24 LTS | only for W2 Ch4's JS toolchain (and to view the slide decks locally from the slides repo) |
 | Docker + Compose | optional | the production-shaped stack (Redis + PostgreSQL); every lab also runs without it |
 
 Windows: use WSL 2 (Ubuntu) and do everything inside it. macOS: `brew install python@3.12`. Linux:
@@ -20,8 +22,8 @@ Windows: use WSL 2 (Ubuntu) and do everything inside it. macOS: `brew install py
 ## 2. Clone and pick your starter
 
 ```bash
-git clone <this repo> antibot-workshop-slides
-cd antibot-workshop-slides
+git clone https://github.com/albertowar/antibot-labs
+cd antibot-labs
 ```
 
 Each workshop starts from its own copy of the store, in `workshops/<NN>/starter/`. All four are the

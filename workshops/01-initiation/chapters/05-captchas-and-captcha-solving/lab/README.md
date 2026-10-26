@@ -30,7 +30,7 @@ Starts from: workshops/01-initiation/starter/ (contract 1.5). Adds: the `captcha
 
 **Format:** **wire-it.** Round 0 plus 4 rounds of attack ⚔️ defend, then a debrief. Each round's defense ships
 as a stub with `TODO (Round N)` markers and a full version in `solutions/roundN/`;
-`python tools/checkpoint.py --round N --catch-up` installs them if you fall behind. See `../chapter_05_content.md`, §5.6.
+`python tools/checkpoint.py --round N --catch-up` installs them if you fall behind. See `workshops/01-initiation/chapters/05-captchas-and-captcha-solving/chapter_05_content.md` (slides repo), §5.6.
 
 You play both sides. Each round, an attack script beats the store's current CAPTCHA setup. You fix one defense module (the `TODO (Round N)` markers), and the checkpoint measures what the fix stops **and what it costs 40 simulated shoppers**.
 

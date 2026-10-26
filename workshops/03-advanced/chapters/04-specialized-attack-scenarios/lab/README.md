@@ -26,7 +26,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.5). Adds: a Round 0 pe
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** five rounds of defend 🔵 and attack 🔴, one per attacker economy, then a debrief. See `../chapter_04_content.md`. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back.
+**Format:** five rounds of defend 🔵 and attack 🔴, one per attacker economy, then a debrief. See `workshops/03-advanced/chapters/04-specialized-attack-scenarios/chapter_04_content.md` (slides repo). **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back.
 
 The spine of the chapter: **an attack's economics force a signature it cannot hide, and the defense that works targets that signature, not a generic "is this a bot" score.** You play defender against five specialized attackers (a credential stuffer, a scalper, a scraper, a fake-account farm, a click fraudster). Each round you finish one check, run the attackers that beat the previous step, and read the scoreboard: what the attacker got, next to the real shoppers the defense hurt.
 
@@ -65,7 +65,7 @@ The rest of the store (catalogue, cart, checkout, the simulated edge, the decisi
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages:
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages:
 
 ```bash
 cd lab

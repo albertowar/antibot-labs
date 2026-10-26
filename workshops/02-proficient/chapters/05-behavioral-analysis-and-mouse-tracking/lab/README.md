@@ -35,7 +35,7 @@ Starts from: `workshops/02-proficient/starter/` (contract 1.5). Adds: a behavior
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** Round 0 recon plus 5 rounds of attack ⚔️ defend, then a debrief. See `../chapter_05_content.md`, Section 5.8. **Style: pre-written.** Every layer ships complete in `defenses/behavior_l1.py` … `behavior_l5.py`: you read it, switch the level, and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`.
+**Format:** Round 0 recon plus 5 rounds of attack ⚔️ defend, then a debrief. See `workshops/02-proficient/chapters/05-behavioral-analysis-and-mouse-tracking/chapter_05_content.md` (slides repo), Section 5.8. **Style: pre-written.** Every layer ships complete in `defenses/behavior_l1.py` … `behavior_l5.py`: you read it, switch the level, and measure. `solutions/round<N>/` holds only that round's `defenses/ladder.py` and `policy.py`.
 
 The store is running a **limited drop**: the Lab Runner 9 shoe, one reservation form. Scalper bots want every pair.
 
@@ -74,7 +74,7 @@ The rest of the store (catalog, cart, checkout, drops, accounts, the simulated e
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab adds a browser:
+Work through `PREWORK.md` first. This lab adds a browser:
 
 ```bash
 cd lab

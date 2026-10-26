@@ -5,7 +5,7 @@
 from `workshops/02-proficient/starter.manifest.json`. Do not edit this folder by hand; change the manifest and rebuild.
 
 This folder is copied, never imported, by every Workshop 2 chapter lab. You do not need any other
-workshop to run it: it is the same store the onboarding decks tour (`onboarding/demo-store/`), with
+workshop to run it: it is the same store the onboarding decks in the slides repo tour (`onboarding/demo-store/`), with
 nothing from other chapters wired in. Do not edit it inside a lab; if a chapter needs something the
 skeleton lacks, that is a contract change (see the contract's §4).
 

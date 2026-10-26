@@ -36,7 +36,7 @@ Starts from: `workshops/04-ai-era-bots/starter/` (contract 1.7). Adds: the crawl
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** 5 rounds of defend 🔵 and attack 🔴 (one checkpoint each, `--round 1` to `--round 5`), plus two debriefs. **Style: wire-it.** Three defense modules ship as stubs with `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `python tools/checkpoint.py --round N --catch-up` installs rounds 1..N and `--restore` puts your files back. See `../chapter_02_content.md`, §2.5.
+**Format:** 5 rounds of defend 🔵 and attack 🔴 (one checkpoint each, `--round 1` to `--round 5`), plus two debriefs. **Style: wire-it.** Three defense modules ship as stubs with `TODO (Round N)`; the finished versions are in `solutions/roundN/`. `python tools/checkpoint.py --round N --catch-up` installs rounds 1..N and `--restore` puts your files back. See `workshops/04-ai-era-bots/chapters/02-verified-bot-identity/chapter_02_content.md` (slides repo), §2.5.
 
 You run a store that wants search engines and AI crawlers to index it, and that gives verified crawlers a *fast lane*: 600 requests a minute instead of the 30 every anonymous client gets. Scrapers want that lane. In every round you play the scraper that takes it, then the defender who closes the door, and you measure both what the impostor got and which genuine crawlers your new check wrongly throttled.
 
@@ -81,7 +81,7 @@ lab/
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages plus `cryptography` (and `dnspython` for the bonus tool):
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages plus `cryptography` (and `dnspython` for the bonus tool):
 
 ```bash
 cd lab

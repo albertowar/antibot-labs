@@ -22,7 +22,7 @@ Starts from: `workshops/03-advanced/starter/` (contract 1.8). Adds: the raffle (
 - `tools/checkpoint.py`
 <!-- lab-diff:end -->
 
-**Format:** five rounds of defend 🔵 and attack 🔴, then a debrief. See `../chapter_09_content.md`. **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back. Round 0 is finished: it is Chapter 4's funnel, copied byte for byte.
+**Format:** five rounds of defend 🔵 and attack 🔴, then a debrief. See `workshops/03-advanced/chapters/09-fair-drops-raffles-and-allocation/chapter_09_content.md` (slides repo). **Style: wire-it.** Each defense ships as a stub in `defenses/` with a `TODO (Round N)`; the finished version is in `solutions/roundN/`. `--catch-up` installs rounds 1..N (the check and `ladder.py`), and `--restore` puts your files back. Round 0 is finished: it is Chapter 4's funnel, copied byte for byte.
 
 The spine of the chapter: **a raffle moves the decision from one request to the whole list of entries, and the defender's job is to make "one entry per person" true, without dropping the people who merely look like a farm.** You play defender against four crews that each buy a different thing (speed, tickets, a trusted history, a spread-out identity) and a fifth that buys nothing the data can see (a crowd of paid people). Each round you finish one check, run the crews that beat the previous step, and read two numbers side by side: the share of the 50 pairs that reached real fans, and the real fans each rule hurt.
 
@@ -70,7 +70,7 @@ The draw, the claim waves, the expiry and the re-scores are lab routes (`/lab/ra
 
 ## Setup
 
-Work through `onboarding/setup/PREWORK.md` first. This lab needs nothing beyond the starter's packages:
+Work through `PREWORK.md` first. This lab needs nothing beyond the starter's packages:
 
 ```bash
 cd lab
