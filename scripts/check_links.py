@@ -13,7 +13,17 @@ Checks two kinds of reference:
 Paths with placeholders (<NN>, *, {..}, ...) are skipped. Run it after renaming or moving a
 chapter, file or folder: it is the cheap way to catch the references a rename broke.
 
-Exit status: 0 if every path resolves, 1 otherwise.
+Two repos, one script. The series is split between the slides repo (docs, decks, theme,
+onboarding, pitch, university) and the labs repo (labs, starters, the store contract, the lab
+scripts), which keep the same ``workshops/<NN>/chapters/<slug>/`` paths. A path that does not
+resolve here is tried against the sibling checkout named by ``ANTIBOT_SIBLING_ROOT`` (default:
+``../antibot-labs`` when run from the slides repo, ``../antibot-workshop-slides`` from the labs
+repo). When no sibling checkout exists, those paths are counted and skipped with one warning,
+so CI without a sibling stays green. This file is byte-identical in both repos (like
+``labnet.py``): edit it in one and copy it to the other.
+
+Exit status: 0 if every path resolves (or could only be checked against a missing sibling),
+1 otherwise.
 """
 
 import os
@@ -22,14 +32,16 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+IS_SLIDES_REPO = os.path.isdir(os.path.join(ROOT, "theme"))
+SIBLING = os.path.abspath(os.environ.get(
+    "ANTIBOT_SIBLING_ROOT",
+    os.path.join(ROOT, "..", "antibot-labs" if IS_SLIDES_REPO else "antibot-workshop-slides")))
+SIBLING_OK = os.path.isdir(SIBLING)
 TOP = ("workshops/", "scripts/", "onboarding/", "theme/", "pitch/", "university/")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 REPO_PATH = re.compile(r"(?<![\w./-])((?:" + "|".join(re.escape(t) for t in TOP) + r")[\w./@+-]*)")
 PLACEHOLDER = re.compile(r"[<>*{}]|\.\.\.|…|NN|<w>")
 REL_SPAN = re.compile(r"`(\.\.?/[^`\s]+\.md)`")
-# Paths the docs name on purpose before they exist (the starter chain; see DECISIONS.md). Drop an entry
-# once the folder is built.
-PLANNED = ("workshops/02-proficient/starter", "workshops/03-advanced/starter", "workshops/04-ai-era-bots/starter")
 
 
 def md_files(prefixes):
@@ -41,28 +53,53 @@ def md_files(prefixes):
     return files
 
 
-def exists(path):
-    path = re.sub(r":\d+(?:[-,]\d+)*$", "", path).rstrip(".,;:)")
+def clean(path):
+    return re.sub(r":\d+(?:[-,]\d+)*$", "", path).rstrip(".,;:)")
+
+
+def exists_at(path):
     return os.path.exists(path) or os.path.exists(path.rstrip("/"))
 
 
+def resolve(rel_to_root):
+    """'ok' if the path exists in this repo or the sibling, 'sibling' if only a missing sibling
+    could hold it, 'missing' otherwise. ``rel_to_root`` is the path relative to the repo root."""
+    rel_to_root = clean(rel_to_root)
+    if exists_at(os.path.join(ROOT, rel_to_root)):
+        return "ok"
+    if not SIBLING_OK:
+        return "sibling"
+    return "ok" if exists_at(os.path.join(SIBLING, rel_to_root)) else "missing"
+
+
 def main(argv):
-    bad = []
+    bad, unchecked = [], 0
     for rel in md_files(argv):
-        here = os.path.dirname(os.path.join(ROOT, rel))
+        here = os.path.dirname(rel)
         for n, line in enumerate(open(os.path.join(ROOT, rel), encoding="utf-8"), 1):
+            targets = []
             for target in MD_LINK.findall(line) + REL_SPAN.findall(line):
                 if re.match(r"^[a-z]+:|^#|^/", target) or PLACEHOLDER.search(target):
                     continue
-                if not exists(os.path.normpath(os.path.join(here, target.split("#")[0]))):
-                    bad.append((rel, n, target))
+                targets.append((target, os.path.normpath(os.path.join(here, target.split("#")[0]))))
             for target in REPO_PATH.findall(line):
-                if PLACEHOLDER.search(target) or target.startswith(PLANNED):
+                if PLACEHOLDER.search(target):
                     continue
-                if not exists(os.path.join(ROOT, target)):
+                targets.append((target, target))
+            for target, rel_to_root in targets:
+                if rel_to_root.startswith(".."):
                     bad.append((rel, n, target))
+                    continue
+                state = resolve(rel_to_root)
+                if state == "missing":
+                    bad.append((rel, n, target))
+                elif state == "sibling":
+                    unchecked += 1
     for rel, n, target in bad:
         print(f"{rel}:{n}: missing {target}")
+    if unchecked:
+        print(f"warning: {unchecked} path(s) not found here and no sibling checkout at {SIBLING} "
+              f"to check them against (set ANTIBOT_SIBLING_ROOT)")
     print(f"{len(bad)} missing path(s)")
     return 1 if bad else 0
 

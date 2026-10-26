@@ -1,0 +1,24 @@
+# Lab conventions. Lab verification stays local: each lab needs its own venv and minutes of
+# wall time (make verify LAB=..., make verify-changed). If a CI lab check is ever wanted, the
+# natural next step is a job that pip-installs the W1 starter's requirements.txt and runs
+# scripts/starter_check.py (boot + smoke included).
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # everything make check runs is stdlib-only: lab conventions, Markdown paths
+      # (paths that live in the slides repo are skipped with a warning when no sibling
+      # checkout exists, as here), starter drift (no starter boots, no lab venvs)
+      - run: make check

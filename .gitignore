@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Node (the W2 Ch4 lab's JS toolchain)
+node_modules/
+
+# Lab runtime state (every lab/.gitignore repeats these; the root copy catches strays)
+instance/
+logs/
+.env
+*.bak
+*.db
+*.sqlite
+*.sqlite3
+*.pem
+
+# Editors / OS / local tooling
+.DS_Store
+.claude/settings.local.json
