@@ -49,6 +49,7 @@ Five chapters keep residue lists next to their doc and deck in the slides repo, 
 ## 4. Workshop 3 · Advanced
 
 ### Ch5 Risk-Based Authentication — 🟡
+- [ ] **P1 · `make check` and CI are red until `tools/checkpoint.py` gains `--catch-up`** (`check_labs.py` rule 9; pre-existing, carried over from the single repo). Until then `make -k check` runs the other two checks.
 Content doc and deck in the slides repo quote round outcomes predicted from the lab's measured calibration until the lab runs. The open items (the blocked attack-script and passkey decisions, the checkpoint rounds, the README, replacing the predictions with measurements) are in the chapter's residue list in the slides repo (see the top of this file).
 
 ### Ch6 Session Trust & Sensitive Actions — 🟡
