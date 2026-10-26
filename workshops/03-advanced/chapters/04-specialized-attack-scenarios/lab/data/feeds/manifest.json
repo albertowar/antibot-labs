@@ -56,7 +56,7 @@
    "rows": 1,
    "shaped_like": "Spamhaus DROP",
    "real_source_url": "https://www.spamhaus.org/drop/drop_v4.json",
-   "licence": "Free for non-commercial use",
+   "licence": "Free for any use, with attribution; fetch at most hourly",
    "production_refresh": "daily"
   },
   "firehol_level1.netset": {
